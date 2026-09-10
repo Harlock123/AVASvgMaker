@@ -933,36 +933,33 @@ public partial class MainWindow : Window
     private void OnExportPngClick(object? sender, RoutedEventArgs e) =>
         _ = ExportRasterAsync(RasterFormat.Png);
 
+    private void OnExportJpegClick(object? sender, RoutedEventArgs e) =>
+        _ = ExportRasterAsync(RasterFormat.Jpeg);
+
+    private void OnExportWebpClick(object? sender, RoutedEventArgs e) =>
+        _ = ExportRasterAsync(RasterFormat.Webp);
+
     private void OnExportBmpClick(object? sender, RoutedEventArgs e) =>
         _ = ExportRasterAsync(RasterFormat.Bmp);
 
-    /// <summary>PNG and BMP are the same export; only the bytes at the end of it differ.</summary>
+    private void OnExportPdfClick(object? sender, RoutedEventArgs e) => _ = ExportPdfAsync();
+
+    /// <summary>The four raster formats are one export; only the bytes at the end of it differ.</summary>
     private async Task ExportRasterAsync(RasterFormat format)
     {
         Canvas.CommitEdit();
 
-        var scale = await RasterExportDialog.ShowAsync(this, Canvas.Document, format);
+        var options = await RasterExportDialog.ShowAsync(this, Canvas.Document, format);
 
-        if (scale is not { } chosen)
+        if (options is null)
             return;
 
-        var suggested = Path.GetFileNameWithoutExtension(_currentFile?.Name ?? "diagram");
-        var extension = format.Extension();
-
-        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = $"Export {format.Label()}",
-            SuggestedFileName = $"{suggested}.{extension}",
-            DefaultExtension = extension,
-            FileTypeChoices =
-            [
-                new FilePickerFileType(format.Description())
-                {
-                    Patterns = [$"*.{extension}"],
-                    MimeTypes = [format.MimeType()]
-                }
-            ]
-        });
+        var file = await AskWhereToPutAsync(format.Label(), format.Extension(),
+            new FilePickerFileType(format.Description())
+            {
+                Patterns = format.Patterns(),
+                MimeTypes = [format.MimeType()]
+            });
 
         if (file is null)
             return;
@@ -970,19 +967,67 @@ public partial class MainWindow : Window
         try
         {
             await using var stream = await file.OpenWriteAsync();
-            RasterExporter.Export(Canvas.Document, stream, chosen, format);
+            RasterExporter.Export(Canvas.Document, stream, options.Scale, format, options.Quality);
             await stream.FlushAsync();
 
             if (stream.CanSeek)
                 stream.SetLength(stream.Position);
 
-            var size = RasterExporter.SizeAt(Canvas.Document, chosen);
+            var size = RasterExporter.SizeAt(Canvas.Document, options.Scale);
             StatusText.Text = $"Exported {file.Name} at {size.Width} x {size.Height}";
         }
         catch (Exception ex)
         {
             StatusText.Text = $"Export failed: {ex.Message}";
         }
+    }
+
+    /// <summary>PDF is a vector export, so there is no size to settle first.</summary>
+    private async Task ExportPdfAsync()
+    {
+        Canvas.CommitEdit();
+
+        var file = await AskWhereToPutAsync("PDF", "pdf",
+            new FilePickerFileType("PDF document")
+            {
+                Patterns = ["*.pdf"],
+                MimeTypes = ["application/pdf"]
+            });
+
+        if (file is null)
+            return;
+
+        try
+        {
+            await using var stream = await file.OpenWriteAsync();
+            await PdfExporter.ExportAsync(
+                Canvas.Document, stream, Path.GetFileNameWithoutExtension(file.Name));
+            await stream.FlushAsync();
+
+            if (stream.CanSeek)
+                stream.SetLength(stream.Position);
+
+            StatusText.Text = $"Exported {file.Name}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Export failed: {ex.Message}";
+        }
+    }
+
+    /// <summary>The save picker every export shows, named after the drawing.</summary>
+    private async Task<IStorageFile?> AskWhereToPutAsync(
+        string label, string extension, FilePickerFileType type)
+    {
+        var suggested = Path.GetFileNameWithoutExtension(_currentFile?.Name ?? "diagram");
+
+        return await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = $"Export {label}",
+            SuggestedFileName = $"{suggested}.{extension}",
+            DefaultExtension = extension,
+            FileTypeChoices = [type]
+        });
     }
 
     private async Task ExportSvgAsync()

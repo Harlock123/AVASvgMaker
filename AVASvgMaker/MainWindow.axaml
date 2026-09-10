@@ -66,7 +66,11 @@
                 <Separator />
                 <MenuItem Header="_Export">
                     <MenuItem Header="_SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
+                    <MenuItem Header="P_DF..." Click="OnExportPdfClick" />
+                    <Separator />
                     <MenuItem Header="_PNG..." InputGesture="Ctrl+Shift+E" Click="OnExportPngClick" />
+                    <MenuItem Header="_JPEG..." Click="OnExportJpegClick" />
+                    <MenuItem Header="_WebP..." Click="OnExportWebpClick" />
                     <MenuItem Header="_BMP..." Click="OnExportBmpClick" />
                 </MenuItem>
                 <Separator />
