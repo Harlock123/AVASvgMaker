@@ -50,9 +50,15 @@ Once a shape is on the page:
 | Resize it | Drag one of the eight handles round it |
 | Turn it | Drag the round handle on the stalk above it |
 | Label it | Double-click it, or select it and press `F2`, then type |
+| Nudge it | The arrow keys, or `Alt` and the arrows |
 | Delete it | Select it and press `Delete` |
 
 Positions and sizes snap to the grid, which you can switch off or resize from the toolbar.
+Nudging moves the selection one grid step at a time, and a container takes its contents along.
+
+The arrow keys nudge whenever the page has the keyboard. After you have used a panel or a
+toolbar box the arrows belong to whatever you touched last, so **hold `Alt`** and they nudge
+from anywhere in the window.
 
 ### Selecting
 
@@ -295,6 +301,7 @@ here is the page, so that is left behind too.
 | `F2` | Edit the label of the selected shape |
 | `F9` `F10` | Fold the toolbox and properties panels away |
 | Arrow keys | Nudge the selection by one grid cell |
+| `Alt` + arrows | Nudge from anywhere in the window |
 | `Delete` | Delete the selection, and any connectors glued to it |
 | `Escape` | Back to the select tool |
 | Middle-drag, or space and drag | Pan the page |

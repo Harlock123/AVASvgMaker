@@ -1142,6 +1142,22 @@ public partial class MainWindow : Window
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        // Alt and an arrow nudges the selection from anywhere in the window. The page offers
+        // the same on a bare arrow, but only while it holds the keyboard focus - after using
+        // a toolbar box or a panel the arrows belong to whatever was touched last, and the
+        // shape on the page stays put. With Alt held there is nothing else they could mean.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt) &&
+            e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
+        {
+            Canvas.CommitEdit();
+
+            if (Canvas.Nudge(e.Key))
+                Canvas.Focus();
+
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.F9:

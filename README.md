@@ -66,6 +66,7 @@ Or [build it yourself](#building).
 **Editing**
 
 - **Multi-select** - shift or ctrl click, or sweep a marquee; the selection moves, stretches, nudges, restyles and deletes as one
+- **Nudging** - arrow keys, or `Alt` and the arrows from anywhere in the window, move the selection a grid step at a time
 - **Grouping** - `Ctrl+G` makes several shapes one thing to click, move and resize; `Ctrl+Shift+G` breaks it up again
 - **Undo and redo** - 100 steps, restoring the selection along with the page
 - **Copy, paste and duplicate** - copies carry as the same JSON the file format uses, so shapes paste into another instance of the app
@@ -445,7 +446,8 @@ A pool, lane or grouping box holds what is put into it:
 - **Dropping a shape inside adopts it**, and dragging it out lets it go. The *innermost*
   container wins, so a shape dropped on a lane joins the lane rather than the pool around it.
 - **Moving a container carries its contents**, without moving anything twice when both the
-  container and something inside it are selected.
+  container and something inside it are selected. That holds however it is moved - dragged, or
+  nudged from the keyboard, both of which ask the same question of the document.
 - **Lanes belong to their pool** and are positioned by it, so they follow when the pool is
   moved or resized. A lane has no resize handles of its own, and cannot be dragged around
   freely - the pool decides where it sits. **Dragging a lane reorders it** among its siblings
@@ -592,7 +594,8 @@ nothing shows through and they read correctly whatever is behind them.
 | Edit > Reset connector route | Hand the selected connectors back to the router |
 | Double-click a shape, or `F2` | Edit its label in place |
 | Text tool, click the page | Add a text box and start typing |
-| Arrow keys | Nudge the selection by one grid cell |
+| Arrow keys | Nudge the selection by one grid cell, while the page has the keyboard |
+| `Alt` + arrow keys | The same, from anywhere in the window - after using a panel or a toolbar box, a bare arrow belongs to whatever was touched last |
 | `Delete` / `Backspace` | Delete the selection, along with any connectors glued to it |
 | `Escape` | Back to the select tool, clearing the selection and any armed stencil |
 

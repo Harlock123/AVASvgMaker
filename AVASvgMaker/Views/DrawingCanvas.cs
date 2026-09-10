@@ -1332,21 +1332,8 @@ public class DrawingCanvas : Decorator
     {
         _dragShapes.Clear();
 
-        // Dragging a container takes what is inside it along, without moving anything twice.
-        foreach (var shape in Document.Selection)
-        {
-            if (!_dragShapes.Contains(shape))
-                _dragShapes.Add(shape);
-
-            if (!shape.IsContainer)
-                continue;
-
-            foreach (var child in Document.DescendantsOf(shape))
-            {
-                if (!_dragShapes.Contains(child))
-                    _dragShapes.Add(child);
-            }
-        }
+        // Dragging a container takes what is inside it along.
+        _dragShapes.AddRange(Document.WithContents(Document.Selection));
 
         _dragStartUnion = ShapeClipboard.Union(Document.Selection);
         _dragApplied = default;
@@ -1855,9 +1842,14 @@ public class DrawingCanvas : Decorator
     /// Re-homes whatever was just moved. A shape dropped inside a container joins it, and one
     /// dragged out is let go; a lane's home is decided by the pool, not by where it was left.
     /// </summary>
-    private void ReviewContainment()
+    /// <summary>
+    /// Re-homes whatever has just moved. The set is given rather than assumed, because a
+    /// nudge from the keyboard moves things without a drag ever having started - and reading
+    /// the drag's own list would then review an empty one and re-home nothing.
+    /// </summary>
+    private void ReviewContainment(IEnumerable<DiagramShape>? moved = null)
     {
-        foreach (var shape in _dragShapes.ToList())
+        foreach (var shape in (moved ?? _dragShapes).ToList())
         {
             if (shape is ConnectorShape || shape.Kind == ShapeKind.Lane)
                 continue;
@@ -2123,29 +2115,44 @@ public class DrawingCanvas : Decorator
             Cursor = new Cursor(StandardCursorType.Arrow);
     }
 
-    private void Nudge(Key key)
+    /// <summary>
+    /// Moves the selection by one step of the grid. Public because the window offers the same
+    /// thing on Alt and the arrows, which has to work wherever the keyboard focus happens to
+    /// be - a plain arrow only reaches here while the page itself has it.
+    /// </summary>
+    public bool Nudge(Key key)
     {
         if (Document.Selection.Count == 0)
-            return;
+            return false;
 
         var step = Grid.SnapToGrid ? Grid.Size : 1;
         var dx = key == Key.Left ? -step : key == Key.Right ? step : 0;
         var dy = key == Key.Up ? -step : key == Key.Down ? step : 0;
 
-        // Nudge the group as a unit so it stops at the page edge together.
+        if (dx == 0 && dy == 0)
+            return false;
+
+        // Nudged as a unit so the whole selection stops at the page edge together, rather
+        // than the leading shape stopping and the rest closing up behind it.
         var union = ShapeClipboard.Union(Document.Selection);
         var target = Document.ClampToPage(new Rect(union.X + dx, union.Y + dy, union.Width, union.Height));
         var applied = new Vector(target.X - union.X, target.Y - union.Y);
 
         if (applied.X == 0 && applied.Y == 0)
-            return;
+            return false;
 
-        foreach (var shape in Document.Selection)
+        // The same set a drag would move: a container takes its contents with it.
+        var moving = Document.WithContents(Document.Selection);
+
+        foreach (var shape in moving)
             shape.Translate(applied);
 
+        ReviewContainment(moving);
         Document.MarkModified();
         InvalidateVisual();
         ReportStatus();
+
+        return true;
     }
 
     #endregion

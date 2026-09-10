@@ -67,9 +67,33 @@ internal static class Harness
         canvas.Grid.SnapToGrid = false;
         canvas.SyncPageSize();
 
+        // Headless input goes to the focused element of an active window; without both, a
+        // key press is simply dropped and a test reads as a feature that does not work.
+        window.Activate();
+        canvas.Focus();
+
         Settle(window);
         return (window, canvas);
     }
+
+    /// <summary>A key press through the real input path, as the windowing system would send it.</summary>
+    public static void Press(MainWindow window, Key key, RawInputModifiers modifiers = RawInputModifiers.None)
+    {
+        Avalonia.Headless.HeadlessWindowExtensions.KeyPressQwerty(window, Physical(key), modifiers);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static PhysicalKey Physical(Key key) => key switch
+    {
+        Key.Left => PhysicalKey.ArrowLeft,
+        Key.Right => PhysicalKey.ArrowRight,
+        Key.Up => PhysicalKey.ArrowUp,
+        Key.Down => PhysicalKey.ArrowDown,
+        Key.Delete => PhysicalKey.Delete,
+        Key.Escape => PhysicalKey.Escape,
+        Key.F2 => PhysicalKey.F2,
+        _ => PhysicalKey.None
+    };
 
     public static void Settle(MainWindow window)
     {

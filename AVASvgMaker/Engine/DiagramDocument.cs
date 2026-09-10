@@ -634,6 +634,34 @@ public class DiagramDocument
 
     #endregion
 
+    /// <summary>
+    /// The shapes that move when the given ones do: the selection, and whatever is inside any
+    /// container in it. A container carries its contents, and nothing is listed twice - a
+    /// shape both selected and inside a selected container would otherwise move twice as far.
+    /// </summary>
+    public IReadOnlyList<DiagramShape> WithContents(IEnumerable<DiagramShape> shapes)
+    {
+        var moving = new List<DiagramShape>();
+        var seen = new HashSet<DiagramShape>();
+
+        foreach (var shape in shapes)
+        {
+            if (seen.Add(shape))
+                moving.Add(shape);
+
+            if (!shape.IsContainer)
+                continue;
+
+            foreach (var child in DescendantsOf(shape))
+            {
+                if (seen.Add(child))
+                    moving.Add(child);
+            }
+        }
+
+        return moving;
+    }
+
     #region Containers
 
     public IEnumerable<DiagramShape> ChildrenOf(DiagramShape container) =>
