@@ -203,4 +203,61 @@ public static class ShapeArranger
 
         return !all.SequenceEqual(before);
     }
+
+    /// <summary>
+    /// Stretches shapes from one rectangle into another, each keeping its place and its size
+    /// in proportion - which is what resizing a whole selection, or a group, comes to.
+    ///
+    /// The starting bounds are passed in rather than read off the shapes, because a drag
+    /// applies this again on every pointer move and reading the shapes would compound the
+    /// scaling instead of replacing it.
+    /// </summary>
+    public static void Scale(IReadOnlyList<(DiagramShape Shape, Rect Start, Point[] Points)> shapes, Rect from, Rect to)
+    {
+        if (from.Width <= 0 || from.Height <= 0)
+            return;
+
+        var scaleX = to.Width / from.Width;
+        var scaleY = to.Height / from.Height;
+
+        Point Map(Point point) => new(
+            to.X + (point.X - from.X) * scaleX,
+            to.Y + (point.Y - from.Y) * scaleY);
+
+        foreach (var (shape, start, points) in shapes)
+        {
+            if (shape is ConnectorShape connector)
+            {
+                // A connector has no bounds of its own to set; its ends and bends are the
+                // shape. Glued ends are left alone - the shape they are stuck to moves them.
+                if (connector.StartShape is null && points.Length > 0)
+                    connector.Start = Map(points[0]);
+
+                if (connector.EndShape is null && points.Length > 1)
+                    connector.End = Map(points[1]);
+
+                if (points.Length > 2)
+                    connector.Waypoints = points.Skip(2).Select(Map).ToList();
+
+                continue;
+            }
+
+            var corner = Map(start.TopLeft);
+
+            shape.Bounds = new Rect(
+                corner.X,
+                corner.Y,
+                Math.Max(DiagramShape.MinSize, start.Width * scaleX),
+                Math.Max(DiagramShape.MinSize, start.Height * scaleY));
+        }
+    }
+
+    /// <summary>
+    /// What a scale needs to remember about a shape before the drag starts: its bounds, and
+    /// for a connector the points that stand in for them.
+    /// </summary>
+    public static (DiagramShape Shape, Rect Start, Point[] Points) Snapshot(DiagramShape shape) =>
+        shape is ConnectorShape connector
+            ? (shape, shape.Bounds, [connector.Start, connector.End, .. connector.Waypoints])
+            : (shape, shape.Bounds, []);
 }

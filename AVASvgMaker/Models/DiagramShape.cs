@@ -62,6 +62,13 @@ public abstract class DiagramShape
     /// <summary>False for shapes sized by their end points rather than by a box.</summary>
     public virtual bool IsBoxResizable => true;
 
+    /// <summary>
+    /// Which group the shape belongs to, or 0 for none. A group is an id shared by its members
+    /// rather than an object holding them, so a shape can be grouped and still sit in a pool,
+    /// and grouping costs the drawing nothing but a number on each shape.
+    /// </summary>
+    public int GroupId { get; set; }
+
     protected DiagramShape(Rect bounds)
     {
         _bounds = bounds;

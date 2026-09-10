@@ -26,9 +26,9 @@ public static partial class DiagramFile
     /// <summary>
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
     /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights,
-    /// 9 the font a label is in. Older files still load.
+    /// 9 the font a label is in, 10 grouping. Older files still load.
     /// </summary>
-    public const int CurrentVersion = 9;
+    public const int CurrentVersion = 10;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -114,6 +114,12 @@ public static partial class DiagramFile
 
         /// <summary>The container this shape sits in, by id. Absent when it sits on the page.</summary>
         public int? ContainerId { get; set; }
+
+        /// <summary>
+        /// Which group the shape is in. Version 10 onwards, and absent for a shape that is not
+        /// in one - which, in most drawings, is all of them.
+        /// </summary>
+        public int? GroupId { get; set; }
 
         /// <summary>
         /// A lane's share of its pool. Version 8 onwards, and only written for a lane that
@@ -238,6 +244,7 @@ public static partial class DiagramFile
             Italic = shape.Italic ? true : null,
             TextAlign = shape.TextAlign == Models.TextAlign.Center ? null : shape.TextAlign.ToString(),
             ContainerId = IdOf(shape.Container, ids),
+            GroupId = shape.GroupId == 0 ? null : shape.GroupId,
             LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
                         && Math.Abs(lane.LaneShare - 1) > 1e-9
                 ? lane.LaneShare
@@ -398,6 +405,7 @@ public static partial class DiagramFile
         shape.Bold = record.Bold ?? false;
         shape.Italic = record.Italic ?? false;
         shape.TextAlign = Parse(record.TextAlign, Models.TextAlign.Center);
+        shape.GroupId = record.GroupId ?? 0;
 
         // Absent before version 8, and absent since for any lane on the standard share.
         if (shape is ContainerShape { Kind: ShapeKind.Lane } lane && record.LaneShare is { } share && share > 0)

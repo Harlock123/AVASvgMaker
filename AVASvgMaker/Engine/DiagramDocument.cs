@@ -491,6 +491,94 @@ public class DiagramDocument
             connector.UpdateRoute(obstacles, RouteClearance);
     }
 
+    #region Groups
+
+    /// <summary>
+    /// Everything grouped with the given shape, in drawing order, or just the shape itself
+    /// when it is not in a group.
+    /// </summary>
+    public IReadOnlyList<DiagramShape> GroupOf(DiagramShape shape) => shape.GroupId == 0
+        ? [shape]
+        : Shapes.Where(other => other.GroupId == shape.GroupId).ToList();
+
+    /// <summary>
+    /// The same shapes, with every group any of them belongs to filled in. Picking one member
+    /// of a group picks the group, which is the whole point of having one.
+    /// </summary>
+    public IReadOnlyList<DiagramShape> WithGroups(IEnumerable<DiagramShape> shapes)
+    {
+        var wanted = shapes.ToList();
+        var ids = wanted.Select(shape => shape.GroupId).Where(id => id != 0).ToHashSet();
+
+        if (ids.Count == 0)
+            return wanted;
+
+        var seen = new HashSet<DiagramShape>(wanted);
+
+        // Walked in drawing order so the result is ordered like the page, not like the clicks.
+        return Shapes.Where(shape => seen.Contains(shape) || ids.Contains(shape.GroupId)).ToList();
+    }
+
+    /// <summary>
+    /// Makes one group of everything given, along with anything already grouped with it.
+    /// Grouping two groups makes a single group of them all rather than a group of groups -
+    /// there is no nesting, and one number per shape is what says so.
+    /// </summary>
+    public bool Group(IEnumerable<DiagramShape> shapes)
+    {
+        var members = WithGroups(shapes);
+
+        if (members.Count < 2)
+            return false;
+
+        var id = Shapes.Select(shape => shape.GroupId).DefaultIfEmpty(0).Max() + 1;
+
+        // Already one group, and all of it: nothing to do.
+        if (members.All(shape => shape.GroupId == members[0].GroupId) && members[0].GroupId != 0)
+            return false;
+
+        foreach (var shape in members)
+            shape.GroupId = id;
+
+        MarkModified();
+        return true;
+    }
+
+    /// <summary>Breaks up whatever groups the given shapes belong to.</summary>
+    public bool Ungroup(IEnumerable<DiagramShape> shapes)
+    {
+        var members = WithGroups(shapes).Where(shape => shape.GroupId != 0).ToList();
+
+        if (members.Count == 0)
+            return false;
+
+        foreach (var shape in members)
+            shape.GroupId = 0;
+
+        MarkModified();
+        return true;
+    }
+
+    /// <summary>
+    /// Gives every group among these shapes a fresh id, so a pasted copy of a group is a group
+    /// of its own rather than joining the one it was copied from.
+    /// </summary>
+    public void RenumberGroups(IReadOnlyList<DiagramShape> shapes)
+    {
+        var next = Shapes.Select(shape => shape.GroupId).DefaultIfEmpty(0).Max() + 1;
+        var fresh = new Dictionary<int, int>();
+
+        foreach (var shape in shapes.Where(shape => shape.GroupId != 0))
+        {
+            if (!fresh.TryGetValue(shape.GroupId, out var id))
+                fresh[shape.GroupId] = id = next++;
+
+            shape.GroupId = id;
+        }
+    }
+
+    #endregion
+
     #region Containers
 
     public IEnumerable<DiagramShape> ChildrenOf(DiagramShape container) =>

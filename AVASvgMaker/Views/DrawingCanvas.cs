@@ -39,6 +39,7 @@ public class DrawingCanvas : Decorator
         MovingSegment,
         ReorderingLane,
         ResizingLane,
+        ResizingSelection,
         DrawingConnector,
         Marquee
     }
@@ -99,6 +100,9 @@ public class DrawingCanvas : Decorator
 
     /// <summary>Set while a bend is being dragged and has come back onto the line.</summary>
     private bool _bendDoomed;
+
+    /// <summary>Where each shape of a selection stood when a stretch of the whole lot began.</summary>
+    private readonly List<(DiagramShape Shape, Rect Start, Point[] Points)> _scaling = [];
 
     private int _activeHandle = -1;
 
@@ -517,9 +521,32 @@ public class DrawingCanvas : Decorator
             return;
         }
 
+        // A group of shapes gets one dashed box round the lot, with the same handles a single
+        // shape has: the selection resizes as though it were one shape.
         context.DrawRectangle(null, ScreenDashPen(SelectionBrush, 1, 6),
             ShapeClipboard.Union(selection).Inflate(Screen(5)));
+
+        if (!CanResizeSelection())
+            return;
+
+        foreach (var handle in BoxHandles(SelectionBox()))
+            context.DrawRectangle(HandleBrush, outline, handle);
     }
+
+    /// <summary>
+    /// True when the selection has something in it that a stretch would actually move. A lane
+    /// is placed by its pool, so a selection of nothing but lanes has no size of its own.
+    /// </summary>
+    private bool CanResizeSelection() =>
+        Document.Selection.Count > 1 && Document.Selection.Any(Stretchable);
+
+    /// <summary>
+    /// Whether a stretch of the whole selection moves this shape. A connector has no box to
+    /// resize but its ends and bends still travel; a lane is placed by its pool, so a
+    /// selection of nothing but lanes has no size of its own to change.
+    /// </summary>
+    private static bool Stretchable(DiagramShape shape) =>
+        shape is ConnectorShape || shape.IsBoxResizable;
 
     /// <summary>What a connector handle does when it is dragged.</summary>
     private enum HandleKind
@@ -566,13 +593,13 @@ public class DrawingCanvas : Decorator
     }
 
     /// <summary>Eight box handles for a shape, or the connector handles above.</summary>
-    private Rect[] SelectionHandles(DiagramShape shape)
+    private Rect[] SelectionHandles(DiagramShape shape) => shape is ConnectorShape connector
+        ? ConnectorHandles(connector).Select(handle => handle.Rect).ToArray()
+        : BoxHandles(shape.Bounds);
+
+    /// <summary>The eight handles round a rectangle, in the order the resize maths expects.</summary>
+    private Rect[] BoxHandles(Rect bounds)
     {
-        if (shape is ConnectorShape connector)
-            return ConnectorHandles(connector).Select(handle => handle.Rect).ToArray();
-
-        var bounds = shape.Bounds;
-
         Point[] points =
         [
             new(bounds.Left, bounds.Top),
@@ -588,6 +615,14 @@ public class DrawingCanvas : Decorator
         return points.Select(point => HandleRect(point)).ToArray();
     }
 
+    /// <summary>
+    /// The box the handles of a multiple selection sit on, and the box a stretch maps out of.
+    /// It is the plain union: the dashed outline is drawn a few pixels outside it so as not to
+    /// sit on the shapes, but stretching has to work from where the shapes actually are or the
+    /// anchored corner drifts and the scale comes out slightly wrong.
+    /// </summary>
+    private Rect SelectionBox() => ShapeClipboard.Union(Document.Selection);
+
     /// <summary>Handles are a fixed size on screen, so they stay grabbable at any zoom.</summary>
     private Rect HandleRect(Point centre, double scale = 1)
     {
@@ -595,14 +630,16 @@ public class DrawingCanvas : Decorator
         return new Rect(centre.X - size / 2, centre.Y - size / 2, size, size);
     }
 
-    /// <summary>The handle under the point, or -1. Handles are offered for a single shape only.</summary>
+    /// <summary>The handle under the point, or -1.</summary>
     private int HandleAt(Point pagePoint)
     {
-        if (Document.Selection.Count != 1)
-            return -1;
+        var handles = Document.Selection.Count switch
+        {
+            1 => SelectionHandles(Document.Selection[0]),
+            > 1 when CanResizeSelection() => BoxHandles(SelectionBox()),
+            _ => []
+        };
 
-        var selected = Document.Selection[0];
-        var handles = SelectionHandles(selected);
         for (var i = 0; i < handles.Length; i++)
         {
             if (handles[i].Inflate(Screen(2)).Contains(pagePoint))
@@ -862,6 +899,13 @@ public class DrawingCanvas : Decorator
         var pagePoint = ToPage(point.Position);
 
         var handle = HandleAt(pagePoint);
+
+        if (handle >= 0 && Document.Selection.Count > 1)
+        {
+            BeginSelectionResize(handle, e);
+            return;
+        }
+
         if (handle >= 0 && Document.Selected is { } active)
         {
             _activeHandle = handle;
@@ -945,12 +989,17 @@ public class DrawingCanvas : Decorator
 
         if (extending)
         {
-            Document.ToggleSelection(hit);
+            // Grouped shapes go in and out of the selection together.
+            var members = Document.GroupOf(hit);
+
+            Document.SetSelection(Document.IsSelected(hit)
+                ? Document.Selection.Where(shape => !members.Contains(shape)).ToList()
+                : Document.Selection.Concat(members).ToList());
         }
         else if (!Document.IsSelected(hit))
         {
             // Clicking inside an existing multi-selection keeps it, so the group can be dragged.
-            Document.SelectOnly(hit);
+            Document.SetSelection(Document.GroupOf(hit));
 
             // A container is a backdrop: raising one because it was clicked would bury the
             // very contents the click was aimed past.
@@ -1160,6 +1209,10 @@ public class DrawingCanvas : Decorator
                 _dragChanged = true;
                 InvalidateVisual();
                 ReportStatus();
+                return;
+
+            case DragMode.ResizingSelection:
+                ScaleSelection(pagePoint);
                 return;
 
             case DragMode.MovingEndpoint when Document.Selected is ConnectorShape connector
@@ -1417,6 +1470,7 @@ public class DrawingCanvas : Decorator
         _activeHandle = -1;
         _activeSegment = -1;
         _dragLane = null;
+        _scaling.Clear();
         _glueTarget = null;
         _portShape = null;
         _portIndex = -1;
@@ -1464,10 +1518,11 @@ public class DrawingCanvas : Decorator
             return;
         }
 
+        // Sweeping up part of a group takes the whole of it.
         if (_marqueeAdds)
-            Document.SetSelection(Document.Selection.Concat(caught).ToList());
+            Document.SetSelection(Document.WithGroups(Document.Selection.Concat(caught)));
         else
-            Document.SetSelection(caught);
+            Document.SetSelection(Document.WithGroups(caught));
     }
 
     /// <summary>
@@ -1552,6 +1607,57 @@ public class DrawingCanvas : Decorator
     }
 
     /// <summary>Applies a handle drag to the bounds, keeping the shape at least <see cref="DiagramShape.MinSize"/> across.</summary>
+    /// <summary>
+    /// Starts stretching a whole selection. Every shape's starting place is taken now, so each
+    /// pointer move maps from where things were rather than from where the last move left them,
+    /// which would compound the scaling.
+    /// </summary>
+    private void BeginSelectionResize(int handle, PointerPressedEventArgs e)
+    {
+        _scaling.Clear();
+
+        // A pool carries its lanes, and its lanes carry their contents, so anything inside a
+        // pool that is itself being stretched is left to the pool rather than moved twice.
+        foreach (var shape in Document.Selection)
+        {
+            if (!Stretchable(shape) || InsideScaledPool(shape))
+                continue;
+
+            _scaling.Add(ShapeArranger.Snapshot(shape));
+        }
+
+        _dragMode = DragMode.ResizingSelection;
+        _activeHandle = handle;
+        _dragStartBounds = SelectionBox();
+
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    private bool InsideScaledPool(DiagramShape shape)
+    {
+        for (var at = shape.Container; at is not null; at = at.Container)
+        {
+            if (at is ContainerShape { Kind: ShapeKind.Pool } && Document.IsSelected(at))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void ScaleSelection(Point pagePoint)
+    {
+        if (_scaling.Count == 0)
+            return;
+
+        ShapeArranger.Scale(_scaling, _dragStartBounds,
+            Resize(_dragStartBounds, _activeHandle, pagePoint));
+
+        _dragChanged = true;
+        InvalidateVisual();
+        ReportStatus();
+    }
+
     private Rect Resize(Rect start, int handle, Point pagePoint)
     {
         var snapped = Grid.Snap(pagePoint);
@@ -1877,6 +1983,7 @@ public class DrawingCanvas : Decorator
         _editing = null;
         _pendingConnector = null;
         _dragLane = null;
+        _scaling.Clear();
         _glueTarget = null;
         _portShape = null;
         _portIndex = -1;

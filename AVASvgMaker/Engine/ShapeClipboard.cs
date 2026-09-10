@@ -75,6 +75,10 @@ public static class ShapeClipboard
 
         using (document.BeginBatch())
         {
+            // A pasted copy of a group is a group of its own, not more members of the one it
+            // was copied from - which may well be sitting on the page already.
+            document.RenumberGroups(pasted);
+
             foreach (var shape in pasted)
                 document.Shapes.Add(shape);
 

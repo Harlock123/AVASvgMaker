@@ -104,6 +104,35 @@ public partial class MainWindow : Window
         Canvas.ReportStatus();
     }
 
+    private void OnGroupClick(object? sender, RoutedEventArgs e)
+    {
+        var document = Canvas.Document;
+
+        if (document.Group(document.Selection))
+        {
+            // The group is now the selection, so what was picked and what moves agree.
+            document.SetSelection(document.WithGroups(document.Selection));
+            StatusText.Text = $"Grouped {document.Selection.Count} shapes";
+        }
+        else
+        {
+            StatusText.Text = "Select two or more shapes to group them";
+        }
+
+        Canvas.InvalidateVisual();
+    }
+
+    private void OnUngroupClick(object? sender, RoutedEventArgs e)
+    {
+        var document = Canvas.Document;
+
+        StatusText.Text = document.Ungroup(document.Selection)
+            ? "Ungrouped"
+            : "Nothing selected is in a group";
+
+        Canvas.InvalidateVisual();
+    }
+
     /// <summary>
     /// Puts a pool's lanes back on equal shares. Works from whatever is selected: the pool
     /// itself, or a lane, or a shape sitting in one.
@@ -1035,6 +1064,14 @@ public partial class MainWindow : Window
 
             case Key.N:
                 OnNewClick(sender, e);
+                break;
+
+            case Key.G when shift:
+                OnUngroupClick(sender, e);
+                break;
+
+            case Key.G:
+                OnGroupClick(sender, e);
                 break;
 
             case Key.P when shift:

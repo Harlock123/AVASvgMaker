@@ -129,6 +129,9 @@
                 <MenuItem Header="Send to bac_k" InputGesture="Ctrl+Shift+B" Tag="Back"
                           Click="OnOrderClick" />
                 <Separator />
+                <MenuItem Header="_Group" InputGesture="Ctrl+G" Click="OnGroupClick" />
+                <MenuItem Header="_Ungroup" InputGesture="Ctrl+Shift+G" Click="OnUngroupClick" />
+                <Separator />
                 <MenuItem Header="_Even lane heights" Click="OnEvenLanesClick" />
             </MenuItem>
             <MenuItem Header="_Page">

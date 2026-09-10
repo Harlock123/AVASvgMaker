@@ -51,7 +51,8 @@ Or [build it yourself](#building).
 
 **Editing**
 
-- **Multi-select** - shift or ctrl click, or sweep a marquee; the group moves, nudges, restyles and deletes as one
+- **Multi-select** - shift or ctrl click, or sweep a marquee; the selection moves, stretches, nudges, restyles and deletes as one
+- **Grouping** - `Ctrl+G` makes several shapes one thing to click, move and resize; `Ctrl+Shift+G` breaks it up again
 - **Undo and redo** - 100 steps, restoring the selection along with the page
 - **Copy, paste and duplicate** - copies carry as the same JSON the file format uses, so shapes paste into another instance of the app
 - **Align, distribute and match size** - line a selection up on any edge, space it evenly, or size it to the shape selected last
@@ -194,12 +195,13 @@ and files written by a future version rather than loading them incorrectly. Vers
 connection ports and routing, version 3 hand-placed bends, and version 4 the line style;
 older files still load, and version 1 connectors keep their original straight routing. Version 5
 added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
-heights, and version 9 the font a label is in. Older files still load: a version 5 file, which
+heights, version 9 the font a label is in, and version 10 grouping. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
-drawn; and a file up to version 8 has no font settings, so its labels come back plain and
-centred, which is how they were drawn. The on-disk
+drawn; a file up to version 8 has no font settings, so its labels come back plain and centred,
+which is how they were drawn; and a file up to version 9 has no groups, because there were
+none to have. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -229,7 +231,7 @@ fields because its end points define it.
 |---|---|
 | **File menu** | New, Open, Save, Save As, Page set up, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route |
-| **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, and evening a pool's lane heights |
+| **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, and folding either side panel away - plus a zoom box in the status bar |
 | **Select / Text box / Connector** | What a click on the page does. Text and Connector drop back to Select after one use of the text tool; the connector tool stays armed so several can be drawn in a row |
@@ -266,6 +268,26 @@ sets the formatting for the next shape drawn, so a colour can
 be chosen once and then used for several shapes. Formatting a selection also updates that
 default. A new text box keeps its transparent fill rather than taking the current one, but it
 can still be given a fill afterwards.
+
+## Grouping
+
+`Ctrl+G` makes one thing of two or more shapes: clicking any member picks the whole group,
+and it then moves, stretches, restyles and deletes as one. `Ctrl+Shift+G` breaks it up again -
+from any member, since picking one picks them all. Sweeping a marquee across part of a group
+takes the whole of it.
+
+A group is **an id shared by its members**, not an object that holds them. That is what lets a
+shape be grouped and still sit in a pool - the two are different fields and neither has to know
+about the other - and it means grouping costs a drawing nothing but a number on each shape.
+Nothing has to be kept in step: there is no group object whose bounds, drawing order or
+lifetime could drift away from what it is supposed to contain.
+
+The price is that **groups do not nest**. Grouping a group with something else makes a single
+larger group rather than a group of groups, because one number per shape cannot say more than
+that. In exchange, ungrouping is exactly as predictable: it frees everything the group had.
+
+A pasted copy of a group is a group of its own rather than more members of the one it was
+copied from, which may well still be on the page.
 
 ## Containers
 
@@ -355,6 +377,7 @@ nothing shows through and they read correctly whatever is behind them.
 | `Ctrl+X` / `Ctrl+C` / `Ctrl+V` | Cut, Copy, Paste |
 | `Ctrl+D` | Duplicate the selection |
 | `Ctrl+A` | Select all |
+| `Ctrl+G` / `Ctrl+Shift+G` | Group the selection, ungroup it |
 | `Ctrl+Shift+P` | Add a page |
 | `Ctrl+PageUp` / `Ctrl+PageDown` | Previous page, next page |
 | `Ctrl+Shift+F` / `Ctrl+Shift+B` | Bring to front, send to back |
@@ -370,6 +393,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag any selected shape | Move the whole selection together |
 | Drag a shape | Move it, snapped to the grid |
 | Drag a handle | Resize, snapped to the grid |
+| Drag a handle on a multiple selection | Stretch the whole selection, each shape keeping its place and size in proportion |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
 | Drag a connector's end handle | Re-route it; drop on a shape to glue, on the page to un-glue |
 | Drag a connector's corner handle | Move that bend; the segments either side keep their right angles. Drop it back on the line between its neighbours and it is taken out - the handle turns red first, so you can see it coming |
@@ -701,8 +725,21 @@ Images/                  Screenshots used above
   bounds are *derived* from the shapes it is glued to, so they shift on their own as those
   shapes move and cannot be used as a fixed point to measure a move from. `Translate` also
   leaves glued ends alone, since the shape already positions them.
-- Handles are only offered for a selection of one; a group shows a dashed bounding box.
-  Resizing several shapes at once is not implemented yet.
+- Handles are offered for a selection of one, and for a selection of several as one box round
+  the lot. A connector is the exception: selected on its own it shows its ends, bends and
+  segment midpoints instead of a resize box.
+- Stretching a selection maps every shape out of the box the shapes started in, and the
+  starting bounds are captured once when the drag begins rather than read off the shapes each
+  time. Read them each time and every pointer move would scale what the last move already
+  scaled, so the drag would run away exponentially instead of tracking the pointer.
+- The handles of a multiple selection sit on the plain union of the shapes, while the dashed
+  outline is drawn a few pixels outside it so as not to lie on top of them. Putting the handles
+  on the inflated box instead is the obvious thing to do and is quietly wrong: the stretch then
+  works out of a box five pixels larger than the shapes, so the anchored corner creeps and the
+  scale comes out slightly short.
+- A connector in a stretched selection has no bounds to set - its ends and bends are its
+  geometry - so those are mapped instead, and an end glued to a shape is left alone, since the
+  shape it is stuck to is already moving it.
 - A connection point is found by walking out from the middle of the shape to the edge of its
   box and halving until the outline is crossed, asking the shape's own geometry each time
   whether the point is still inside. Twenty halvings put it within a thousandth of a unit.
@@ -752,7 +789,6 @@ Natural next steps, roughly in order of usefulness:
 
 - Custom stencils saved from a drawing
 - Letting routed connectors avoid each other, not only the shapes
-- Resizing a multi-selection as a group, and grouping proper
 - Rulers, margins and smart guides
 
 ## License
