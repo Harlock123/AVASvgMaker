@@ -220,6 +220,12 @@ and entity-relationship diagrams need:
 | Hollow arrow | UML generalisation - a closed, unfilled triangle |
 | One, Many, Zero or one, One or many, Zero or many | The entity-relationship crow's foot family |
 
+A connection point that ends up facing away from the other end is used from the opposite side
+instead. Pin a connector to the bottom of one shape and the top of another, then swap the two
+over - reordering a lane will do it - and the line would otherwise have to double back across
+both shapes to reach them. Nothing is written back, so the point you chose is still the point
+you chose: put the shapes back and the original attachment returns.
+
 Hollow caps are closed but unfilled. The shaft already stops at the base of the cap, so
 nothing shows through and they read correctly whatever is behind them.
 

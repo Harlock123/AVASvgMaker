@@ -265,14 +265,52 @@ public class ConnectorShape : DiagramShape
     }
 
     /// <summary>Where the line actually starts once gluing and edge clipping are applied.</summary>
-    public Point ResolvedStart => Resolve(StartShape, StartPort, Start, AnchorOf(EndShape, EndPort, End));
+    public Point ResolvedStart =>
+        Resolve(StartShape, EffectiveStartPort, Start, AnchorOf(EndShape, EndPort, End));
 
-    public Point ResolvedEnd => Resolve(EndShape, EndPort, End, AnchorOf(StartShape, StartPort, Start));
+    public Point ResolvedEnd =>
+        Resolve(EndShape, EffectiveEndPort, End, AnchorOf(StartShape, StartPort, Start));
 
     /// <summary>The direction the line leaves each end, used when routing around obstacles.</summary>
-    public Vector StartDirection => Direction(StartShape, StartPort, ResolvedStart);
+    public Vector StartDirection => Direction(StartShape, EffectiveStartPort, ResolvedStart);
 
-    public Vector EndDirection => Direction(EndShape, EndPort, ResolvedEnd);
+    public Vector EndDirection => Direction(EndShape, EffectiveEndPort, ResolvedEnd);
+
+    /// <summary>
+    /// The connection point actually used, which is the opposite of the chosen one when the
+    /// chosen one faces away from the other end.
+    ///
+    /// A connector pinned to the bottom of one shape and the top of another looks right until
+    /// the shapes swap places - reordering a lane will do it - and then each line has to leave
+    /// its shape, doubling back across it, to reach the other. Flipping to the opposite point
+    /// keeps the line outside both shapes. Nothing is written back: the chosen point is still
+    /// the chosen one, so putting the shapes back the way they were restores the original.
+    /// </summary>
+    private int EffectiveStartPort => FacingPort(StartShape, StartPort, AnchorOf(EndShape, EndPort, End));
+
+    private int EffectiveEndPort => FacingPort(EndShape, EndPort, AnchorOf(StartShape, StartPort, Start));
+
+    private static int FacingPort(DiagramShape? glued, int port, Point toward)
+    {
+        if (glued is null || port < 0)
+            return port;
+
+        var points = glued.ConnectionPoints;
+
+        // Only the plain four-point layout has a meaningful opposite.
+        if (port >= points.Count || points.Count != DiagramShape.ConnectionDirections.Length)
+            return port;
+
+        var outward = glued.ConnectionDirection(port);
+        var away = new Vector(toward.X - points[port].X, toward.Y - points[port].Y);
+
+        // Facing the other end, or square on to it: leave it alone.
+        if (outward.X * away.X + outward.Y * away.Y >= 0)
+            return port;
+
+        var opposite = (port + points.Count / 2) % points.Count;
+        return opposite;
+    }
 
     private static Point AnchorOf(DiagramShape? glued, int port, Point free)
     {
