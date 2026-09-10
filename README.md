@@ -249,6 +249,7 @@ facsimile of the file.
 
 | Not read | |
 |---|---|
+| **The page background** | A drawing that opens with a rectangle the size of itself is painting its background, which here is the page. Every SVG this editor writes begins with one |
 | **Gradients, patterns, filters, masks, clip paths** | Nothing in this editor can hold them |
 | **`image`, `use`, `symbol`, stylesheets** | Counted and reported rather than silently dropped |
 | **Units other than the absolute ones** | `px`, `pt`, `pc`, `mm`, `cm` and `in` convert; percentages need a context the importer does not carry |
@@ -459,6 +460,11 @@ Only a container's title band and its border are clickable. The interior is left
 can be swept with the marquee and dropped into - clicking the middle of a pool to pick up the
 pool would make it nearly impossible to use. Containers are also hollow, so their contents
 read against the page rather than against a second wash of colour.
+
+A shape covering most of the page is treated as a backdrop, and clicking it selects it without
+bringing it to the front. Raising one would put an opaque sheet over the whole drawing and bury
+everything behind it, which looks exactly like the work having been deleted. The same reasoning
+applies to a container, below, and for the same reason.
 
 A container is always drawn before the shapes it holds, and that rule is restored after any
 reordering rather than being left to each operation to respect - otherwise bringing a lane to

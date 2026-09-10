@@ -728,6 +728,18 @@ public class DrawingCanvas : Decorator
     /// </summary>
     private Rect SelectionBox() => ShapeClipboard.Union(Document.Selection);
 
+    /// <summary>
+    /// Whether a shape is really the background rather than something on it. Judged by area
+    /// against the page, so it catches a rectangle drawn over everything as readily as one
+    /// that arrived with an import.
+    /// </summary>
+    private bool IsBackdrop(DiagramShape shape)
+    {
+        var page = Document.PageWidth * Document.PageHeight;
+
+        return page > 0 && shape.Bounds.Width * shape.Bounds.Height >= page * 0.8;
+    }
+
     /// <summary>Handles are a fixed size on screen, so they stay grabbable at any zoom.</summary>
     private Rect HandleRect(Point centre, double scale = 1)
     {
@@ -1187,9 +1199,11 @@ public class DrawingCanvas : Decorator
             // Clicking inside an existing multi-selection keeps it, so the group can be dragged.
             Document.SetSelection(Document.GroupOf(hit));
 
-            // A container is a backdrop: raising one because it was clicked would bury the
-            // very contents the click was aimed past.
-            if (!hit.IsContainer)
+            // A backdrop is not raised by being clicked: doing so would bury the very
+            // contents the click was aimed past. A container is one by its nature, and so is
+            // anything covering most of the page - which is what an imported drawing's
+            // background rectangle is, and what makes one swallow a whole page of work.
+            if (!hit.IsContainer && !IsBackdrop(hit))
                 Document.BringToFront(hit);
         }
 

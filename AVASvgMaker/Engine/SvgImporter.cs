@@ -41,6 +41,18 @@ public static class SvgImporter
 
     private static readonly XNamespace Svg = "http://www.w3.org/2000/svg";
 
+    /// <summary>A plain rectangle, no outline, covering the whole drawing.</summary>
+    private static bool IsBackground(DiagramShape shape, double width, double height)
+    {
+        if (shape.Kind != ShapeKind.Rectangle || shape.Stroke.A != 0 || shape.IsRotated)
+            return false;
+
+        var bounds = shape.Bounds;
+
+        return bounds.X <= 1 && bounds.Y <= 1 &&
+               bounds.Width >= width - 2 && bounds.Height >= height - 2;
+    }
+
     public static Result Read(Stream stream)
     {
         var document = XDocument.Load(stream);
@@ -74,6 +86,16 @@ public static class SvgImporter
         var shapes = new List<DiagramShape>();
         Walk(root, toPage, Style.Root, shapes, skipped);
 
+        // A drawing that opens with a rectangle the size of itself is painting its background,
+        // which here is the page. Every SVG this editor writes begins with one. Brought in as a
+        // shape it would be an opaque sheet over the whole drawing, catching every click meant
+        // for the bare page and burying the work behind it the first time one landed.
+        if (shapes.Count > 1 && IsBackground(shapes[0], width, height))
+        {
+            shapes.RemoveAt(0);
+            skipped["page background"] = 1;
+        }
+
         foreach (var shape in shapes)
             page.Shapes.Add(shape);
 
@@ -82,7 +104,11 @@ public static class SvgImporter
 
         var left = skipped
             .OrderByDescending(entry => entry.Value)
-            .Select(entry => entry.Value == 1 ? $"1 {entry.Key}" : $"{entry.Value} {entry.Key}s")
+            .Select(entry => entry.Key.Contains(' ')
+                ? $"the {entry.Key}"
+                : entry.Value == 1
+                    ? $"1 {entry.Key}"
+                    : $"{entry.Value} {entry.Key}s")
             .ToList();
 
         return new Result(page, shapes.Count, left);

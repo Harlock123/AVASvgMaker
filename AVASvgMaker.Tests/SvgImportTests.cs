@@ -254,9 +254,13 @@ public class SvgImportTests
         Assert.Equal(500, read.Document.PageWidth, 1);
         Assert.Equal(400, read.Document.PageHeight, 1);
 
-        // The white page rectangle the exporter writes comes back as a shape too.
+        // Four shapes and four labels. The white page rectangle the exporter writes is the
+        // page rather than a shape on it, and is left behind.
         Assert.True(read.Shapes >= 8, $"only {read.Shapes} shapes came back");
-        Assert.Empty(read.Skipped);
+        Assert.Equal(["the page background"], read.Skipped);
+
+        Assert.DoesNotContain(read.Document.Shapes, shape =>
+            shape.Bounds.Width >= 500 && shape.Bounds.Height >= 400);
 
         // Every label survives, which is the part a user would notice first.
         var labels = read.Document.Shapes.Select(shape => shape.Text).ToList();
