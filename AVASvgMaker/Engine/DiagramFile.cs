@@ -26,9 +26,9 @@ public static partial class DiagramFile
     /// <summary>
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
     /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights,
-    /// 9 the font a label is in, 10 grouping. Older files still load.
+    /// 9 the font a label is in, 10 grouping, 11 the margin guide. Older files still load.
     /// </summary>
-    public const int CurrentVersion = 10;
+    public const int CurrentVersion = 11;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -72,6 +72,9 @@ public static partial class DiagramFile
         public double? Width { get; set; }
 
         public double? Height { get; set; }
+
+        /// <summary>Version 11 onwards, and omitted when there is no margin guide to draw.</summary>
+        public double? Margin { get; set; }
 
         public List<ShapeRecord> Shapes { get; set; } = [];
     }
@@ -192,7 +195,8 @@ public static partial class DiagramFile
             {
                 Name = page.Name,
                 Width = page.Width,
-                Height = page.Height
+                Height = page.Height,
+                Margin = page.Margin > 0 ? page.Margin : null
             };
 
             foreach (var shape in page.Shapes)
@@ -325,6 +329,8 @@ public static partial class DiagramFile
                 page.Width = width;
                 page.Height = height;
             }
+
+            page.Margin = Math.Max(0, pageRecord.Margin ?? 0);
 
             // First pass builds the shapes, second pass glues connectors to them, so a
             // connector can reference a shape that is drawn above it. The table is per page,

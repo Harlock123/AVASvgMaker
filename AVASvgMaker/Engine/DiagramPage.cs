@@ -19,6 +19,12 @@ public class DiagramPage(string name)
     public double Width { get; set; } = 816;
     public double Height { get; set; } = 1056;
 
+    /// <summary>
+    /// How far in from the edge the margin guide is drawn, or 0 for none. A guide only: it is
+    /// not a boundary, and nothing is stopped from being put outside it or clipped by it.
+    /// </summary>
+    public double Margin { get; set; }
+
     /// <summary>Index order is z-order.</summary>
     public List<DiagramShape> Shapes { get; } = [];
 }

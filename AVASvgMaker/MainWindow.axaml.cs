@@ -97,6 +97,11 @@ public partial class MainWindow : Window
 
         FillFontList();
 
+        TopRuler.Attach(Canvas, CanvasScroll);
+        SideRuler.Attach(Canvas, CanvasScroll);
+        RulersMenuItem.Icon = Tick(true);
+        GuidesMenuItem.Icon = Tick(Canvas.SmartGuides);
+
         UpdateTitle();
         SyncHistoryMenu();
         SyncProperties();
@@ -531,6 +536,29 @@ public partial class MainWindow : Window
     }
 
     #endregion
+
+    /// <summary>The rulers and the corner between them go together, so they toggle together.</summary>
+    private void OnToggleRulersClick(object? sender, RoutedEventArgs e)
+    {
+        var showing = !TopRuler.IsVisible;
+
+        TopRuler.IsVisible = showing;
+        SideRuler.IsVisible = showing;
+        RulerCorner.IsVisible = showing;
+        RulersMenuItem.Icon = Tick(showing);
+    }
+
+    private void OnToggleGuidesClick(object? sender, RoutedEventArgs e)
+    {
+        Canvas.SmartGuides = !Canvas.SmartGuides;
+        GuidesMenuItem.Icon = Tick(Canvas.SmartGuides);
+
+        StatusText.Text = Canvas.SmartGuides
+            ? "Dragging lines up with the other shapes"
+            : "Dragging follows the grid only";
+    }
+
+    private static Control? Tick(bool on) => on ? new TextBlock { Text = "\u2713" } : null;
 
     #region Zoom
 
@@ -1173,13 +1201,14 @@ public partial class MainWindow : Window
 
         var document = Canvas.Document;
         var setup = await PageSetupDialog.ShowAsync(
-            this, document.PageWidth, document.PageHeight, document.DrawingBounds,
-            document.Pages.Count);
+            this, document.PageWidth, document.PageHeight, document.Margin,
+            document.DrawingBounds, document.Pages.Count);
 
         if (setup is null)
             return;
 
         document.SetPageSize(setup.Size.Width, setup.Size.Height, setup.AllPages);
+        document.SetMargin(setup.Margin, setup.AllPages);
         Canvas.SyncPageSize();
 
         var what = setup.AllPages && document.Pages.Count > 1 ? "Every page" : "This page";

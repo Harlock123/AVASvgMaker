@@ -155,6 +155,9 @@
                 <MenuItem Header="_Actual size" InputGesture="Ctrl+0" Click="OnZoomResetClick" />
                 <MenuItem Header="_Fit page" InputGesture="Ctrl+9" Click="OnZoomFitClick" />
                 <Separator />
+                <MenuItem x:Name="RulersMenuItem" Header="_Rulers" Click="OnToggleRulersClick" />
+                <MenuItem x:Name="GuidesMenuItem" Header="Smart _guides" Click="OnToggleGuidesClick" />
+                <Separator />
                 <MenuItem Header="_Shapes panel" InputGesture="F9" Click="OnToggleToolboxClick" />
                 <MenuItem Header="_Properties panel" InputGesture="F10"
                           Click="OnTogglePropertiesClick" />
@@ -404,11 +407,20 @@
         <DockPanel>
             <views:PageTabStrip x:Name="PageTabs" DockPanel.Dock="Bottom" />
 
-            <ScrollViewer Background="{x:Static views:AppTheme.Workspace}"
-                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                <views:DrawingCanvas x:Name="Canvas"
-                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </ScrollViewer>
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,*">
+                <Border x:Name="RulerCorner" Grid.Row="0" Grid.Column="0" Width="20" Height="20"
+                        Background="{x:Static views:AppTheme.Panel}" />
+
+                <views:RulerStrip x:Name="TopRuler" Grid.Row="0" Grid.Column="1" />
+                <views:RulerStrip x:Name="SideRuler" Grid.Row="1" Grid.Column="0" Vertical="True" />
+
+                <ScrollViewer x:Name="CanvasScroll" Grid.Row="1" Grid.Column="1"
+                              Background="{x:Static views:AppTheme.Workspace}"
+                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <views:DrawingCanvas x:Name="Canvas"
+                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </ScrollViewer>
+            </Grid>
         </DockPanel>
     </DockPanel>
 </Window>

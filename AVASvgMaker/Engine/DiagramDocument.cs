@@ -74,6 +74,13 @@ public class DiagramDocument
         set => CurrentPage.Height = value;
     }
 
+    /// <summary>The margin guide on the current page, in page units. 0 draws none.</summary>
+    public double Margin
+    {
+        get => CurrentPage.Margin;
+        set => CurrentPage.Margin = value;
+    }
+
     private readonly List<DiagramShape> _selection = [];
 
     /// <summary>The selected shapes, in the order they were selected.</summary>
@@ -311,7 +318,8 @@ public class DiagramDocument
         var page = new DiagramPage(UnusedPageName())
         {
             Width = CurrentPage.Width,
-            Height = CurrentPage.Height
+            Height = CurrentPage.Height,
+            Margin = CurrentPage.Margin
         };
 
         _pages.Insert(Math.Clamp(position, 0, _pages.Count), page);
@@ -340,7 +348,8 @@ public class DiagramDocument
         var copy = new DiagramPage(UnusedPageName())
         {
             Width = _pages[index].Width,
-            Height = _pages[index].Height
+            Height = _pages[index].Height,
+            Margin = _pages[index].Margin
         };
 
         copy.Shapes.AddRange(DiagramFile.CopyOf(_pages[index].Shapes));
@@ -895,6 +904,27 @@ public class DiagramDocument
     /// Resizes the current page, or every page, as an edit that can be undone. Nothing is
     /// recorded when the pages already have that size.
     /// </summary>
+    /// <summary>Sets the margin guide, on the current page or on all of them.</summary>
+    public void SetMargin(double margin, bool allPages = false)
+    {
+        margin = Math.Max(0, margin);
+
+        var targets = allPages ? _pages : (IReadOnlyList<DiagramPage>)[CurrentPage];
+        var changed = false;
+
+        foreach (var page in targets)
+        {
+            if (Math.Abs(page.Margin - margin) < 0.01)
+                continue;
+
+            page.Margin = margin;
+            changed = true;
+        }
+
+        if (changed)
+            MarkModified();
+    }
+
     public void SetPageSize(double width, double height, bool allPages = false)
     {
         var targets = allPages ? _pages : [CurrentPage];

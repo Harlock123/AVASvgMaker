@@ -50,7 +50,8 @@ public class DrawingCanvas : Decorator
     /// </summary>
     private const double BendRemovalPixels = 6;
 
-    private const double PageMargin = 24;
+    /// <summary>The workspace showing round the page, in page units.</summary>
+    public const double PageMargin = 24;
     private const double HandleSize = 8;
     private const double DefaultShapeWidth = 120;
     private const double DefaultShapeHeight = 80;
@@ -82,6 +83,11 @@ public class DrawingCanvas : Decorator
     private static Color Wash(Color accent) => Color.FromArgb(0x20, accent.R, accent.G, accent.B);
     private static readonly IBrush MidpointHandleBrush = new SolidColorBrush(Color.FromArgb(0xC0, 0xFF, 0xE6, 0xC0));
 
+    /// <summary>The margin guide, and the lines that show what a drag has lined up with.</summary>
+    private static readonly IBrush MarginBrush = new SolidColorBrush(Color.FromArgb(0x70, 0x90, 0x90, 0xA0));
+
+    private static readonly IBrush GuideBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x4A, 0x8A));
+
     /// <summary>A bend that letting go of would remove.</summary>
     private static readonly IBrush DoomedHandleBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x5A, 0x4A));
 
@@ -100,6 +106,15 @@ public class DrawingCanvas : Decorator
 
     /// <summary>Set while a bend is being dragged and has come back onto the line.</summary>
     private bool _bendDoomed;
+
+    /// <summary>How near an edge has to come before a drag lines up with it, in screen pixels.</summary>
+    private const double GuideReachPixels = 6;
+
+    /// <summary>Whether a drag lines itself up with the other shapes on the page.</summary>
+    public bool SmartGuides { get; set; } = true;
+
+    /// <summary>The lines to draw showing what the current drag has lined up with.</summary>
+    private readonly List<(Point A, Point B)> _guides = [];
 
     /// <summary>Where each shape of a selection stood when a stretch of the whole lot began.</summary>
     private readonly List<(DiagramShape Shape, Rect Start, Point[] Points)> _scaling = [];
@@ -248,6 +263,9 @@ public class DrawingCanvas : Decorator
 
     public event Action<double>? ZoomChanged;
 
+    /// <summary>Where the pointer is on the page, or null when it has left the canvas.</summary>
+    public event Action<Point?>? PointerOnPage;
+
     /// <summary>
     /// Sets the zoom, keeping the page point under <paramref name="anchor"/> - a position in
     /// this control - where it is on screen. Without an anchor the viewport centre is held.
@@ -341,6 +359,16 @@ public class DrawingCanvas : Decorator
 
             context.DrawRectangle(null, ScreenPen(PageBorderBrush, 1), page);
 
+            // The margin guide sits under the drawing, as the grid does: it is something to
+            // line work up against, not part of it.
+            if (Document.Margin > 0)
+            {
+                var inside = page.Deflate(Document.Margin);
+
+                if (inside.Width > 0 && inside.Height > 0)
+                    context.DrawRectangle(null, ScreenDashPen(MarginBrush, 1, 4), inside);
+            }
+
             foreach (var shape in Document.Shapes)
                 shape.Render(context, !ReferenceEquals(shape, _editing));
 
@@ -353,6 +381,10 @@ public class DrawingCanvas : Decorator
 
             if (_ghost is { } ghost)
                 context.DrawRectangle(null, ScreenDashPen(GhostBrush, 1.5, 4), ghost);
+
+            // Drawn last, over everything, since the whole job of a guide is to be seen.
+            foreach (var (a, b) in _guides)
+                context.DrawLine(ScreenPen(GuideBrush, 1), a, b);
 
             RenderSelection(context);
 
@@ -1278,6 +1310,7 @@ public class DrawingCanvas : Decorator
         }
 
         UpdateCursor(pagePoint);
+        PointerOnPage?.Invoke(pagePoint);
     }
 
     /// <summary>
@@ -1288,11 +1321,21 @@ public class DrawingCanvas : Decorator
     {
         var delta = pagePoint - _dragOrigin;
 
-        var target = Document.ClampToPage(new Rect(
-            Grid.Snap(_dragStartUnion.X + delta.X),
-            Grid.Snap(_dragStartUnion.Y + delta.Y),
+        var loose = new Rect(
+            _dragStartUnion.X + delta.X,
+            _dragStartUnion.Y + delta.Y,
             _dragStartUnion.Width,
-            _dragStartUnion.Height));
+            _dragStartUnion.Height);
+
+        // Lining up with another shape beats landing on the grid: the grid is a fallback for
+        // the axis no other shape had anything to say about.
+        var (lined, alongX, alongY) = LineUp(loose);
+
+        var target = Document.ClampToPage(new Rect(
+            alongX ? lined.X : Grid.Snap(loose.X),
+            alongY ? lined.Y : Grid.Snap(loose.Y),
+            loose.Width,
+            loose.Height));
 
         var wanted = new Vector(target.X - _dragStartUnion.X, target.Y - _dragStartUnion.Y);
         var step = wanted - _dragApplied;
@@ -1310,6 +1353,87 @@ public class DrawingCanvas : Decorator
         _dragChanged = true;
         InvalidateVisual();
         ReportStatus();
+    }
+
+    /// <summary>
+    /// Looks for edges and middles on the page that the dragged box has come close to lining
+    /// up with, and pulls it onto the nearest on each axis. The lines to draw are collected as
+    /// it goes, so what snapped and what is shown cannot disagree.
+    /// </summary>
+    private (Rect Target, bool AlongX, bool AlongY) LineUp(Rect box)
+    {
+        _guides.Clear();
+
+        if (!SmartGuides)
+            return (box, false, false);
+
+        var moving = new HashSet<DiagramShape>(_dragShapes);
+
+        var others = Document.Shapes
+            .Where(shape => shape is not ConnectorShape && !moving.Contains(shape))
+            .Select(shape => shape.Bounds)
+            .ToList();
+
+        if (others.Count == 0)
+            return (box, false, false);
+
+        var reach = Screen(GuideReachPixels);
+
+        var (shiftX, atX, withX) = Nearest(box, others, reach, vertical: true);
+        var (shiftY, atY, withY) = Nearest(box, others, reach, vertical: false);
+
+        var target = new Rect(box.X + shiftX, box.Y + shiftY, box.Width, box.Height);
+
+        // Drawn long enough to reach both the shape that moved and the one it lined up with.
+        if (withX is { } alignedX)
+            _guides.Add((new Point(atX, Math.Min(target.Top, alignedX.Top)),
+                new Point(atX, Math.Max(target.Bottom, alignedX.Bottom))));
+
+        if (withY is { } alignedY)
+            _guides.Add((new Point(Math.Min(target.Left, alignedY.Left), atY),
+                new Point(Math.Max(target.Right, alignedY.Right), atY)));
+
+        return (target, withX is not null, withY is not null);
+    }
+
+    /// <summary>
+    /// The smallest move along one axis that brings a leading, middle or trailing edge of the
+    /// box onto one of another shape's, or nothing when none is near enough.
+    /// </summary>
+    private static (double Shift, double At, Rect? With) Nearest(
+        Rect box, List<Rect> others, double reach, bool vertical)
+    {
+        double[] mine = vertical
+            ? [box.Left, box.Center.X, box.Right]
+            : [box.Top, box.Center.Y, box.Bottom];
+
+        var shift = 0.0;
+        var at = 0.0;
+        Rect? with = null;
+        var best = reach;
+
+        foreach (var other in others)
+        {
+            double[] theirs = vertical
+                ? [other.Left, other.Center.X, other.Right]
+                : [other.Top, other.Center.Y, other.Bottom];
+
+            foreach (var a in mine)
+            foreach (var b in theirs)
+            {
+                var gap = b - a;
+
+                if (Math.Abs(gap) > best)
+                    continue;
+
+                best = Math.Abs(gap);
+                shift = gap;
+                at = b;
+                with = other;
+            }
+        }
+
+        return (shift, at, with);
     }
 
     private void DragEndpoint(ConnectorShape connector, Point pagePoint)
@@ -1471,6 +1595,7 @@ public class DrawingCanvas : Decorator
         _activeSegment = -1;
         _dragLane = null;
         _scaling.Clear();
+        _guides.Clear();
         _glueTarget = null;
         _portShape = null;
         _portIndex = -1;
@@ -1984,6 +2109,7 @@ public class DrawingCanvas : Decorator
         _pendingConnector = null;
         _dragLane = null;
         _scaling.Clear();
+        _guides.Clear();
         _glueTarget = null;
         _portShape = null;
         _portIndex = -1;

@@ -39,6 +39,9 @@ Or [build it yourself](#building).
 - **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder, each on its own paper
 - **Drag and drop** - drag a stencil onto the page, or click a stencil and then click where you want it
 - **Grid snap** - positions and sizes snap to the grid, switchable between 5, 10, 20, 25 and 50 px
+- **Rulers** - along the top and down the side, marked in page units, with the pointer's position shown on both
+- **Smart guides** - dragging a shape lines it up with the edges and middles of the others, and shows what it caught on
+- **Margin guide** - a dashed inset per page, to keep work clear of the edge
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
 
 **Connectors**
@@ -143,8 +146,10 @@ Letter, Legal, Tabloid, A3, A4 or A5 - or type a width and height; picking a pre
 flipping the orientation fills the boxes in, and typing your own numbers moves the size
 box to *Custom*. A **Fit to the drawing** button sizes the page to what is on it, with a
 small margin. Sizes are given in pixels at 96 DPI, with the inch and millimetre equivalents
-alongside. The page size is part of the document, saved with it and undoable like any other
-edit. Shrinking the page leaves the shapes where they are, as Visio does, so anything now
+alongside. **Margin** draws a dashed inset on the page to line work up against; it is a guide
+and nothing more - nothing is stopped from being put outside it, and nothing is clipped by it.
+Set it to 0 for none. The page size and margin are part of the document, saved with it and
+undoable like any other edit. Shrinking the page leaves the shapes where they are, as Visio does, so anything now
 past the edge stays put until you move it - at which point it is clamped back onto the page.
 
 **File -> Export** holds all six formats, vectors first: **SVG** (`Ctrl+E`) and **PDF**,
@@ -195,13 +200,14 @@ and files written by a future version rather than loading them incorrectly. Vers
 connection ports and routing, version 3 hand-placed bends, and version 4 the line style;
 older files still load, and version 1 connectors keep their original straight routing. Version 5
 added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
-heights, version 9 the font a label is in, and version 10 grouping. Older files still load: a version 5 file, which
+heights, version 9 the font a label is in, version 10 grouping, and version 11 the margin
+guide. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
 drawn; a file up to version 8 has no font settings, so its labels come back plain and centred,
-which is how they were drawn; and a file up to version 9 has no groups, because there were
-none to have. The on-disk
+which is how they were drawn; a file up to version 9 has no groups, because there were none to have; and
+a file up to version 10 has no margins, so its pages come back without one. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -233,7 +239,7 @@ fields because its end points define it.
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
-| **View menu** | Zoom in, Zoom out, Actual size, Fit page, and folding either side panel away - plus a zoom box in the status bar |
+| **View menu** | Zoom in, Zoom out, Actual size, Fit page, rulers, smart guides, and folding either side panel away - plus a zoom box in the status bar |
 | **Select / Text box / Connector** | What a click on the page does. Text and Connector drop back to Select after one use of the text tool; the connector tool stays armed so several can be drawn in a row |
 | **Start / End** | The cap on each end - see below |
 | **Route** | Straight, or right-angle routing that avoids the shapes in the way |
@@ -404,7 +410,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Shift-click or Ctrl-click a shape | Add it to the selection, or take it out |
 | Drag on empty page | Sweep a marquee; it takes the shapes it fully encloses |
 | Drag any selected shape | Move the whole selection together |
-| Drag a shape | Move it, snapped to the grid |
+| Drag a shape | Move it. It lines up with the edges and middles of the other shapes where it comes close to one, and falls back to the grid on whichever axis nothing lined up |
 | Drag a handle | Resize, snapped to the grid |
 | Drag a handle on a multiple selection | Stretch the whole selection, each shape keeping its place and size in proportion |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
@@ -598,6 +604,7 @@ AVASvgMaker/
     ConfirmDialog.cs     A three-way prompt, since Avalonia has no message box
     TextPromptDialog.cs  One line of text, for renaming a page
     PageTabStrip.cs      The page tabs along the bottom of the drawing area
+    RulerStrip.cs        The scale along the top and down the side
     PageSetupDialog.cs   Paper size, orientation, and fit-to-drawing
     RasterExportDialog.cs  Export scale and quality, and the pixel size it comes to
 
@@ -741,6 +748,13 @@ Images/                  Screenshots used above
 - Handles are offered for a selection of one, and for a selection of several as one box round
   the lot. A connector is the exception: selected on its own it shows its ends, bends and
   segment midpoints instead of a resize box.
+- The rulers take their position from the canvas, not from the scroll offset. The page is
+  centred in the workspace while it is smaller than the window, so where a page coordinate
+  lands on screen depends on the layout as much as on the scrolling; asking the canvas where it
+  is gets both at once and cannot drift out of step with it.
+- A smart guide beats the grid, and the grid catches whichever axis no other shape had anything
+  to say about. Snapping and drawing are worked out together in one pass, so the line shown and
+  the line snapped to cannot disagree - which is the failure that makes guides untrustworthy.
 - Connectors avoid each other by paying a penalty per unit of company kept, not by treating
   one another as obstacles. An obstacle can make a route impossible, and a connector with
   nowhere to go is worse than one drawn alongside its neighbour; a penalty degrades instead,
@@ -805,7 +819,6 @@ Images/                  Screenshots used above
 Natural next steps, roughly in order of usefulness:
 
 - Custom stencils saved from a drawing
-- Rulers, margins and smart guides
 
 ## License
 
