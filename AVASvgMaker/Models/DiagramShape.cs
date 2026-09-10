@@ -88,8 +88,16 @@ public abstract class DiagramShape
         new(-1, 0)
     ];
 
+    private Rect _attachBounds;
+    private Point[]? _attachPoints;
+
     /// <summary>
-    /// Where connectors attach, in page coordinates: north, east, south then west by default.
+    /// Where connectors attach, in page coordinates: north, east, south then west. Each one
+    /// sits on the shape's own outline rather than on the box around it, so a line meets a
+    /// triangle or a cylinder where the shape actually is. For a rectangle - and for an
+    /// ellipse or a diamond, whose outlines touch the box at the middle of each side - the
+    /// two are the same point and nothing moves.
+    ///
     /// Shapes with a more useful set of their own can override this, keeping the order so the
     /// directions above still line up.
     /// </summary>
@@ -99,14 +107,74 @@ public abstract class DiagramShape
         {
             var bounds = Bounds;
 
-            return
-            [
-                new Point(bounds.Center.X, bounds.Top),
-                new Point(bounds.Right, bounds.Center.Y),
-                new Point(bounds.Center.X, bounds.Bottom),
-                new Point(bounds.Left, bounds.Center.Y)
-            ];
+            // Worked out afresh only when the shape has actually changed size or place; the
+            // router asks for these constantly.
+            if (_attachPoints is not null && _attachBounds == bounds)
+                return _attachPoints;
+
+            _attachBounds = bounds;
+            _attachPoints = AttachPoints(bounds);
+
+            return _attachPoints;
         }
+    }
+
+    private Point[] AttachPoints(Rect bounds)
+    {
+        Point[] box =
+        [
+            new Point(bounds.Center.X, bounds.Top),
+            new Point(bounds.Right, bounds.Center.Y),
+            new Point(bounds.Center.X, bounds.Bottom),
+            new Point(bounds.Left, bounds.Center.Y)
+        ];
+
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return box;
+
+        var geometry = CreateGeometry();
+        var centre = bounds.Center;
+
+        // A shape whose middle is not inside itself - a line, an open path - has no outline to
+        // walk out to, so it keeps the box it always had.
+        if (!geometry.FillContains(centre))
+            return box;
+
+        var points = new Point[box.Length];
+
+        for (var i = 0; i < box.Length; i++)
+            points[i] = OnOutline(geometry, centre, box[i]);
+
+        return points;
+    }
+
+    /// <summary>
+    /// Walks from a point known to be inside the shape out to one on the bounding box, and
+    /// returns where the outline is crossed. Found by halving rather than by solving, because
+    /// halving works the same for a triangle, a cylinder and a stencil drawn with curves - of
+    /// which there are ninety-odd, and no two the same.
+    /// </summary>
+    private static Point OnOutline(Geometry geometry, Point inside, Point edge)
+    {
+        // The outline reaches the box here, so there is nothing to walk in from.
+        if (geometry.FillContains(edge))
+            return edge;
+
+        var near = inside;
+        var far = edge;
+
+        // Twenty halvings take a shape a thousand units across down to a thousandth of one.
+        for (var i = 0; i < 20; i++)
+        {
+            var middle = new Point((near.X + far.X) / 2, (near.Y + far.Y) / 2);
+
+            if (geometry.FillContains(middle))
+                near = middle;
+            else
+                far = middle;
+        }
+
+        return near;
     }
 
     /// <summary>The direction a connector should leave the given connection point.</summary>

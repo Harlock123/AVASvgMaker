@@ -43,7 +43,7 @@ Or [build it yourself](#building).
 
 **Connectors**
 
-- **Connection points** - every shape offers attachment points at the middle of each edge; they light up while a connector is being drawn and the end snaps to the nearest one
+- **Connection points** - every shape offers four attachment points, sitting on the shape's own outline rather than the box around it; they light up while a connector is being drawn and the end snaps to the nearest one
 - **Glue** - an end dropped on a shape sticks to it and tracks the shape as it moves and resizes
 - **Right-angle routing** - routed connectors keep clear of the shapes in their way, put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved or resized
 - **Adjustable bends** - a selected connector offers a grab point on each end, on every bend, and on the middle of every segment; dragging a middle point adds bends, and dropping one back on the line takes it away again
@@ -324,6 +324,16 @@ and entity-relationship diagrams need:
 | Hollow diamond | UML aggregation |
 | Hollow arrow | UML generalisation - a closed, unfilled triangle |
 | One, Many, Zero or one, One or many, Zero or many | The entity-relationship crow's foot family |
+
+**Connection points sit on the shape, not on the box around it.** A line meets a triangle on
+its sloping side, a hexagon on its corner and a cylinder on the curve of its cap, rather than
+stopping short in the empty corner of a bounding box. For a rectangle nothing moves, and nor
+does it for an ellipse or a diamond, whose outlines already touch the box at the middle of
+each side - so drawings made before this look exactly as they did.
+
+A handful of stencils are hollow where their middle would be - a bowtie, a stick figure, a
+curved arrow - and there is no outline to walk out to along the way. Those keep the four
+points of the box, which is what every shape had before.
 
 A connection point that ends up facing away from the other end is used from the opposite side
 instead. Pin a connector to the bottom of one shape and the top of another, then swap the two
@@ -693,6 +703,13 @@ Images/                  Screenshots used above
   leaves glued ends alone, since the shape already positions them.
 - Handles are only offered for a selection of one; a group shows a dashed bounding box.
   Resizing several shapes at once is not implemented yet.
+- A connection point is found by walking out from the middle of the shape to the edge of its
+  box and halving until the outline is crossed, asking the shape's own geometry each time
+  whether the point is still inside. Twenty halvings put it within a thousandth of a unit.
+  Solving it properly would mean a different intersection for rectangles, ellipses, polygons
+  and beziers, and then the stencil path language on top - ninety-odd outlines, no two the
+  same - whereas halving is one piece of code that treats them all alike. The result is cached
+  against the bounds it was worked out for, because the router asks for these constantly.
 - A bend is removed by dropping it where it stops bending anything - within a few pixels of
   the straight line between its neighbours - rather than by dragging it far away. Far away is
   how a bend is *placed*, so that gesture was not available; near the line it is doing nothing,
@@ -733,7 +750,6 @@ Images/                  Screenshots used above
 
 Natural next steps, roughly in order of usefulness:
 
-- Connection points on the outline of round and angled shapes, rather than on the bounding box
 - Custom stencils saved from a drawing
 - Letting routed connectors avoid each other, not only the shapes
 - Resizing a multi-selection as a group, and grouping proper
