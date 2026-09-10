@@ -27,9 +27,10 @@ public static partial class DiagramFile
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
     /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights,
     /// 9 the font a label is in, 10 grouping, 11 the margin guide, 12 rotation,
-    /// 13 shapes carrying an outline of their own. Older files still load.
+    /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand.
+    /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -168,6 +169,12 @@ public static partial class DiagramFile
 
         /// <summary>Bends placed by hand, as x,y pairs. Absent when the connector routes itself.</summary>
         public double[]? Waypoints { get; set; }
+
+        /// <summary>
+        /// How far the label has been dragged from where it would sit. Version 14 onwards,
+        /// and absent for a label left where the line put it.
+        /// </summary>
+        public double[]? LabelOffset { get; set; }
     }
 
     #endregion
@@ -293,7 +300,10 @@ public static partial class DiagramFile
                 Routing = connector.Routing.ToString(),
                 Waypoints = connector.Waypoints.Count == 0
                     ? null
-                    : connector.Waypoints.SelectMany(point => new[] { point.X, point.Y }).ToArray()
+                    : connector.Waypoints.SelectMany(point => new[] { point.X, point.Y }).ToArray(),
+                LabelOffset = connector.LabelOffset == default
+                    ? null
+                    : [connector.LabelOffset.X, connector.LabelOffset.Y]
             };
         }
 
@@ -404,7 +414,10 @@ public static partial class DiagramFile
                 StartPort = connectorRecord.StartPort,
                 EndPort = connectorRecord.EndPort,
                 Routing = Parse(connectorRecord.Routing, ConnectorRouting.Straight),
-                Waypoints = ToPoints(connectorRecord.Waypoints)
+                Waypoints = ToPoints(connectorRecord.Waypoints),
+                LabelOffset = connectorRecord.LabelOffset is { Length: 2 } moved
+                    ? new Vector(moved[0], moved[1])
+                    : default
             };
         }
         else if (kind == ShapeKind.Path)

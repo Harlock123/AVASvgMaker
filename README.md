@@ -61,6 +61,7 @@ Or [build it yourself](#building).
 - **Right-angle routing** - routed connectors keep clear of the shapes in their way and of each other, put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved or resized
 - **Adjustable bends** - a selected connector offers a grab point on each end, on every bend, and on the middle of every segment; dragging a middle point adds bends, and dropping one back on the line takes it away again
 - **Twelve line ends** - including the hollow arrow and diamond that UML needs, and the entity-relationship crow's foot family
+- **Connector labels** - words on a line, in a gap cut out of it, that follow the line as it re-routes
 
 **Editing**
 
@@ -307,7 +308,8 @@ connection ports and routing, version 3 hand-placed bends, and version 4 the lin
 older files still load, and version 1 connectors keep their original straight routing. Version 5
 added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
 heights, version 9 the font a label is in, version 10 grouping, version 11 the margin guide,
-version 12 rotation, and version 13 shapes carrying an outline of their own. Older files still load: a version 5 file, which
+version 12 rotation, version 13 shapes carrying an outline of their own, and version 14 a
+connector label moved by hand. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
@@ -315,7 +317,8 @@ drawn; a file up to version 8 has no font settings, so its labels come back plai
 which is how they were drawn; a file up to version 9 has no groups, because there were none to have; and
 a file up to version 10 has no margins, so its pages come back without one; and a file up to
 version 11 has no angles, so its shapes come back upright; and a file up to version 12 has no
-outlines of its own, because nothing could make one. The on-disk
+outlines of its own, because nothing could make one; and a file up to version 13 has no moved
+labels, so they sit where the line puts them. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -522,6 +525,26 @@ avoid each other would let two chase one another round the page for ever, each m
 from where the other has just been; an order that only looks backwards cannot come round on
 itself. Drawing order is the order used, so the same page always routes the same way, and a
 file reopened routes exactly as it did when it was saved.
+
+### Labelling a connector
+
+![Labelled connectors](Images/connector-labels.png)
+
+Double-click a connector, or select it and press `F2`, and type. The words sit **in a gap cut
+out of the line** rather than on top of it or behind a panel painted over it, so they read
+against whatever is behind them - a coloured lane, another shape - instead of punching a white
+hole in it. The gap is only as wide as the words.
+
+The label sits in the middle of the **longest straight run** rather than halfway along the
+whole line. Halfway along is very often a corner: on a route that goes out, across and down,
+the middle of the journey is the bend, and a label wrapped round a corner reads as belonging to
+neither part.
+
+Drag the label to move it, and what is kept is **how far it was moved, not where it was put** -
+so it stays the same distance from the run it belongs to as the shapes move and the line
+re-routes beneath it. Where the label has been dragged clear of the line, the line is drawn
+whole. **Edit -> Reset connector route** puts the label back along with the bends, both being
+things done by hand.
 
 A connection point that ends up facing away from the other end is used from the opposite side
 instead. Pin a connector to the bottom of one shape and the top of another, then swap the two

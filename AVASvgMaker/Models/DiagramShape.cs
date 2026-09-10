@@ -385,6 +385,13 @@ public abstract class DiagramShape
 
     protected virtual Rect TextArea => Bounds;
 
+    /// <summary>
+    /// Where the label is drawn, which for most shapes is the shape. A connector's is a small
+    /// box out on the line, and a container's is its title band - so the editor is put here
+    /// rather than over the bounds, or editing either would open a box nowhere near the words.
+    /// </summary>
+    public Rect LabelArea => TextArea;
+
     /// <summary>Where a line of the given width starts, for the alignment in force.</summary>
     private double LineLeft(Rect area, double width) => TextAlign switch
     {

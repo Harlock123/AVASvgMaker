@@ -114,6 +114,18 @@ every straight run:
 Double-clicking a bend also removes it. **Edit -> Reset connector route** hands a connector
 back to the router and forgets everything you placed by hand.
 
+### Labelling a connector
+
+![Labelled connectors](Images/connector-labels.png)
+
+Double-click a connector, or select it and press `F2`, and type. The words sit in a gap cut out
+of the line, so they read cleanly whatever is behind them, and they land in the middle of the
+longest straight run rather than on a bend.
+
+Drag the label to move it off the line. What is remembered is how far you moved it, so it keeps
+its place as the shapes move and the line re-routes beneath it. **Edit -> Reset connector
+route** puts it back.
+
 ### Line ends
 
 The **Start** and **End** pickers in the toolbar set what each end of a connector looks like:

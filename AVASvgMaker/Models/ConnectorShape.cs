@@ -193,6 +193,7 @@ public class ConnectorShape : DiagramShape
     /// <summary>Throws away hand-placed bends and lets the connector route itself again.</summary>
     public void ResetRoute()
     {
+        LabelOffset = default;
         Waypoints = [];
         _route = [];
         _routeKey = 0;
@@ -502,8 +503,8 @@ public class ConnectorShape : DiagramShape
         if (pen is Pen concrete)
             concrete.LineJoin = PenLineJoin.Round;
 
-        for (var i = 0; i < path.Count - 1; i++)
-            context.DrawLine(pen, path[i], path[i + 1]);
+        foreach (var (from, to) in VisibleSegments(path))
+            context.DrawLine(pen, from, to);
 
         RenderCap(context, StartCap, ResolvedStart, -sx, -sy, pen);
         RenderCap(context, EndCap, ResolvedEnd, ex, ey, pen);
@@ -512,46 +513,153 @@ public class ConnectorShape : DiagramShape
             RenderText(context);
     }
 
-    /// <summary>The label sits halfway along the line, measured by distance travelled.</summary>
+    /// <summary>
+    /// Where the label has been dragged to, from where it would otherwise sit. Kept as an
+    /// offset rather than a position so the label follows the line as it re-routes: move
+    /// either shape and the words stay the same distance from the run they belong to.
+    /// </summary>
+    public Vector LabelOffset { get; set; }
+
+    /// <summary>How much clear space is left round the words where the line is broken.</summary>
+    private const double LabelPadding = 5;
+
+    /// <summary>
+    /// The label sits in the middle of the longest straight run rather than halfway along the
+    /// whole line. Halfway along is very often a corner - on a route that goes out, across and
+    /// down, the middle of the journey is the bend - and a label wrapped round a corner reads
+    /// as belonging to neither part.
+    /// </summary>
     protected override Rect TextArea
     {
         get
         {
-            var midpoint = Midpoint();
-            return new Rect(midpoint.X - 60, midpoint.Y - LineHeight / 2, 120, LineHeight);
+            var anchor = LabelAnchor;
+            var size = LabelSize;
+
+            return new Rect(
+                anchor.X - size.Width / 2,
+                anchor.Y - size.Height / 2,
+                size.Width,
+                size.Height);
         }
     }
 
-    private Point Midpoint()
+    public Point LabelAnchor
+    {
+        get
+        {
+            var middle = LongestRun();
+            return new Point(middle.X + LabelOffset.X, middle.Y + LabelOffset.Y);
+        }
+    }
+
+    /// <summary>Just big enough for the words, so the gap in the line is no wider than it need be.</summary>
+    private Size LabelSize
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Text))
+                return default;
+
+            var lines = Text.Replace("\r\n", "\n").Split('\n');
+            var width = lines.Max(line => Format(line).Width);
+
+            // Room for the padding the text renderer keeps inside a shape as well as for the
+            // gap, or the words would be wrapped again inside the box measured to hold them.
+            return new Size(
+                width + (TextPadding + LabelPadding) * 2 + 1,
+                lines.Length * LineHeight + LabelPadding);
+        }
+    }
+
+    /// <summary>The middle of the longest straight run of the route.</summary>
+    private Point LongestRun()
     {
         var path = Path;
-        var total = 0.0;
-
-        for (var i = 0; i < path.Count - 1; i++)
-            total += Distance(path[i], path[i + 1]);
-
-        var half = total / 2;
+        var best = -1.0;
+        var middle = path[^1];
 
         for (var i = 0; i < path.Count - 1; i++)
         {
             var length = Distance(path[i], path[i + 1]);
 
-            if (length < 1e-6)
+            if (length <= best)
                 continue;
 
-            if (half > length)
+            best = length;
+            middle = new Point((path[i].X + path[i + 1].X) / 2, (path[i].Y + path[i + 1].Y) / 2);
+        }
+
+        return middle;
+    }
+
+    /// <summary>
+    /// The line as drawn: the route, with a gap cut out of it where the label sits. Cutting a
+    /// gap rather than painting a panel behind the words means the label reads over whatever
+    /// is behind it - a coloured lane, another shape - instead of punching a white hole in it.
+    /// </summary>
+    private IEnumerable<(Point From, Point To)> VisibleSegments(IReadOnlyList<Point> path)
+    {
+        var gap = string.IsNullOrWhiteSpace(Text) ? default : TextArea;
+
+        for (var i = 0; i < path.Count - 1; i++)
+        {
+            foreach (var piece in Outside(path[i], path[i + 1], gap))
+                yield return piece;
+        }
+    }
+
+    /// <summary>The parts of a segment that lie outside the rectangle, in order along it.</summary>
+    private static IEnumerable<(Point From, Point To)> Outside(Point from, Point to, Rect gap)
+    {
+        if (gap.Width <= 0 || gap.Height <= 0)
+        {
+            yield return (from, to);
+            yield break;
+        }
+
+        // Where the segment enters and leaves the box, as a fraction of its length.
+        var enter = 0.0;
+        var leave = 1.0;
+
+        foreach (var (delta, from1, low, high) in new[]
+                 {
+                     (to.X - from.X, from.X, gap.Left, gap.Right),
+                     (to.Y - from.Y, from.Y, gap.Top, gap.Bottom)
+                 })
+        {
+            if (Math.Abs(delta) < 1e-9)
             {
-                half -= length;
+                // Parallel to this pair of edges: either always between them or never.
+                if (from1 < low || from1 > high)
+                {
+                    yield return (from, to);
+                    yield break;
+                }
+
                 continue;
             }
 
-            var t = half / length;
-            return new Point(
-                path[i].X + (path[i + 1].X - path[i].X) * t,
-                path[i].Y + (path[i + 1].Y - path[i].Y) * t);
+            var a = (low - from1) / delta;
+            var b = (high - from1) / delta;
+
+            enter = Math.Max(enter, Math.Min(a, b));
+            leave = Math.Min(leave, Math.Max(a, b));
         }
 
-        return path[^1];
+        if (enter >= leave)
+        {
+            yield return (from, to);
+            yield break;
+        }
+
+        Point At(double t) => new(from.X + (to.X - from.X) * t, from.Y + (to.Y - from.Y) * t);
+
+        if (enter > 0)
+            yield return (from, At(enter));
+
+        if (leave < 1)
+            yield return (At(leave), to);
     }
 
     /// <summary>Unit vector from <paramref name="from"/> to <paramref name="to"/>, or null for a zero-length line.</summary>
@@ -756,12 +864,16 @@ public class ConnectorShape : DiagramShape
         path[^1] = Offset(path[^1], -ex, -ey, Inset(EndCap));
 
         var stroke = $"stroke=\"{SvgPaint(Stroke)}\" stroke-width=\"{Num(StrokeThickness)}\"{SvgDash()}";
-        var points = string.Join(" ", path.Select(point => $"{Num(point.X)},{Num(point.Y)}"));
 
         var sb = new System.Text.StringBuilder();
         sb.Append("<g>");
-        sb.Append($"<polyline points=\"{points}\" {stroke} fill=\"none\" " +
-                  "stroke-linejoin=\"round\" stroke-linecap=\"butt\" />");
+
+        // Written as the same pieces the editor draws, so the gap the label sits in is in the
+        // exported file too rather than only on screen.
+        foreach (var (from, to) in VisibleSegments(path))
+            sb.Append($"<line x1=\"{Num(from.X)}\" y1=\"{Num(from.Y)}\" " +
+                      $"x2=\"{Num(to.X)}\" y2=\"{Num(to.Y)}\" {stroke} stroke-linecap=\"butt\" />");
+
         sb.Append(SvgCap(StartCap, ResolvedStart, -sx, -sy, stroke));
         sb.Append(SvgCap(EndCap, ResolvedEnd, ex, ey, stroke));
         sb.Append("</g>");

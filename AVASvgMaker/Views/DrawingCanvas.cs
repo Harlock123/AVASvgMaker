@@ -41,6 +41,7 @@ public class DrawingCanvas : Decorator
         ResizingLane,
         ResizingSelection,
         Rotating,
+        MovingLabel,
         DrawingConnector,
         Marquee
     }
@@ -128,6 +129,9 @@ public class DrawingCanvas : Decorator
 
     /// <summary>How far the pointer was from the shape's own angle when a turn began.</summary>
     private double _rotateGrip;
+
+    /// <summary>Where the label offset stood when a drag of it began.</summary>
+    private Vector _labelGrip;
 
     /// <summary>Where each shape of a selection stood when a stretch of the whole lot began.</summary>
     private readonly List<(DiagramShape Shape, Rect Start, Point[] Points)> _scaling = [];
@@ -1087,6 +1091,20 @@ public class DrawingCanvas : Decorator
             return;
         }
 
+        // A connector's label can be dragged clear of whatever it has landed on.
+        if (Document.Selection.Count == 1 &&
+            Document.Selected is ConnectorShape { Text.Length: > 0 } labelled &&
+            labelled.LabelArea.Contains(pagePoint))
+        {
+            _dragMode = DragMode.MovingLabel;
+            _dragOrigin = pagePoint;
+            _labelGrip = labelled.LabelOffset;
+
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+
         var handle = HandleAt(pagePoint);
 
         if (handle >= 0 && Document.Selection.Count > 1)
@@ -1410,6 +1428,13 @@ public class DrawingCanvas : Decorator
                 // still the upright rectangle - so the pointer is turned back to meet it.
                 sizing.Bounds = Document.ClampToPage(
                     Resize(_dragStartBounds, _activeHandle, sizing.Unrotate(pagePoint)));
+                _dragChanged = true;
+                InvalidateVisual();
+                ReportStatus();
+                return;
+
+            case DragMode.MovingLabel when Document.Selected is ConnectorShape labelled:
+                labelled.LabelOffset = _labelGrip + (pagePoint - _dragOrigin);
                 _dragChanged = true;
                 InvalidateVisual();
                 ReportStatus();
@@ -2241,7 +2266,7 @@ public class DrawingCanvas : Decorator
         if (_editor is null || _editing is null)
             return;
 
-        var bounds = _editing.Bounds;
+        var bounds = _editing.LabelArea;
         var origin = ToControl(bounds.TopLeft);
 
         Canvas.SetLeft(_editor, origin.X);
