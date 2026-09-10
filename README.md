@@ -57,7 +57,7 @@ Or [build it yourself](#building).
 - **Align, distribute and match size** - line a selection up on any edge, space it evenly, or size it to the shape selected last
 - **Drawing order** - bring to front, forward, backward, send to back, for one shape or a group
 - **Shape formatting** - fill and line colour, line style and weight, text colour and size, applied to the whole selection from a properties panel
-- **Containers and swimlanes** - pools, lanes and grouping boxes that hold what is dropped into them and carry it when they move
+- **Containers and swimlanes** - pools, lanes and grouping boxes that hold what is dropped into them and carry it when they move, with lanes you can drag to different heights
 
 **Getting work in and out**
 
@@ -193,10 +193,11 @@ A file records its format id and a version number, and the reader refuses both f
 and files written by a future version rather than loading them incorrectly. Version 2 added
 connection ports and routing, version 3 hand-placed bends, and version 4 the line style;
 older files still load, and version 1 connectors keep their original straight routing. Version 5
-added containers, version 6 multiple pages, and version 7 a paper size per page. Older files
-still load: a version 5 file, which had no page record around its shapes, becomes a document of
-one page, and a file up to version 6, which kept one size for the whole document, puts that
-size on every page it has. The on-disk
+added containers, version 6 multiple pages, version 7 a paper size per page, and version 8
+lane heights. Older files still load: a version 5 file, which had no page record around its
+shapes, becomes a document of one page; a file up to version 6, which kept one size for the
+whole document, puts that size on every page it has; and a file up to version 7 has no lane
+shares, so its pools come back evenly divided, which is how they were drawn. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -226,7 +227,7 @@ fields because its end points define it.
 |---|---|
 | **File menu** | New, Open, Save, Save As, Page set up, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route |
-| **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), and the four drawing-order commands |
+| **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, and folding either side panel away - plus a zoom box in the status bar |
 | **Select / Text box / Connector** | What a click on the page does. Text and Connector drop back to Select after one use of the text tool; the connector tool stays armed so several can be drawn in a row |
@@ -272,6 +273,15 @@ A pool, lane or grouping box holds what is put into it:
   moved or resized. A lane has no resize handles of its own, and cannot be dragged around
   freely - the pool decides where it sits. **Dragging a lane reorders it** among its siblings
   instead, which is the only move a lane meaningfully has.
+- **Lanes can be different heights.** Drag the line between two lanes to move it: one gains
+  what the other gives up, and the lanes above and below stay where they are. A lane will not
+  be dragged below 24 px, so none can be squeezed out of existence, and the line only answers
+  where there is nothing else to click - a shape lying across it keeps the click. **Arrange ->
+  Even lane heights** puts a pool's lanes back on equal shares.
+- **A lane's height is a share, not a size.** Lanes divide the pool's body in proportion to
+  their shares, and every lane starts with one. So an untouched pool is divided equally, a
+  lane given twice its neighbour's share is drawn twice as tall, and resizing the pool keeps
+  whatever proportions the lanes were given rather than flattening them back out.
 - **A lane's contents travel with it.** Whenever a lane's band changes - because it was
   reordered, or because the pool was resized - what it holds moves by the same amount.
   Otherwise the shapes stay put while the band slides out from under them.
@@ -675,6 +685,12 @@ Images/                  Screenshots used above
   leaves glued ends alone, since the shape already positions them.
 - Handles are only offered for a selection of one; a group shows a dashed bounding box.
   Resizing several shapes at once is not implemented yet.
+- A lane's height is stored as a share rather than a height because the pool, not the lane,
+  decides the geometry. A stored height would have to be rewritten every time the pool was
+  resized, and would drift out of step the moment one of those rewrites was missed; shares are
+  simply divided afresh on every layout. Lane boundaries are computed from a running total of
+  the shares rather than by stacking heights up, so the last lane lands exactly on the bottom
+  of the pool whatever the shares round to.
 - Raster export calls each shape's own `Render` into a `RenderTargetBitmap`, rather than
   screenshotting the canvas. That is why the grid, the selection and the workspace are absent
   without anything having to be hidden first: the chrome lives in `DrawingCanvas.Render`, not
@@ -709,7 +725,6 @@ Natural next steps, roughly in order of usefulness:
 - Letting routed connectors avoid each other, not only the shapes
 - Resizing a multi-selection as a group, and grouping proper
 - Rulers, margins and smart guides
-- Lanes with individually adjustable heights
 
 ## License
 

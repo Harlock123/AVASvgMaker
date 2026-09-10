@@ -614,6 +614,75 @@ public class DiagramDocument
         return true;
     }
 
+    /// <summary>
+    /// The smallest share a lane may hold. Shares are relative, so this is not a height - it
+    /// only keeps a lane from being divided down to nothing and disappearing.
+    /// </summary>
+    private const double MinimumLaneShare = 0.01;
+
+    /// <summary>The height, in page units, below which a lane will not be dragged.</summary>
+    public const double MinimumLaneHeight = 24;
+
+    /// <summary>
+    /// Moves the boundary between a lane and the one below it, giving one what the other
+    /// loses. The pair's shares add up to what they did before, so the lanes above and below
+    /// them are left where they are.
+    ///
+    /// Returns false when the pair has no room to be divided differently.
+    /// </summary>
+    public bool ResizeLane(ContainerShape lane, double y)
+    {
+        if (lane.Container is not { } pool)
+            return false;
+
+        var lanes = LanesOf(pool);
+        var index = lanes.IndexOf(lane);
+
+        if (index < 0 || index + 1 >= lanes.Count)
+            return false;
+
+        var below = lanes[index + 1];
+        var top = lane.Bounds.Top;
+        var bottom = below.Bounds.Bottom;
+        var span = bottom - top;
+
+        if (span < MinimumLaneHeight * 2)
+            return false;
+
+        y = Math.Clamp(y, top + MinimumLaneHeight, bottom - MinimumLaneHeight);
+
+        var shared = Math.Max(MinimumLaneShare, lane.LaneShare)
+                     + Math.Max(MinimumLaneShare, below.LaneShare);
+
+        var above = shared * (y - top) / span;
+
+        if (Math.Abs(above - lane.LaneShare) < 1e-9)
+            return false;
+
+        lane.LaneShare = above;
+        below.LaneShare = shared - above;
+
+        LayoutContainers();
+        MarkModified();
+        return true;
+    }
+
+    /// <summary>Gives every lane of a pool the same share again.</summary>
+    public bool EvenLaneHeights(DiagramShape pool)
+    {
+        var lanes = LanesOf(pool);
+
+        if (lanes.Count < 2 || lanes.All(lane => Math.Abs(lane.LaneShare - 1) < 1e-9))
+            return false;
+
+        foreach (var lane in lanes)
+            lane.LaneShare = 1;
+
+        LayoutContainers();
+        MarkModified();
+        return true;
+    }
+
     /// <summary>The lanes of a pool, in the order they are drawn from top to bottom.</summary>
     public List<ContainerShape> LanesOf(DiagramShape pool) => ChildrenOf(pool)
         .OfType<ContainerShape>()
@@ -638,12 +707,21 @@ public class DiagramDocument
                 continue;
 
             var body = pool.Body;
-            var height = body.Height / lanes.Count;
+            var total = lanes.Sum(lane => Math.Max(MinimumLaneShare, lane.LaneShare));
+
+            // Boundaries are worked out from a running total rather than by adding heights up,
+            // so the last lane ends exactly on the bottom of the pool however the shares round.
+            var passed = 0.0;
 
             for (var i = 0; i < lanes.Count; i++)
             {
                 var lane = lanes[i];
-                var wanted = new Rect(body.X, body.Y + i * height, body.Width, height);
+                var top = body.Y + body.Height * passed / total;
+
+                passed += Math.Max(MinimumLaneShare, lane.LaneShare);
+
+                var bottom = body.Y + body.Height * passed / total;
+                var wanted = new Rect(body.X, top, body.Width, bottom - top);
 
                 if (lane.Bounds == wanted)
                     continue;

@@ -38,6 +38,14 @@ public class ContainerShape : DiagramShape
     /// <summary>A lane is positioned by the pool that owns it, not by its own handles.</summary>
     public override bool IsBoxResizable => _kind != ShapeKind.Lane;
 
+    /// <summary>
+    /// A lane's share of its pool. Lanes divide the pool's body in proportion to these, so
+    /// equal shares - which is what every lane starts with - divide it equally, and a lane
+    /// given twice the share of its neighbour is drawn twice as tall. Held as a share rather
+    /// than a height so that resizing the pool keeps the proportions the lanes were given.
+    /// </summary>
+    public double LaneShare { get; set; } = 1;
+
     public ContainerShape(ShapeKind kind, Rect bounds, HeaderEdge header) : base(bounds)
     {
         _kind = kind;

@@ -121,6 +121,8 @@
                           Click="OnOrderClick" />
                 <MenuItem Header="Send to bac_k" InputGesture="Ctrl+Shift+B" Tag="Back"
                           Click="OnOrderClick" />
+                <Separator />
+                <MenuItem Header="_Even lane heights" Click="OnEvenLanesClick" />
             </MenuItem>
             <MenuItem Header="_Page">
                 <MenuItem Header="_New page" InputGesture="Ctrl+Shift+P" Click="OnNewPageClick" />

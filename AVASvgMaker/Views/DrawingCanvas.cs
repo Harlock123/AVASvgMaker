@@ -38,6 +38,7 @@ public class DrawingCanvas : Decorator
         MovingBend,
         MovingSegment,
         ReorderingLane,
+        ResizingLane,
         DrawingConnector,
         Marquee
     }
@@ -882,6 +883,14 @@ public class DrawingCanvas : Decorator
         var hit = Document.HitTest(pagePoint, Screen(LineHitPixels));
         var extending = IsExtending(e.KeyModifiers);
 
+        // The line between two lanes is draggable, but only where there is nothing else to
+        // click: a shape sitting across the boundary keeps the click.
+        if (hit is null or ContainerShape && LaneDividerAt(pagePoint) is { } divider)
+        {
+            BeginLaneResize(divider, e);
+            return;
+        }
+
         if (hit is null)
         {
             // An empty-page drag sweeps out a selection marquee.
@@ -930,6 +939,58 @@ public class DrawingCanvas : Decorator
         e.Handled = true;
     }
 
+    /// <summary>How near the line between two lanes counts as grabbing it, in screen pixels.</summary>
+    private const double LaneDividerPixels = 4;
+
+    /// <summary>
+    /// The lane whose bottom edge the point is on, or null. Only the boundaries between lanes
+    /// count: the bottom of the last lane is the bottom of the pool, which is the pool's own
+    /// edge to drag.
+    /// </summary>
+    private ContainerShape? LaneDividerAt(Point pagePoint)
+    {
+        var reach = Screen(LaneDividerPixels);
+
+        foreach (var pool in Document.Shapes.OfType<ContainerShape>().Where(c => c.Kind == ShapeKind.Pool))
+        {
+            var body = pool.Body;
+
+            if (pagePoint.X < body.Left || pagePoint.X > body.Right)
+                continue;
+
+            var lanes = Document.LanesOf(pool);
+
+            // The last lane's bottom is the pool's, so it is not a divider between lanes.
+            for (var i = 0; i < lanes.Count - 1; i++)
+            {
+                if (Math.Abs(pagePoint.Y - lanes[i].Bounds.Bottom) <= reach)
+                    return lanes[i];
+            }
+        }
+
+        return null;
+    }
+
+    private void BeginLaneResize(ContainerShape lane, PointerPressedEventArgs e)
+    {
+        _dragLane = lane;
+        _dragMode = DragMode.ResizingLane;
+
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    /// <summary>Drags the line between two lanes, giving one the height the other loses.</summary>
+    private void ResizeLane(ContainerShape lane, Point pagePoint)
+    {
+        if (!Document.ResizeLane(lane, Grid.Snap(pagePoint.Y)))
+            return;
+
+        _dragChanged = true;
+        InvalidateVisual();
+        ReportStatus();
+    }
+
     private void BeginLaneReorder(ContainerShape lane, PointerPressedEventArgs e)
     {
         _dragLane = lane;
@@ -950,10 +1011,14 @@ public class DrawingCanvas : Decorator
         if (lanes.Count < 2 || body.Height <= 0)
             return;
 
-        var band = body.Height / lanes.Count;
-        var position = (int)Math.Floor((pagePoint.Y - body.Top) / band);
+        // Lanes can be different heights, so the band under the pointer is the first one whose
+        // bottom it has not passed rather than a fixed fraction of the pool.
+        var position = lanes.FindIndex(band => pagePoint.Y < band.Bounds.Bottom);
 
-        if (!Document.MoveLaneTo(lane, Math.Clamp(position, 0, lanes.Count - 1)))
+        if (position < 0)
+            position = lanes.Count - 1;
+
+        if (!Document.MoveLaneTo(lane, position))
             return;
 
         _dragChanged = true;
@@ -1077,6 +1142,10 @@ public class DrawingCanvas : Decorator
                                              && Document.Selection.Count == 1:
                 DragSegment(sliding, pagePoint);
                 return;
+
+            case DragMode.ResizingLane when _dragLane is { } resizing:
+                ResizeLane(resizing, pagePoint);
+                break;
 
             case DragMode.ReorderingLane when _dragLane is { } lane:
                 ReorderLane(lane, pagePoint);
@@ -1364,8 +1433,13 @@ public class DrawingCanvas : Decorator
         }
         else
         {
-            cursor = Document.HitTest(pagePoint, Screen(LineHitPixels)) switch
+            var hit = Document.HitTest(pagePoint, Screen(LineHitPixels));
+
+            cursor = hit switch
             {
+                // The same cursor as a lane's own band, because it does the same kind of thing.
+                null or ContainerShape when LaneDividerAt(pagePoint) is not null =>
+                    StandardCursorType.SizeNorthSouth,
                 ContainerShape { Kind: ShapeKind.Lane } => StandardCursorType.SizeNorthSouth,
                 not null => StandardCursorType.SizeAll,
                 _ => StandardCursorType.Arrow

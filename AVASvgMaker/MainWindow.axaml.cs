@@ -102,6 +102,39 @@ public partial class MainWindow : Window
         Canvas.ReportStatus();
     }
 
+    /// <summary>
+    /// Puts a pool's lanes back on equal shares. Works from whatever is selected: the pool
+    /// itself, or a lane, or a shape sitting in one.
+    /// </summary>
+    private void OnEvenLanesClick(object? sender, RoutedEventArgs e)
+    {
+        var pool = PoolOf(Canvas.Document.Selected);
+
+        if (pool is null)
+        {
+            StatusText.Text = "Select a pool, or something in one, to even its lanes";
+            return;
+        }
+
+        StatusText.Text = Canvas.Document.EvenLaneHeights(pool)
+            ? "Lane heights evened"
+            : "Those lanes are already even";
+
+        Canvas.InvalidateVisual();
+    }
+
+    /// <summary>The pool a shape belongs to, walking out through whatever contains it.</summary>
+    private static DiagramShape? PoolOf(DiagramShape? shape)
+    {
+        for (var at = shape; at is not null; at = at.Container)
+        {
+            if (at is ContainerShape { Kind: ShapeKind.Pool })
+                return at;
+        }
+
+        return null;
+    }
+
     #region Pages
 
     private void OnNewPageClick(object? sender, RoutedEventArgs e) => Canvas.Document.AddPage();

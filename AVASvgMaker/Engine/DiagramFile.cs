@@ -25,9 +25,10 @@ public static partial class DiagramFile
     public const string Extension = "avadiag";
     /// <summary>
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
-    /// 5 containers, 6 multiple pages, 7 a paper size per page. Older files still load.
+    /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights.
+    /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -100,6 +101,13 @@ public static partial class DiagramFile
 
         /// <summary>The container this shape sits in, by id. Absent when it sits on the page.</summary>
         public int? ContainerId { get; set; }
+
+        /// <summary>
+        /// A lane's share of its pool. Version 8 onwards, and only written for a lane that
+        /// does not hold the standard single share - so an evenly divided pool, which is most
+        /// of them, writes nothing at all.
+        /// </summary>
+        public double? LaneShare { get; set; }
 
         public ConnectorRecord? Connector { get; set; }
     }
@@ -212,7 +220,11 @@ public static partial class DiagramFile
             StrokeThickness = shape.StrokeThickness,
             StrokeStyle = shape.StrokeStyle.ToString(),
             FontSize = shape.FontSize,
-            ContainerId = IdOf(shape.Container, ids)
+            ContainerId = IdOf(shape.Container, ids),
+            LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
+                        && Math.Abs(lane.LaneShare - 1) > 1e-9
+                ? lane.LaneShare
+                : null
         };
 
         if (shape is ConnectorShape connector)
@@ -365,6 +377,10 @@ public static partial class DiagramFile
         shape.StrokeThickness = record.StrokeThickness > 0 ? record.StrokeThickness : 2;
         shape.StrokeStyle = Parse(record.StrokeStyle, Models.StrokeStyle.Solid);
         shape.FontSize = record.FontSize > 0 ? record.FontSize : 13;
+
+        // Absent before version 8, and absent since for any lane on the standard share.
+        if (shape is ContainerShape { Kind: ShapeKind.Lane } lane && record.LaneShare is { } share && share > 0)
+            lane.LaneShare = share;
 
         return shape;
     }
