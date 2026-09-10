@@ -36,7 +36,7 @@ Or [build it yourself](#building).
 
 - **96 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML and network, in categories that fold away, with a search box
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
-- **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder
+- **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder, each on its own paper
 - **Drag and drop** - drag a stencil onto the page, or click a stencil and then click where you want it
 - **Grid snap** - positions and sizes snap to the grid, switchable between 5, 10, 20, 25 and 50 px
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
@@ -123,9 +123,11 @@ document. Duplicating a page copies its contents through the file format, so the
 real copies with their own glue rather than references shared with the page they came from.
 Deleting a page with anything on it asks first, since there is no other way back to it.
 
-The **page size belongs to the document**, not to a page, so every page of a document prints
-on the same paper. The selection does not follow you across pages, and a label part-way
-through being typed is finished on the page it was started on.
+**Each page carries its own paper**, so one document can hold a portrait page, a landscape
+one and an A5 note. A new page takes its size from the page you made it on, which is nearly
+always what is wanted, and page setup offers to apply a size to every page at once when there
+is more than one. The selection does not follow you across pages, and a label part-way through
+being typed is finished on the page it was started on.
 
 **Which page is in front of you is not an edit.** Like the selection, it is carried alongside
 the undo history rather than recorded in it, so turning pages never fills the history with
@@ -134,7 +136,8 @@ it stood. Adding, deleting, renaming and reordering pages *are* edits, and undo 
 
 ## Page setup and image export
 
-**File -> Page set up** sets the paper for every page of the document. Pick one of the six presets -
+**File -> Page set up** sets the paper the current page sits on - or, with **Apply to every
+page**, all of them at once. Pick one of the six presets -
 Letter, Legal, Tabloid, A3, A4 or A5 - or type a width and height; picking a preset or
 flipping the orientation fills the boxes in, and typing your own numbers moves the size
 box to *Custom*. A **Fit to the drawing** button sizes the page to what is on it, with a
@@ -160,6 +163,9 @@ PDF is also the only export that can hold a whole document, so it is the only on
 a document of several pages offers **All pages** or **This page only**. Every other export
 writes a single picture, and writes the page in front of you.
 
+Each page goes into the PDF at its own size, so a landscape page among portrait ones comes out
+landscape rather than being squeezed onto the others' paper.
+
 The four **picture** formats share one dialog: 1x, 2x, 3x or 4x, with the pixel size each
 scale produces shown against it, and anything over 100 megapixels refused. JPEG and WebP add
 a quality setting, because they are the two that throw detail away.
@@ -175,20 +181,22 @@ a quality setting, because they are the two that throw detail away.
 
 | | |
 |---|---|
-| **`.avadiag`** | The native format - JSON, human-readable and diffable. Round-trips everything: pages and their names, shapes, labels, colours, z-order, page size, and the glue, ports and routing of connectors. This is the one to save your work in |
+| **`.avadiag`** | The native format - JSON, human-readable and diffable. Round-trips everything: pages with their names and paper sizes, shapes, labels, colours, z-order, and the glue, ports and routing of connectors. This is the one to save your work in |
 | **`.svg`** | Export only. Standards-compliant SVG for handing to another tool. Lossy as a working format: glue and tool state are not representable, so exports cannot be reopened for editing |
 | **`.png`** | Export only. The page rendered at 1x, 2x, 3x or 4x, for pasting into a document or a chat where SVG is not welcome |
 | **`.jpg`** | Export only. Lossy, no transparency, quality adjustable. There when something insists on JPEG |
 | **`.webp`** | Export only. Lossy, quality adjustable. Smaller than PNG at moderate quality |
 | **`.bmp`** | Export only. The same render as the PNG, written as a 24-bit uncompressed Windows bitmap, for tools that will take nothing else. Much the larger file for exactly the same picture |
-| **`.pdf`** | Export only. Vector pages at their true physical size, with the text left as text - the whole document in one file, or just the page you are on. The one to print or to attach |
+| **`.pdf`** | Export only. Vector pages at their true physical size, each at its own, with the text left as text - the whole document in one file, or just the page you are on. The one to print or to attach |
 
 A file records its format id and a version number, and the reader refuses both foreign JSON
 and files written by a future version rather than loading them incorrectly. Version 2 added
 connection ports and routing, version 3 hand-placed bends, and version 4 the line style;
 older files still load, and version 1 connectors keep their original straight routing. Version 5
-added containers, and version 6 multiple pages - a version 5 file, which had no page record
-around its shapes, loads as a document of one page. The on-disk
+added containers, version 6 multiple pages, and version 7 a paper size per page. Older files
+still load: a version 5 file, which had no page record around its shapes, becomes a document of
+one page, and a file up to version 6, which kept one size for the whole document, puts that
+size on every page it has. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -636,12 +644,13 @@ Images/                  Screenshots used above
   visual tree loses its capture. And the capture is taken when the drag starts rather than
   when the button goes down, because capturing on the press would stop the second press of a
   double-click from reaching the tab that wants it for renaming.
-- Pages are a list on the document, and `Shapes` is the current page's list rather than a
-  field of its own. That is what keeps the canvas, the arranger, the clipboard and the
-  exporters unaware that there is more than one page: they all go through `Shapes` and get the
-  page in front of the user. The exporters that need another page - the PDF writer - ask for it
-  by name through `Refresh(page)`, which switches without raising the events a real page turn
-  would.
+- Pages are a list on the document, and both `Shapes` and `PageWidth`/`PageHeight` read
+  through to the current page rather than being fields of their own. That is what keeps the
+  canvas, the arranger, the clipboard and the picture exporters unaware that a document has
+  more than one page, or that its pages can be different sizes: they ask the document and get
+  the page in front of the user. Only the PDF writer needs the others, and it asks for a page
+  by name - `Refresh(page)` to bring it up to date, which switches without raising the events
+  a real page turn would, and then the page's own `Width` and `Height` to size it.
 - The clipboard is the file format with a subset of the shapes, which is what makes pasted
   shapes real copies rather than shared references. A connector copied without the shape it
   was glued to keeps its position: `DiagramFile` freezes such an end at its resolved point
@@ -701,7 +710,6 @@ Natural next steps, roughly in order of usefulness:
 - Resizing a multi-selection as a group, and grouping proper
 - Rulers, margins and smart guides
 - Lanes with individually adjustable heights
-- Per-page paper sizes, so a document can mix portrait and landscape
 
 ## License
 

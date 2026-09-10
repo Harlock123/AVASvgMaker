@@ -9,9 +9,18 @@ using AVASvgMaker.Models;
 
 namespace AVASvgMaker.Views;
 
-/// <summary>Chooses the size of the page. Returns the new size, or null if it was cancelled.</summary>
+/// <summary>The paper chosen, and whether every page is to be put on it.</summary>
+public record PageSetup(Size Size, bool AllPages);
+
+/// <summary>Chooses the size of a page. Returns the choice, or null if it was cancelled.</summary>
 public class PageSetupDialog : Window
 {
+    private readonly CheckBox _allPages = new()
+    {
+        Content = "Apply to every page",
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
     private readonly ComboBox _preset = new() { Width = 150 };
     private readonly ComboBox _orientation = new() { Width = 150 };
     private readonly NumericUpDown _width = new() { Width = 150, Minimum = 100, Maximum = 20000, Increment = 10 };
@@ -22,7 +31,7 @@ public class PageSetupDialog : Window
     /// <summary>Guards the boxes against reacting while they are being filled in.</summary>
     private bool _syncing;
 
-    private PageSetupDialog(double width, double height, Rect? drawing)
+    private PageSetupDialog(double width, double height, Rect? drawing, int pageCount)
     {
         _drawing = drawing;
 
@@ -53,6 +62,10 @@ public class PageSetupDialog : Window
         layout.Children.Add(Row("Height", _height));
         layout.Children.Add(_summary);
 
+        // Only worth asking when there is more than one page to ask about.
+        if (pageCount > 1)
+            layout.Children.Add(_allPages);
+
         if (drawing is { Width: > 0, Height: > 0 })
         {
             var fit = new Button { Content = "Fit to the drawing", HorizontalAlignment = HorizontalAlignment.Left };
@@ -69,7 +82,8 @@ public class PageSetupDialog : Window
         };
 
         var ok = new Button { Content = "OK", MinWidth = 88, IsDefault = true };
-        ok.Click += (_, _) => Close(new Size(Value(_width), Value(_height)));
+        ok.Click += (_, _) => Close(new PageSetup(
+            new Size(Value(_width), Value(_height)), _allPages.IsChecked == true));
 
         var cancel = new Button { Content = "Cancel", MinWidth = 88, IsCancel = true };
         cancel.Click += (_, _) => Close(null);
@@ -188,9 +202,10 @@ public class PageSetupDialog : Window
                         $"{width / 96 * 25.4:0} x {height / 96 * 25.4:0} mm";
     }
 
-    public static async Task<Size?> ShowAsync(Window owner, double width, double height, Rect? drawing)
+    public static async Task<PageSetup?> ShowAsync(
+        Window owner, double width, double height, Rect? drawing, int pageCount)
     {
-        var dialog = new PageSetupDialog(width, height, drawing);
-        return await dialog.ShowDialog<Size?>(owner);
+        var dialog = new PageSetupDialog(width, height, drawing, pageCount);
+        return await dialog.ShowDialog<PageSetup?>(owner);
     }
 }

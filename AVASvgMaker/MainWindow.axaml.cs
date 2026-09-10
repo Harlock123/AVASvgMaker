@@ -184,7 +184,10 @@ public partial class MainWindow : Window
             : string.Empty;
 
         Canvas.CancelInteraction();
-        Canvas.InvalidateVisual();
+
+        // Pages can be different sizes, so turning to one resizes the canvas under it.
+        // SyncPageSize repaints, so there is no separate invalidate here.
+        Canvas.SyncPageSize();
 
         // The status line counts the shapes on the page in front of you, so it has to be
         // asked again once that is a different page.
@@ -1028,16 +1031,18 @@ public partial class MainWindow : Window
         Canvas.CommitEdit();
 
         var document = Canvas.Document;
-        var size = await PageSetupDialog.ShowAsync(
-            this, document.PageWidth, document.PageHeight, document.DrawingBounds);
+        var setup = await PageSetupDialog.ShowAsync(
+            this, document.PageWidth, document.PageHeight, document.DrawingBounds,
+            document.Pages.Count);
 
-        if (size is not { } chosen)
+        if (setup is null)
             return;
 
-        document.SetPageSize(chosen.Width, chosen.Height);
+        document.SetPageSize(setup.Size.Width, setup.Size.Height, setup.AllPages);
         Canvas.SyncPageSize();
 
-        StatusText.Text = $"Page is now {chosen.Width:0} x {chosen.Height:0}";
+        var what = setup.AllPages && document.Pages.Count > 1 ? "Every page" : "This page";
+        StatusText.Text = $"{what} is now {setup.Size.Width:0} x {setup.Size.Height:0}";
     }
 
     private void OnExportSvgClick(object? sender, RoutedEventArgs e) => _ = ExportSvgAsync();

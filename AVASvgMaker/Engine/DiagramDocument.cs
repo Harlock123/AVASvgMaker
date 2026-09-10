@@ -15,11 +15,6 @@ namespace AVASvgMaker.Engine;
 /// </summary>
 public class DiagramDocument
 {
-    // US Letter at 96 DPI. The size belongs to the document rather than to a page, so every
-    // page of a document prints on the same paper.
-    public double PageWidth { get; set; } = 816;
-    public double PageHeight { get; set; } = 1056;
-
     private readonly List<DiagramPage> _pages = [new DiagramPage("Page 1")];
     private int _pageIndex;
 
@@ -60,6 +55,24 @@ public class DiagramDocument
 
     /// <summary>The shapes on the current page. Index order is z-order.</summary>
     public List<DiagramShape> Shapes => _pages[_pageIndex].Shapes;
+
+    /// <summary>
+    /// The paper the current page is on. Each page carries its own, so a document can mix
+    /// portrait and landscape; like <see cref="Shapes"/>, this reads through to whichever page
+    /// is in front of the user, which is what keeps the canvas and the exporters from having
+    /// to know that pages can differ.
+    /// </summary>
+    public double PageWidth
+    {
+        get => CurrentPage.Width;
+        set => CurrentPage.Width = value;
+    }
+
+    public double PageHeight
+    {
+        get => CurrentPage.Height;
+        set => CurrentPage.Height = value;
+    }
 
     private readonly List<DiagramShape> _selection = [];
 
@@ -240,9 +253,6 @@ public class DiagramDocument
     /// <summary>Takes on the contents of a freshly loaded document, keeping this instance.</summary>
     public void ReplaceWith(DiagramDocument source)
     {
-        PageWidth = source.PageWidth;
-        PageHeight = source.PageHeight;
-
         _pages.Clear();
         _pages.AddRange(source._pages);
 
@@ -296,7 +306,13 @@ public class DiagramDocument
     {
         PageChanging?.Invoke();
 
-        var page = new DiagramPage(UnusedPageName());
+        // A new page takes its paper from the one you were on, which is nearly always what
+        // is wanted and is the only guess available.
+        var page = new DiagramPage(UnusedPageName())
+        {
+            Width = CurrentPage.Width,
+            Height = CurrentPage.Height
+        };
 
         _pages.Insert(Math.Clamp(position, 0, _pages.Count), page);
         _pageIndex = _pages.IndexOf(page);
@@ -321,7 +337,12 @@ public class DiagramDocument
 
         index = Math.Clamp(index, 0, _pages.Count - 1);
 
-        var copy = new DiagramPage(UnusedPageName());
+        var copy = new DiagramPage(UnusedPageName())
+        {
+            Width = _pages[index].Width,
+            Height = _pages[index].Height
+        };
+
         copy.Shapes.AddRange(DiagramFile.CopyOf(_pages[index].Shapes));
 
         _pages.Insert(index + 1, copy);
@@ -691,15 +712,27 @@ public class DiagramDocument
 
     #endregion
 
-    /// <summary>Resizes the page, as an edit that can be undone.</summary>
-    public void SetPageSize(double width, double height)
+    /// <summary>
+    /// Resizes the current page, or every page, as an edit that can be undone. Nothing is
+    /// recorded when the pages already have that size.
+    /// </summary>
+    public void SetPageSize(double width, double height, bool allPages = false)
     {
-        if (Math.Abs(PageWidth - width) < 0.01 && Math.Abs(PageHeight - height) < 0.01)
-            return;
+        var targets = allPages ? _pages : [CurrentPage];
+        var changed = false;
 
-        PageWidth = width;
-        PageHeight = height;
-        MarkModified();
+        foreach (var page in targets)
+        {
+            if (Math.Abs(page.Width - width) < 0.01 && Math.Abs(page.Height - height) < 0.01)
+                continue;
+
+            page.Width = width;
+            page.Height = height;
+            changed = true;
+        }
+
+        if (changed)
+            MarkModified();
     }
 
     /// <summary>The box around everything on the page, or nothing when it is empty.</summary>

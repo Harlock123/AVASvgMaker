@@ -25,9 +25,9 @@ public static partial class DiagramFile
     public const string Extension = "avadiag";
     /// <summary>
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
-    /// 5 containers, 6 multiple pages. Older files still load.
+    /// 5 containers, 6 multiple pages, 7 a paper size per page. Older files still load.
     /// </summary>
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -47,7 +47,13 @@ public static partial class DiagramFile
     {
         public string Format { get; set; } = FormatId;
         public int Version { get; set; } = CurrentVersion;
+        /// <summary>
+        /// The paper every page was on, up to version 6, when the size belonged to the
+        /// document. Still read, as the size for every page of an older file; no longer
+        /// written, because each page now carries its own.
+        /// </summary>
         public double PageWidth { get; set; }
+
         public double PageHeight { get; set; }
 
         /// <summary>Version 6 onwards. Version 5 and earlier wrote a single page's shapes below.</summary>
@@ -60,6 +66,12 @@ public static partial class DiagramFile
     private sealed class PageRecord
     {
         public string Name { get; set; } = "Page 1";
+
+        /// <summary>Version 7 onwards. Absent in older files, which kept one size per document.</summary>
+        public double? Width { get; set; }
+
+        public double? Height { get; set; }
+
         public List<ShapeRecord> Shapes { get; set; } = [];
     }
 
@@ -145,16 +157,16 @@ public static partial class DiagramFile
         foreach (var shape in page.Shapes)
             ids[shape] = next++;
 
-        var record = new DocumentRecord
-        {
-            PageWidth = document.PageWidth,
-            PageHeight = document.PageHeight,
-            Pages = []
-        };
+        var record = new DocumentRecord { Pages = [] };
 
         foreach (var page in document.Pages)
         {
-            var pageRecord = new PageRecord { Name = page.Name };
+            var pageRecord = new PageRecord
+            {
+                Name = page.Name,
+                Width = page.Width,
+                Height = page.Height
+            };
 
             foreach (var shape in page.Shapes)
                 pageRecord.Shapes.Add(ToRecord(shape, ids));
@@ -253,12 +265,6 @@ public static partial class DiagramFile
 
         var document = new DiagramDocument();
 
-        if (record.PageWidth > 0 && record.PageHeight > 0)
-        {
-            document.PageWidth = record.PageWidth;
-            document.PageHeight = record.PageHeight;
-        }
-
         // Up to version 5 a document was one page, written without a page record around it.
         var pageRecords = record.Pages is { Count: > 0 }
             ? record.Pages
@@ -272,6 +278,17 @@ public static partial class DiagramFile
             var page = new DiagramPage(string.IsNullOrWhiteSpace(pageRecord.Name)
                 ? $"Page {p + 1}"
                 : pageRecord.Name);
+
+            // Version 7 onwards a page carries its own paper. Before that the document did,
+            // so an older file puts the one size it has on every page it has.
+            var width = pageRecord.Width ?? record.PageWidth;
+            var height = pageRecord.Height ?? record.PageHeight;
+
+            if (width > 0 && height > 0)
+            {
+                page.Width = width;
+                page.Height = height;
+            }
 
             // First pass builds the shapes, second pass glues connectors to them, so a
             // connector can reference a shape that is drawn above it. The table is per page,

@@ -42,13 +42,15 @@ public static class PdfExporter
         using var pdf = SKDocument.CreatePdf(stream, metadata)
             ?? throw new IOException("Skia would not open a PDF document.");
 
-        var width = document.PageWidth * PointsPerPixel;
-        var height = document.PageHeight * PointsPerPixel;
-
         var pages = allPages ? document.Pages : [document.CurrentPage];
 
         foreach (var page in pages)
         {
+            // Each page is written at its own size. PDF has no trouble with a document whose
+            // pages differ, so a landscape page among portrait ones comes out landscape.
+            var width = page.Width * PointsPerPixel;
+            var height = page.Height * PointsPerPixel;
+
             // Routes and lane positions are refreshed while painting on screen. Only the page
             // being edited has been painted, so every page is brought up to date here rather
             // than the export depending on which ones have been looked at.
@@ -56,7 +58,7 @@ public static class PdfExporter
 
             var canvas = pdf.BeginPage((float)width, (float)height);
 
-            var visual = new PageVisual(document, page);
+            var visual = new PageVisual(page);
             visual.Measure(new Size(width, height));
             visual.Arrange(new Rect(0, 0, width, height));
 
@@ -77,7 +79,7 @@ public static class PdfExporter
     /// carrying. Skia's <c>RasterDpi</c> would scale the content too - it divides by it - but
     /// that is a side effect of a setting that means something else, so it is left alone.
     /// </summary>
-    private sealed class PageVisual(DiagramDocument document, DiagramPage page) : Control
+    private sealed class PageVisual(DiagramPage page) : Control
     {
         public override void Render(DrawingContext context)
         {
@@ -85,7 +87,7 @@ public static class PdfExporter
                 Matrix.CreateScale(PointsPerPixel, PointsPerPixel));
 
             context.DrawRectangle(Brushes.White, null,
-                new Rect(0, 0, document.PageWidth, document.PageHeight));
+                new Rect(0, 0, page.Width, page.Height));
 
             foreach (var shape in page.Shapes)
                 shape.Render(context);

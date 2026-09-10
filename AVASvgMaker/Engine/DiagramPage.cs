@@ -15,6 +15,10 @@ public class DiagramPage(string name)
 {
     public string Name { get; set; } = name;
 
+    // US Letter at 96 DPI, until told otherwise.
+    public double Width { get; set; } = 816;
+    public double Height { get; set; } = 1056;
+
     /// <summary>Index order is z-order.</summary>
     public List<DiagramShape> Shapes { get; } = [];
 }
