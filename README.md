@@ -37,6 +37,7 @@ Or [build it yourself](#building).
 **Drawing**
 
 - **96 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML and network, in categories that fold away, with a search box
+- **Shapes of your own** - save any selection as a reusable shape and it joins the toolbox, kept between drawings and between sessions
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
 - **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder, each on its own paper
 - **Drag and drop** - drag a stencil onto the page, or click a stencil and then click where you want it
@@ -78,6 +79,36 @@ Or [build it yourself](#building).
 - **Zoom and pan** - 25% to 400%, `Ctrl`+wheel about the pointer, fit-to-page, middle-drag or space-drag to pan
 - **Collapsible panels** - fold the shapes and properties panels out of the way to give the page the whole window
 - **Follows the desktop theme** - on Omarchy the app takes its colours from the current theme and re-colours the moment you switch, with the palette it ships with as the fallback everywhere else
+
+## Shapes of your own
+
+![Saved shapes in the toolbox](Images/custom-shapes.png)
+
+**Edit -> Save selection as a shape** keeps whatever is selected under a name of your choosing.
+It appears in **My shapes** at the top of the toolbox and is placed like any other stencil -
+dragged onto the page, or clicked and then clicked where you want it. Right-click one to rename
+or delete it.
+
+![A saved shape placed twice](Images/custom-shapes-placed.png)
+
+A saved shape is **a piece of drawing, not an outline**. What comes back is what went in: every
+shape, its colours, its font, the connectors between them, and their grouping. That is why the
+thumbnail is the shapes themselves rather than a silhouette - in a list of other people's
+rectangles, the colours are most of what makes yours recognisable.
+
+It is stored as the same JSON the clipboard and the file format use, which is what makes this
+almost free: placing one is a paste with an aim rather than an offset, so it already arrives as
+a real copy with its own glue and its own group id - not more members of the group it was saved
+from, which may well still be on the page.
+
+The library lives beside the settings rather than beside a drawing, in
+`~/.config/AVASvgMaker/stencils.json` on Linux and the equivalent elsewhere: a shape you saved
+belongs to you, not to the file you happened to be working on. A library that will not parse is
+ignored rather than fatal - the shapes in the drawing matter and these do not.
+
+**A saved shape keeps exactly the grouping it was saved with.** Group the selection before
+saving it if you want it to move as one thing afterwards; save it ungrouped and it arrives as
+loose shapes.
 
 ## Stencils
 
@@ -263,7 +294,7 @@ fields because its end points define it.
 | Group | What it does |
 |---|---|
 | **File menu** | New, Open, Save, Save As, Page set up, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
-| **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route |
+| **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, and saving a selection as a shape of your own |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, rulers, smart guides, and folding either side panel away - plus a zoom box in the status bar |
@@ -656,6 +687,7 @@ AVASvgMaker/
     DisplayScaleWatcher.cs  Notices the compositor rescaling the display
     UndoStack.cs         Snapshot history, and the modified flag that follows it
     GridSettings.cs      Grid visibility, size and snapping maths
+    StencilLibrary.cs    The shapes you saved yourself, and the file they live in
     SvgExporter.cs       Document -> SVG document
     RasterExporter.cs    Document -> PNG, JPEG, WebP or BMP, at a chosen scale
     RasterFormat.cs      The four picture formats, and what each one is called
@@ -664,6 +696,7 @@ AVASvgMaker/
     DrawingCanvas.cs     The page: grid, shapes, tools, selection, connectors, label editing
     ToolboxPanel.cs      The stencil strip, and the drag source
     ShapePreview.cs      A stencil thumbnail
+    FragmentPreview.cs   A thumbnail of a saved shape - the shapes themselves, scaled
     ColorSwatchPicker.cs A colour button and palette that only reports real choices
     ConfirmDialog.cs     A three-way prompt, since Avalonia has no message box
     TextPromptDialog.cs  One line of text, for renaming a page
@@ -881,9 +914,17 @@ Images/                  Screenshots used above
 
 ## Not yet implemented
 
-Natural next steps, roughly in order of usefulness:
+Nothing outstanding. The list that used to live here - font and alignment, connection points on
+outlines, custom stencils, removing a bend by dragging it, connectors avoiding each other,
+grouping and group resize, rulers, margins, smart guides, lane heights, multiple pages - has
+been worked through.
 
-- Custom stencils saved from a drawing
+Where it would go next, if it went anywhere:
+
+- Rotating a shape, which nothing in the geometry currently allows for
+- Reading an SVG back in, which is a different and much larger problem than writing one
+- Data behind a shape - fields, and a way to show them - which is what separates a diagram tool
+  from a drawing one
 
 ## License
 

@@ -174,6 +174,12 @@ public class DrawingCanvas : Decorator
     /// <summary>The stencil waiting to be placed by the next click on the page, if any.</summary>
     public ShapeKind? ArmedKind { get; set; }
 
+    /// <summary>
+    /// The id of one of your own saved shapes, waiting to be put down. Held apart from
+    /// <see cref="ArmedKind"/> because a saved shape is several shapes and has no one kind.
+    /// </summary>
+    public string? ArmedStencil { get; set; }
+
     /// <summary>Line ends given to the next connector drawn.</summary>
     public EndCapStyle DefaultStartCap { get; set; } = EndCapStyle.None;
 
@@ -189,6 +195,9 @@ public class DrawingCanvas : Decorator
 
     /// <summary>Raised when the armed stencil is consumed or cleared by the canvas.</summary>
     public event Action<ShapeKind?>? ArmedKindChanged;
+
+    /// <summary>Raised when one of your own shapes has been put down and is no longer armed.</summary>
+    public event Action? StencilPlaced;
 
     /// <summary>Raised when the canvas changes the tool itself, so the toolbar can resync.</summary>
     public event Action<EditorTool>? ToolChanged;
@@ -810,8 +819,21 @@ public class DrawingCanvas : Decorator
         return Enum.TryParse<ShapeKind>(raw, out var kind) ? kind : null;
     }
 
+    private static string? StencilFromData(IDataObject data) =>
+        data.Get(ToolboxPanel.CustomDragFormat) as string;
+
     private void OnDragOver(object? sender, DragEventArgs e)
     {
+        var at = ToPage(e.GetPosition(this));
+
+        if (StencilFromData(e.Data) is { } id)
+        {
+            e.DragEffects = DragDropEffects.Copy;
+            _ghost = StencilGhost(id, at);
+            InvalidateVisual();
+            return;
+        }
+
         if (KindFromData(e.Data) is not { } kind)
         {
             e.DragEffects = DragDropEffects.None;
@@ -819,7 +841,7 @@ public class DrawingCanvas : Decorator
         }
 
         e.DragEffects = DragDropEffects.Copy;
-        _ghost = DefaultBoundsAt(kind, ToPage(e.GetPosition(this)));
+        _ghost = DefaultBoundsAt(kind, at);
         InvalidateVisual();
     }
 
@@ -833,6 +855,15 @@ public class DrawingCanvas : Decorator
     {
         _ghost = null;
 
+        if (StencilFromData(e.Data) is { } id)
+        {
+            PlaceStencil(id, ToPage(e.GetPosition(this)));
+            ClearArmed();
+            Focus();
+            e.Handled = true;
+            return;
+        }
+
         if (KindFromData(e.Data) is not { } kind)
             return;
 
@@ -844,11 +875,54 @@ public class DrawingCanvas : Decorator
 
     private void ClearArmed()
     {
+        if (ArmedStencil is not null)
+        {
+            ArmedStencil = null;
+            StencilPlaced?.Invoke();
+        }
+
         if (ArmedKind is null)
             return;
 
         ArmedKind = null;
         ArmedKindChanged?.Invoke(null);
+    }
+
+    /// <summary>
+    /// Drops a saved fragment with its middle at the point, and leaves it selected - the same
+    /// as a paste, so it can be moved straight away if it did not land where it was wanted.
+    /// </summary>
+    public IReadOnlyList<DiagramShape> PlaceStencil(string id, Point pageCentre)
+    {
+        if (StencilLibrary.Find(id) is not { } stencil)
+            return [];
+
+        var placed = ShapeClipboard.Place(Document, stencil.Fragment, Grid.Snap(pageCentre));
+
+        if (placed.Count > 0)
+        {
+            ReviewContainment();
+            InvalidateVisual();
+            ReportStatus();
+        }
+
+        return placed;
+    }
+
+    /// <summary>The outline a saved fragment would take up, centred where it would land.</summary>
+    private Rect? StencilGhost(string id, Point pageCentre)
+    {
+        if (StencilLibrary.Find(id) is not { } stencil ||
+            ShapeClipboard.Extent(stencil.Fragment) is not { } extent)
+            return null;
+
+        var centre = Grid.Snap(pageCentre);
+
+        return new Rect(
+            centre.X - extent.Width / 2,
+            centre.Y - extent.Height / 2,
+            extent.Width,
+            extent.Height);
     }
 
     private void SetTool(EditorTool tool)
@@ -979,6 +1053,15 @@ public class DrawingCanvas : Decorator
             case EditorTool.Text:
                 PlaceTextBox(pagePoint, e);
                 return;
+        }
+
+        if (ArmedStencil is { } saved)
+        {
+            PlaceStencil(saved, pagePoint);
+            ClearArmed();
+            _ghost = null;
+            e.Handled = true;
+            return;
         }
 
         if (ArmedKind is { } armed)
@@ -1695,7 +1778,7 @@ public class DrawingCanvas : Decorator
                 cursor = HandleCursors[handle];
             }
         }
-        else if (Tool != EditorTool.Select || ArmedKind is not null)
+        else if (Tool != EditorTool.Select || ArmedKind is not null || ArmedStencil is not null)
         {
             cursor = StandardCursorType.Cross;
         }
@@ -2318,9 +2401,11 @@ public class DrawingCanvas : Decorator
             {
                 EditorTool.Connector => "Drag between two shapes to connect them",
                 EditorTool.Text => "Click the page to add a text box",
-                _ => ArmedKind is { } armed
-                    ? $"Click the page to place a {ShapeFactory.DisplayName(armed)}"
-                    : $"{Document.Shapes.Count} shape(s) on the page"
+                _ => ArmedStencil is { } saved && StencilLibrary.Find(saved) is { } stencil
+                    ? $"Click the page to place {stencil.Name}"
+                    : ArmedKind is { } armed
+                        ? $"Click the page to place a {ShapeFactory.DisplayName(armed)}"
+                        : $"{Document.Shapes.Count} shape(s) on the page"
             }
         };
 

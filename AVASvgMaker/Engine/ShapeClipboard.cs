@@ -90,6 +90,47 @@ public static class ShapeClipboard
     }
 
     /// <summary>
+    /// Drops a saved fragment onto the page with its middle at the given point - what placing
+    /// a stencil of your own comes to. The same machinery as a paste, aimed rather than offset.
+    /// </summary>
+    public static IReadOnlyList<DiagramShape> Place(DiagramDocument document, string json, Point centre)
+    {
+        Rect union;
+
+        try
+        {
+            var shapes = DiagramFile.FromJson(json).Shapes;
+
+            if (shapes.Count == 0)
+                return [];
+
+            union = Union(shapes);
+        }
+        catch
+        {
+            return [];
+        }
+
+        return Paste(document, json, new Vector(
+            centre.X - union.Center.X,
+            centre.Y - union.Center.Y));
+    }
+
+    /// <summary>The size a fragment takes up, for a preview or a drop outline.</summary>
+    public static Rect? Extent(string json)
+    {
+        try
+        {
+            var shapes = DiagramFile.FromJson(json).Shapes;
+            return shapes.Count == 0 ? null : Union(shapes);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Moves the whole group by one offset, so the shapes keep their positions relative to
     /// each other, and pulls the group back if the offset would take it off the page.
     /// </summary>

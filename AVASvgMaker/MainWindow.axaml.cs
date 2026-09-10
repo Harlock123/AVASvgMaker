@@ -53,6 +53,11 @@ public partial class MainWindow : Window
 
         // The canvas clears the armed stencil once it has been placed.
         Canvas.ArmedKindChanged += kind => Toolbox.Arm(kind);
+        Canvas.StencilPlaced += () => Toolbox.ArmStencil(null);
+
+        Toolbox.StencilArmed += id => Canvas.ArmedStencil = id;
+        Toolbox.RenameRequested += stencil => _ = RenameStencilAsync(stencil);
+        Toolbox.DeleteRequested += stencil => _ = DeleteStencilAsync(stencil);
         Canvas.ToolChanged += SyncToolButtons;
         Canvas.SelectionChanged += SyncConnectorStyle;
         Canvas.SelectionChanged += SyncProperties;
@@ -107,6 +112,62 @@ public partial class MainWindow : Window
         SyncProperties();
         SyncPages();
         Canvas.ReportStatus();
+    }
+
+    /// <summary>
+    /// Keeps a selection as a shape of your own. It is saved as the same JSON the clipboard
+    /// carries, so what comes back is what was saved - several shapes, their formatting, their
+    /// glue and their grouping.
+    /// </summary>
+    private async void OnSaveStencilClick(object? sender, RoutedEventArgs e)
+    {
+        Canvas.CommitEdit();
+
+        var document = Canvas.Document;
+        var selection = document.WithGroups(document.Selection);
+
+        if (selection.Count == 0)
+        {
+            StatusText.Text = "Select something to save it as a shape";
+            return;
+        }
+
+        if (ShapeClipboard.Copy(document, selection) is not { } fragment)
+        {
+            StatusText.Text = "That selection cannot be saved as a shape";
+            return;
+        }
+
+        var suggested = selection.Count == 1 && !string.IsNullOrWhiteSpace(selection[0].Text)
+            ? selection[0].Text.Split('\n')[0].Trim()
+            : $"{selection.Count} shapes";
+
+        var name = await TextPromptDialog.ShowAsync(this, "Save as a shape", "Shape name", suggested);
+
+        if (name is null)
+            return;
+
+        StatusText.Text = StencilLibrary.Add(name, fragment) is { } saved
+            ? $"Saved \"{saved.Name}\" - it is in My shapes at the top of the toolbox"
+            : "That shape could not be saved";
+    }
+
+    private async Task RenameStencilAsync(CustomStencil stencil)
+    {
+        var name = await TextPromptDialog.ShowAsync(this, "Rename shape", "Shape name", stencil.Name);
+
+        if (name is not null)
+            StencilLibrary.Rename(stencil.Id, name);
+    }
+
+    private async Task DeleteStencilAsync(CustomStencil stencil)
+    {
+        var answer = await ConfirmDialog.ShowAsync(this,
+            $"Delete the saved shape \"{stencil.Name}\"? Drawings already using it are not affected.",
+            "Delete", "Keep");
+
+        if (answer == ConfirmResult.Primary && StencilLibrary.Remove(stencil.Id))
+            StatusText.Text = $"Deleted \"{stencil.Name}\"";
     }
 
     private void OnGroupClick(object? sender, RoutedEventArgs e)

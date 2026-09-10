@@ -99,6 +99,8 @@
                 <MenuItem Header="_Clear page" Click="OnClearClick" />
                 <Separator />
                 <MenuItem Header="_Reset connector route" Click="OnResetRouteClick" />
+                <Separator />
+                <MenuItem Header="Save selection as a _shape..." Click="OnSaveStencilClick" />
             </MenuItem>
             <MenuItem Header="_Arrange">
                 <MenuItem Header="A_lign">
