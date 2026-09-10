@@ -843,7 +843,7 @@ public partial class MainWindow : Window
                 break;
 
             case Key.E when shift:
-                _ = ExportPngAsync();
+                _ = ExportRasterAsync(RasterFormat.Png);
                 break;
 
             case Key.E:
@@ -930,30 +930,36 @@ public partial class MainWindow : Window
 
     private void OnExportSvgClick(object? sender, RoutedEventArgs e) => _ = ExportSvgAsync();
 
-    private void OnExportPngClick(object? sender, RoutedEventArgs e) => _ = ExportPngAsync();
+    private void OnExportPngClick(object? sender, RoutedEventArgs e) =>
+        _ = ExportRasterAsync(RasterFormat.Png);
 
-    private async Task ExportPngAsync()
+    private void OnExportBmpClick(object? sender, RoutedEventArgs e) =>
+        _ = ExportRasterAsync(RasterFormat.Bmp);
+
+    /// <summary>PNG and BMP are the same export; only the bytes at the end of it differ.</summary>
+    private async Task ExportRasterAsync(RasterFormat format)
     {
         Canvas.CommitEdit();
 
-        var scale = await PngExportDialog.ShowAsync(this, Canvas.Document);
+        var scale = await RasterExportDialog.ShowAsync(this, Canvas.Document, format);
 
         if (scale is not { } chosen)
             return;
 
         var suggested = Path.GetFileNameWithoutExtension(_currentFile?.Name ?? "diagram");
+        var extension = format.Extension();
 
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export PNG",
-            SuggestedFileName = $"{suggested}.png",
-            DefaultExtension = "png",
+            Title = $"Export {format.Label()}",
+            SuggestedFileName = $"{suggested}.{extension}",
+            DefaultExtension = extension,
             FileTypeChoices =
             [
-                new FilePickerFileType("PNG image")
+                new FilePickerFileType(format.Description())
                 {
-                    Patterns = ["*.png"],
-                    MimeTypes = ["image/png"]
+                    Patterns = [$"*.{extension}"],
+                    MimeTypes = [format.MimeType()]
                 }
             ]
         });
@@ -964,13 +970,13 @@ public partial class MainWindow : Window
         try
         {
             await using var stream = await file.OpenWriteAsync();
-            PngExporter.Export(Canvas.Document, stream, chosen);
+            RasterExporter.Export(Canvas.Document, stream, chosen, format);
             await stream.FlushAsync();
 
             if (stream.CanSeek)
                 stream.SetLength(stream.Position);
 
-            var size = PngExporter.SizeAt(Canvas.Document, chosen);
+            var size = RasterExporter.SizeAt(Canvas.Document, chosen);
             StatusText.Text = $"Exported {file.Name} at {size.Width} x {size.Height}";
         }
         catch (Exception ex)

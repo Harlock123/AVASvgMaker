@@ -62,7 +62,7 @@ Or [build it yourself](#building).
 
 - **Save and load** - a native `.avadiag` document that keeps what SVG export cannot: glue, ports, hand-placed bends, containment and z-order
 - **SVG export** - real SVG primitives, not a bitmap trace
-- **PNG export** - the page rendered at 1x to 4x, on white, with no grid or selection handles in the picture
+- **PNG and BMP export** - the page rendered at 1x to 4x, on white, with no grid or selection handles in the picture
 - **Six platforms** - Windows, macOS and Linux, on both x64 and ARM, each a single self-contained executable
 
 **Fitting in**
@@ -101,7 +101,7 @@ share one outline and differ only in that marker, which is exactly how the notat
 defined: the four gateways *are* one diamond with four different marks in it. The same definition produces both the
 on-screen geometry and the exported SVG, so the two cannot drift apart.
 
-## Page setup and PNG export
+## Page setup and image export
 
 **File -> Page set up** sets the page the drawing sits on. Pick one of the six presets -
 Letter, Legal, Tabloid, A3, A4 or A5 - or type a width and height; picking a preset or
@@ -112,12 +112,22 @@ alongside. The page size is part of the document, saved with it and undoable lik
 edit. Shrinking the page leaves the shapes where they are, as Visio does, so anything now
 past the edge stays put until you move it - at which point it is clamped back onto the page.
 
-**File -> Export PNG** (`Ctrl+Shift+E`) renders the page at 1x, 2x, 3x or 4x - the dialog
-shows the pixel size each scale produces, and refuses anything over 100 megapixels. What is
-exported is the page and only the page: white paper, no grid, no selection handles, no
-workspace around it, whatever the screen happens to be showing. Containers are laid out and
-connectors routed before the render, so an export straight after opening a file matches what
-the app would draw.
+**File -> Export** holds all three exports together: **SVG** (`Ctrl+E`), **PNG**
+(`Ctrl+Shift+E`) and **BMP**. SVG writes real vector primitives; PNG and BMP are the same
+rasterised export and share a dialog, differing only in how the finished bitmap is written
+out.
+
+The raster dialog offers 1x, 2x, 3x or 4x, shows the pixel size each scale produces, and
+refuses anything over 100 megapixels. A BMP is uncompressed, so its exact file size is
+worked out and shown before you commit to it. What is exported is the page and only the
+page: white paper, no grid, no selection handles, no workspace around it, whatever the
+screen happens to be showing. Containers are laid out and connectors routed before the
+render, so an export straight after opening a file matches what the app would draw.
+
+BMP is there for the tools that will not take anything else - some older Windows software,
+a few embedded and print workflows. It is a 24-bit uncompressed Windows bitmap, which is the
+variant everything that reads BMP at all can open. Prefer PNG where you have the choice: it
+is the same picture, pixel for pixel, in a fraction of the space.
 
 ## Files
 
@@ -126,6 +136,7 @@ the app would draw.
 | **`.avadiag`** | The native format - JSON, human-readable and diffable. Round-trips everything: shapes, labels, colours, z-order, page size, and the glue, ports and routing of connectors. This is the one to save your work in |
 | **`.svg`** | Export only. Standards-compliant SVG for handing to another tool. Lossy as a working format: glue and tool state are not representable, so exports cannot be reopened for editing |
 | **`.png`** | Export only. The page rendered at 1x, 2x, 3x or 4x, for pasting into a document or a chat where SVG is not welcome |
+| **`.bmp`** | Export only. The same render as the PNG, written as a 24-bit uncompressed Windows bitmap, for tools that will take nothing else. Much the larger file for exactly the same picture |
 
 A file records its format id and a version number, and the reader refuses both foreign JSON
 and files written by a future version rather than loading them incorrectly. Version 2 added
@@ -158,7 +169,7 @@ fields because its end points define it.
 
 | Group | What it does |
 |---|---|
-| **File menu** | New, Open, Save, Save As, Page set up, Export SVG, Export PNG, Exit |
+| **File menu** | New, Open, Save, Save As, Page set up, Export (SVG, PNG, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), and the four drawing-order commands |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, and folding either side panel away - plus a zoom box in the status bar |
@@ -255,7 +266,7 @@ nothing shows through and they read correctly whatever is behind them.
 |---|---|
 | `F9` / `F10` | Fold the shapes and properties panels away |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New, Open, Save, Save As |
-| `Ctrl+E` / `Ctrl+Shift+E` | Export SVG, Export PNG |
+| `Ctrl+E` / `Ctrl+Shift+E` | Export SVG, Export PNG (BMP is on the same submenu) |
 | `Ctrl+Z` / `Ctrl+Y` (or `Ctrl+Shift+Z`) | Undo, Redo |
 | `Ctrl+X` / `Ctrl+C` / `Ctrl+V` | Cut, Copy, Paste |
 | `Ctrl+D` | Duplicate the selection |
@@ -452,7 +463,8 @@ AVASvgMaker/
     UndoStack.cs         Snapshot history, and the modified flag that follows it
     GridSettings.cs      Grid visibility, size and snapping maths
     SvgExporter.cs       Document -> SVG document
-    PngExporter.cs       Document -> PNG bitmap, at a chosen scale
+    RasterExporter.cs    Document -> PNG or BMP bitmap, at a chosen scale
+    RasterFormat.cs      PNG or BMP, and what each one is called
   Views/      Controls that draw themselves
     DrawingCanvas.cs     The page: grid, shapes, tools, selection, connectors, label editing
     ToolboxPanel.cs      The stencil strip, and the drag source
@@ -460,7 +472,7 @@ AVASvgMaker/
     ColorSwatchPicker.cs A colour button and palette that only reports real choices
     ConfirmDialog.cs     A three-way prompt, since Avalonia has no message box
     PageSetupDialog.cs   Paper size, orientation, and fit-to-drawing
-    PngExportDialog.cs   Export scale, and the pixel size it comes to
+    RasterExportDialog.cs  Export scale, and the pixel size it comes to
 
 build.sh                 Builds every target it can, and explains the rest
 .github/workflows/       Builds all six on a runner of each operating system
@@ -587,11 +599,18 @@ Images/                  Screenshots used above
   leaves glued ends alone, since the shape already positions them.
 - Handles are only offered for a selection of one; a group shows a dashed bounding box.
   Resizing several shapes at once is not implemented yet.
-- PNG export calls each shape's own `Render` into a `RenderTargetBitmap`, rather than
+- Raster export calls each shape's own `Render` into a `RenderTargetBitmap`, rather than
   screenshotting the canvas. That is why the grid, the selection and the workspace are absent
   without anything having to be hidden first: the chrome lives in `DrawingCanvas.Render`, not
   in the shapes. Scale is carried as the bitmap's DPI, so the drawing is emitted in page units
   and comes out crisp at 4x instead of enlarged.
+- PNG and BMP share that render and part company only at the last step. Skia will decode a
+  BMP but will not encode one, so `RasterExporter` writes the file itself: a 24-bit bottom-up
+  BITMAPINFOHEADER, rows padded to four bytes, the DPI recorded as pixels per metre. It copies
+  one row at a time out of the bitmap, because a whole 4x page held twice over runs to
+  hundreds of megabytes. The page is painted opaque white before anything else is drawn, so
+  there is no alpha to drop and nothing to un-premultiply - the BMP comes out pixel-identical
+  to the PNG.
 
 ## Not yet implemented
 

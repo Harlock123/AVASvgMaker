@@ -1,27 +1,30 @@
-using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
 using AVASvgMaker.Engine;
 
 namespace AVASvgMaker.Views;
 
 /// <summary>Chooses how large the exported image should be. Returns the scale, or null.</summary>
-public class PngExportDialog : Window
+public class RasterExportDialog : Window
 {
     private static readonly double[] Scales = [1, 2, 3, 4];
 
     private readonly ComboBox _scale = new() { Width = 190 };
-    private readonly TextBlock _summary = new() { FontSize = 11, Opacity = 0.7 };
+    private readonly TextBlock _summary = new()
+        { FontSize = 11, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
     private readonly Button _export;
     private readonly DiagramDocument _document;
+    private readonly RasterFormat _format;
 
-    private PngExportDialog(DiagramDocument document)
+    private RasterExportDialog(DiagramDocument document, RasterFormat format)
     {
         _document = document;
+        _format = format;
 
-        Title = "Export PNG";
+        Title = $"Export {format.Label()}";
         Width = 330;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
@@ -30,7 +33,7 @@ public class PngExportDialog : Window
 
         foreach (var scale in Scales)
         {
-            var size = PngExporter.SizeAt(document, scale);
+            var size = RasterExporter.SizeAt(document, scale);
             _scale.Items.Add(new ComboBoxItem
             {
                 Content = $"{scale:0}x  -  {size.Width} x {size.Height} px",
@@ -81,19 +84,24 @@ public class PngExportDialog : Window
     private void Describe()
     {
         var scale = Selected();
-        var size = PngExporter.SizeAt(_document, scale);
-        var tooLarge = PngExporter.IsTooLarge(_document, scale);
+        var size = RasterExporter.SizeAt(_document, scale);
+        var tooLarge = RasterExporter.IsTooLarge(_document, scale);
 
-        _summary.Text = tooLarge
+        var summary = tooLarge
             ? $"{size.Width} x {size.Height} px is too large to render."
             : $"{size.Width} x {size.Height} px on a white page, at {96 * scale:0} DPI.";
 
+        // A BMP keeps every pixel, so say how big that comes to before it is written.
+        if (!tooLarge && RasterExporter.FileSize(_document, scale, _format) is { } bytes)
+            summary += $" Uncompressed, about {bytes / 1024.0 / 1024.0:0.#} MB.";
+
+        _summary.Text = summary;
         _export.IsEnabled = !tooLarge;
     }
 
-    public static async Task<double?> ShowAsync(Window owner, DiagramDocument document)
+    public static async Task<double?> ShowAsync(Window owner, DiagramDocument document, RasterFormat format)
     {
-        var dialog = new PngExportDialog(document);
+        var dialog = new RasterExportDialog(document, format);
         return await dialog.ShowDialog<double?>(owner);
     }
 }

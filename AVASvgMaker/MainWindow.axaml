@@ -64,8 +64,11 @@
                 <Separator />
                 <MenuItem Header="Page set_up..." Click="OnPageSetupClick" />
                 <Separator />
-                <MenuItem Header="_Export SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
-                <MenuItem Header="Export _PNG..." InputGesture="Ctrl+Shift+E" Click="OnExportPngClick" />
+                <MenuItem Header="_Export">
+                    <MenuItem Header="_SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
+                    <MenuItem Header="_PNG..." InputGesture="Ctrl+Shift+E" Click="OnExportPngClick" />
+                    <MenuItem Header="_BMP..." Click="OnExportBmpClick" />
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
