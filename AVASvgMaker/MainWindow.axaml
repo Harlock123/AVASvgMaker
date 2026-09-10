@@ -1,0 +1,348 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:AVASvgMaker.Views"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="860"
+        x:Class="AVASvgMaker.MainWindow"
+        Title="AVASvgMaker - SVG Diagram Editor"
+        Width="1280" Height="820"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Styles>
+        <Style Selector="Border.group">
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+        <Style Selector="Rectangle.separator">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Fill" Value="{x:Static views:AppTheme.Border}" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.collapse">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="{x:Static views:AppTheme.Panel}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Opacity" Value="0.65" />
+        </Style>
+        <Style Selector="Button.collapse:pointerover">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+        <Style Selector="TextBlock.field">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel>
+        <!-- Menu -->
+        <Menu DockPanel.Dock="Top" Background="{x:Static views:AppTheme.Panel}">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" InputGesture="Ctrl+N" Click="OnNewClick" />
+                <MenuItem Header="_Open..." InputGesture="Ctrl+O" Click="OnOpenClick" />
+                <Separator />
+                <MenuItem Header="_Save" InputGesture="Ctrl+S" Click="OnSaveClick" />
+                <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Click="OnSaveAsClick" />
+                <Separator />
+                <MenuItem Header="_Export SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem x:Name="UndoMenuItem" Header="_Undo" InputGesture="Ctrl+Z"
+                          Click="OnUndoClick" IsEnabled="False" />
+                <MenuItem x:Name="RedoMenuItem" Header="_Redo" InputGesture="Ctrl+Y"
+                          Click="OnRedoClick" IsEnabled="False" />
+                <Separator />
+                <MenuItem Header="Cu_t" InputGesture="Ctrl+X" Click="OnCutClick" />
+                <MenuItem Header="_Copy" InputGesture="Ctrl+C" Click="OnCopyClick" />
+                <MenuItem Header="_Paste" InputGesture="Ctrl+V" Click="OnPasteClick" />
+                <MenuItem Header="D_uplicate" InputGesture="Ctrl+D" Click="OnDuplicateClick" />
+                <Separator />
+                <MenuItem Header="Select _all" InputGesture="Ctrl+A" Click="OnSelectAllClick" />
+                <MenuItem Header="_Delete" InputGesture="Delete" Click="OnDeleteClick" />
+                <MenuItem Header="_Clear page" Click="OnClearClick" />
+                <Separator />
+                <MenuItem Header="_Reset connector route" Click="OnResetRouteClick" />
+            </MenuItem>
+            <MenuItem Header="_Arrange">
+                <MenuItem Header="A_lign">
+                    <MenuItem Header="_Left" Tag="Left" Click="OnAlignClick" />
+                    <MenuItem Header="_Centre" Tag="CenterX" Click="OnAlignClick" />
+                    <MenuItem Header="_Right" Tag="Right" Click="OnAlignClick" />
+                    <Separator />
+                    <MenuItem Header="_Top" Tag="Top" Click="OnAlignClick" />
+                    <MenuItem Header="_Middle" Tag="Middle" Click="OnAlignClick" />
+                    <MenuItem Header="_Bottom" Tag="Bottom" Click="OnAlignClick" />
+                </MenuItem>
+                <MenuItem Header="_Distribute">
+                    <MenuItem Header="_Horizontally" Tag="H" Click="OnDistributeClick" />
+                    <MenuItem Header="_Vertically" Tag="V" Click="OnDistributeClick" />
+                </MenuItem>
+                <MenuItem Header="Make same _size">
+                    <MenuItem Header="_Width" Tag="Width" Click="OnMatchSizeClick" />
+                    <MenuItem Header="_Height" Tag="Height" Click="OnMatchSizeClick" />
+                    <MenuItem Header="_Both" Tag="Both" Click="OnMatchSizeClick" />
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="Bring to _front" InputGesture="Ctrl+Shift+F" Tag="Front"
+                          Click="OnOrderClick" />
+                <MenuItem Header="Bring f_orward" InputGesture="Ctrl+OemCloseBrackets" Tag="Forward"
+                          Click="OnOrderClick" />
+                <MenuItem Header="Send _backward" InputGesture="Ctrl+OemOpenBrackets" Tag="Backward"
+                          Click="OnOrderClick" />
+                <MenuItem Header="Send to bac_k" InputGesture="Ctrl+Shift+B" Tag="Back"
+                          Click="OnOrderClick" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="Zoom _in" InputGesture="Ctrl+OemPlus" Click="OnZoomInClick" />
+                <MenuItem Header="Zoom _out" InputGesture="Ctrl+OemMinus" Click="OnZoomOutClick" />
+                <MenuItem Header="_Actual size" InputGesture="Ctrl+0" Click="OnZoomResetClick" />
+                <MenuItem Header="_Fit page" InputGesture="Ctrl+9" Click="OnZoomFitClick" />
+                <Separator />
+                <MenuItem Header="_Shapes panel" InputGesture="F9" Click="OnToggleToolboxClick" />
+                <MenuItem Header="_Properties panel" InputGesture="F10"
+                          Click="OnTogglePropertiesClick" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Toolbar -->
+        <Border DockPanel.Dock="Top" Background="{x:Static views:AppTheme.Panel}" BorderBrush="{x:Static views:AppTheme.Border}" BorderThickness="0,0,0,1"
+                Padding="10,6">
+            <WrapPanel Orientation="Horizontal">
+
+                <!-- Tools -->
+                <Border Classes="group">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <ToggleButton x:Name="SelectToolButton" Content="Select" IsChecked="True"
+                                      Click="OnToolClick" Tag="Select" />
+                        <ToggleButton x:Name="TextToolButton" Content="Text box"
+                                      Click="OnToolClick" Tag="Text" />
+                        <ToggleButton x:Name="ConnectorToolButton" Content="Connector"
+                                      Click="OnToolClick" Tag="Connector" />
+                    </StackPanel>
+                </Border>
+
+                <Rectangle Classes="separator" />
+
+                <!-- Line ends -->
+                <Border Classes="group">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Classes="label" Text="Start" />
+                        <ComboBox x:Name="StartCapBox" Width="170" SelectedIndex="0"
+                                  SelectionChanged="OnConnectorStyleChanged">
+                            <ComboBoxItem Tag="None">None</ComboBoxItem>
+                            <ComboBoxItem Tag="Arrow">Arrow</ComboBoxItem>
+                            <ComboBoxItem Tag="OpenArrow">Open arrow</ComboBoxItem>
+                            <ComboBoxItem Tag="Dot">Dot</ComboBoxItem>
+                            <ComboBoxItem Tag="Diamond">Diamond (composition)</ComboBoxItem>
+                            <ComboBoxItem Tag="HollowArrow">Hollow arrow (generalisation)</ComboBoxItem>
+                            <ComboBoxItem Tag="HollowDiamond">Hollow diamond (aggregation)</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootOne">One</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFoot">Many</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootZeroOrOne">Zero or one</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootOneOrMany">One or many</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootZeroOrMany">Zero or many</ComboBoxItem>
+                        </ComboBox>
+
+                        <TextBlock Classes="label" Text="End" Margin="6,0,4,0" />
+                        <ComboBox x:Name="EndCapBox" Width="170" SelectedIndex="1"
+                                  SelectionChanged="OnConnectorStyleChanged">
+                            <ComboBoxItem Tag="None">None</ComboBoxItem>
+                            <ComboBoxItem Tag="Arrow">Arrow</ComboBoxItem>
+                            <ComboBoxItem Tag="OpenArrow">Open arrow</ComboBoxItem>
+                            <ComboBoxItem Tag="Dot">Dot</ComboBoxItem>
+                            <ComboBoxItem Tag="Diamond">Diamond (composition)</ComboBoxItem>
+                            <ComboBoxItem Tag="HollowArrow">Hollow arrow (generalisation)</ComboBoxItem>
+                            <ComboBoxItem Tag="HollowDiamond">Hollow diamond (aggregation)</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootOne">One</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFoot">Many</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootZeroOrOne">Zero or one</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootOneOrMany">One or many</ComboBoxItem>
+                            <ComboBoxItem Tag="CrowsFootZeroOrMany">Zero or many</ComboBoxItem>
+                        </ComboBox>
+
+                        <TextBlock Classes="label" Text="Route" Margin="6,0,4,0" />
+                        <ComboBox x:Name="RoutingBox" Width="118" SelectedIndex="1"
+                                  SelectionChanged="OnConnectorStyleChanged">
+                            <ComboBoxItem Tag="Straight">Straight</ComboBoxItem>
+                            <ComboBoxItem Tag="Orthogonal">Right-angle</ComboBoxItem>
+                        </ComboBox>
+
+                        <TextBlock Classes="label" Text="Weight" Margin="6,0,4,0" />
+                        <ComboBox x:Name="WeightBox" Width="70" SelectedIndex="1"
+                                  SelectionChanged="OnConnectorStyleChanged">
+                            <ComboBoxItem Tag="1">1 px</ComboBoxItem>
+                            <ComboBoxItem Tag="2">2 px</ComboBoxItem>
+                            <ComboBoxItem Tag="3">3 px</ComboBoxItem>
+                            <ComboBoxItem Tag="4">4 px</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <Rectangle Classes="separator" />
+
+                <!-- Grid -->
+                <Border Classes="group">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <CheckBox x:Name="SnapCheck" Content="Snap to grid" IsChecked="True"
+                                  IsCheckedChanged="OnGridOptionChanged" />
+                        <CheckBox x:Name="ShowGridCheck" Content="Show grid" IsChecked="True"
+                                  IsCheckedChanged="OnGridOptionChanged" />
+                        <ComboBox x:Name="GridSizeBox" Width="80" SelectedIndex="1"
+                                  SelectionChanged="OnGridSizeChanged">
+                            <ComboBoxItem Tag="5">5 px</ComboBoxItem>
+                            <ComboBoxItem Tag="10">10 px</ComboBoxItem>
+                            <ComboBoxItem Tag="20">20 px</ComboBoxItem>
+                            <ComboBoxItem Tag="25">25 px</ComboBoxItem>
+                            <ComboBoxItem Tag="50">50 px</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <Rectangle Classes="separator" />
+
+                <!-- Page -->
+                <Border Classes="group">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button Content="Delete" Click="OnDeleteClick" />
+                        <Button Content="Clear page" Click="OnClearClick" />
+                    </StackPanel>
+                </Border>
+
+            </WrapPanel>
+        </Border>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="{x:Static views:AppTheme.Panel}" BorderBrush="{x:Static views:AppTheme.Border}" BorderThickness="0,1,0,0"
+                Padding="10,4">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock x:Name="StatusText" Grid.Column="0" Text="Ready" FontSize="12"
+                           Opacity="0.85" VerticalAlignment="Center" />
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                            VerticalAlignment="Center">
+                    <Button Content="-" Width="26" Padding="0" Click="OnZoomOutClick"
+                            ToolTip.Tip="Zoom out (Ctrl+-)" />
+                    <ComboBox x:Name="ZoomBox" Width="92" SelectedIndex="3"
+                              SelectionChanged="OnZoomBoxChanged">
+                        <ComboBoxItem Tag="0.25">25%</ComboBoxItem>
+                        <ComboBoxItem Tag="0.5">50%</ComboBoxItem>
+                        <ComboBoxItem Tag="0.75">75%</ComboBoxItem>
+                        <ComboBoxItem Tag="1">100%</ComboBoxItem>
+                        <ComboBoxItem Tag="1.5">150%</ComboBoxItem>
+                        <ComboBoxItem Tag="2">200%</ComboBoxItem>
+                        <ComboBoxItem Tag="4">400%</ComboBoxItem>
+                        <ComboBoxItem Tag="fit">Fit page</ComboBoxItem>
+                    </ComboBox>
+                    <Button Content="+" Width="26" Padding="0" Click="OnZoomInClick"
+                            ToolTip.Tip="Zoom in (Ctrl++)" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Properties -->
+        <Border x:Name="PropertiesPanel" DockPanel.Dock="Right" Width="236"
+                Background="{x:Static views:AppTheme.Panel}" BorderBrush="{x:Static views:AppTheme.Border}" BorderThickness="1,0,0,0" Padding="12,10">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="PROPERTIES" FontWeight="Bold" FontSize="11" Opacity="0.7" />
+                    <TextBlock x:Name="PropertiesHint" TextWrapping="Wrap" FontSize="11" Opacity="0.6"
+                               Text="Nothing selected - changes set the formatting for the next shape." />
+
+                    <TextBlock Classes="section" Text="FILL" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <views:ColorSwatchPicker x:Name="FillPicker" />
+                        <CheckBox x:Name="FillNoneCheck" Content="None" VerticalAlignment="Center"
+                                  IsThreeState="True" IsCheckedChanged="OnFillNoneChanged" />
+                    </StackPanel>
+
+                    <TextBlock Classes="section" Text="LINE" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <views:ColorSwatchPicker x:Name="LinePicker" />
+                        <CheckBox x:Name="LineNoneCheck" Content="None" VerticalAlignment="Center"
+                                  IsThreeState="True" IsCheckedChanged="OnLineNoneChanged" />
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="field" Text="Style"
+                                   Margin="0,0,8,4" />
+                        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="LineStyleBox" SelectedIndex="0"
+                                  HorizontalAlignment="Stretch" Margin="0,0,0,4"
+                                  SelectionChanged="OnLineStyleChanged">
+                            <ComboBoxItem Tag="Solid">Solid</ComboBoxItem>
+                            <ComboBoxItem Tag="Dashed">Dashed</ComboBoxItem>
+                            <ComboBoxItem Tag="Dotted">Dotted</ComboBoxItem>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="field" Text="Weight"
+                                   Margin="0,0,8,0" />
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="LineWeightBox" SelectedIndex="1"
+                                  HorizontalAlignment="Stretch" SelectionChanged="OnLineWeightChanged">
+                            <ComboBoxItem Tag="1">1 px</ComboBoxItem>
+                            <ComboBoxItem Tag="2">2 px</ComboBoxItem>
+                            <ComboBoxItem Tag="3">3 px</ComboBoxItem>
+                            <ComboBoxItem Tag="4">4 px</ComboBoxItem>
+                            <ComboBoxItem Tag="6">6 px</ComboBoxItem>
+                        </ComboBox>
+                    </Grid>
+
+                    <TextBlock Classes="section" Text="TEXT" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <views:ColorSwatchPicker x:Name="TextPicker" />
+                        <ComboBox x:Name="FontSizeBox" SelectedIndex="2" Width="82"
+                                  VerticalAlignment="Center" SelectionChanged="OnFontSizeChanged">
+                            <ComboBoxItem Tag="10">10 pt</ComboBoxItem>
+                            <ComboBoxItem Tag="12">12 pt</ComboBoxItem>
+                            <ComboBoxItem Tag="13">13 pt</ComboBoxItem>
+                            <ComboBoxItem Tag="16">16 pt</ComboBoxItem>
+                            <ComboBoxItem Tag="20">20 pt</ComboBoxItem>
+                            <ComboBoxItem Tag="24">24 pt</ComboBoxItem>
+                            <ComboBoxItem Tag="32">32 pt</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Shapes, collapsible to the left -->
+        <Border x:Name="ShapesPanel" DockPanel.Dock="Left" Width="228"
+                Background="{x:Static views:AppTheme.Panel}" BorderBrush="{x:Static views:AppTheme.Border}" BorderThickness="0,0,1,0">
+            <views:ToolboxPanel x:Name="Toolbox" />
+        </Border>
+
+        <Button x:Name="ToolboxToggle" DockPanel.Dock="Left" Classes="collapse"
+                Content="&#x2039;" ToolTip.Tip="Hide the shapes panel (F9)"
+                Click="OnToggleToolboxClick" />
+
+        <!-- Properties, collapsible to the right -->
+        <Button x:Name="PropertiesToggle" DockPanel.Dock="Right" Classes="collapse"
+                Content="&#x203A;" ToolTip.Tip="Hide the properties panel (F10)"
+                Click="OnTogglePropertiesClick" />
+
+        <!-- The page takes whatever is left -->
+        <ScrollViewer Background="{x:Static views:AppTheme.Workspace}"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <views:DrawingCanvas x:Name="Canvas"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>

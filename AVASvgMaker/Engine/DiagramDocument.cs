@@ -1,0 +1,366 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia;
+using AVASvgMaker.Models;
+
+namespace AVASvgMaker.Engine;
+
+/// <summary>The page and the shapes on it. Index order in <see cref="Shapes"/> is z-order.</summary>
+public class DiagramDocument
+{
+    // US Letter at 96 DPI.
+    public double PageWidth { get; set; } = 816;
+    public double PageHeight { get; set; } = 1056;
+
+    public List<DiagramShape> Shapes { get; } = new();
+
+    private readonly List<DiagramShape> _selection = [];
+
+    /// <summary>The selected shapes, in the order they were selected.</summary>
+    public IReadOnlyList<DiagramShape> Selection => _selection;
+
+    /// <summary>
+    /// The shape that single-shape operations act on: the last one selected, or null when
+    /// nothing is. Handles and the connector toolbar only apply to a selection of one.
+    /// </summary>
+    public DiagramShape? Selected => _selection.Count > 0 ? _selection[^1] : null;
+
+    /// <summary>Raised when the selection changes. Selection is not saved, but undo restores it.</summary>
+    public event Action? SelectionChanged;
+
+    public bool IsSelected(DiagramShape shape) => _selection.Contains(shape);
+
+    /// <summary>Replaces the selection with one shape, or clears it when given null.</summary>
+    public void SelectOnly(DiagramShape? shape)
+    {
+        if (shape is null)
+        {
+            ClearSelection();
+            return;
+        }
+
+        if (_selection.Count == 1 && ReferenceEquals(_selection[0], shape))
+            return;
+
+        _selection.Clear();
+        _selection.Add(shape);
+        SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Adds a shape to the selection, or removes it if it is already there.</summary>
+    public void ToggleSelection(DiagramShape shape)
+    {
+        if (!_selection.Remove(shape))
+            _selection.Add(shape);
+
+        SelectionChanged?.Invoke();
+    }
+
+    public void SetSelection(IEnumerable<DiagramShape> shapes)
+    {
+        _selection.Clear();
+
+        foreach (var shape in shapes)
+        {
+            if (!_selection.Contains(shape))
+                _selection.Add(shape);
+        }
+
+        SelectionChanged?.Invoke();
+    }
+
+    public void SelectAll() => SetSelection(Shapes);
+
+    public void ClearSelection()
+    {
+        if (_selection.Count == 0)
+            return;
+
+        _selection.Clear();
+        SelectionChanged?.Invoke();
+    }
+
+    private void Deselect(DiagramShape shape)
+    {
+        if (_selection.Remove(shape))
+            SelectionChanged?.Invoke();
+    }
+
+    /// <summary>True when there are changes that have not been written to disk.</summary>
+    public bool IsModified { get; private set; }
+
+    /// <summary>Raised whenever the modified flag changes, so the title bar can follow it.</summary>
+    public event Action? ModifiedChanged;
+
+    /// <summary>Raised after every change to the page, once per edit. Drives the undo history.</summary>
+    public event Action? Changed;
+
+    private int _batchDepth;
+    private bool _batchPending;
+
+    public void MarkModified()
+    {
+        if (!IsModified)
+        {
+            IsModified = true;
+            ModifiedChanged?.Invoke();
+        }
+
+        if (_batchDepth > 0)
+        {
+            _batchPending = true;
+            return;
+        }
+
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Groups several mutations into one edit, so a compound operation such as deleting a
+    /// shape along with its connectors becomes a single step in the undo history.
+    /// </summary>
+    public IDisposable BeginBatch() => new Batch(this);
+
+    private void EndBatch()
+    {
+        if (--_batchDepth > 0 || !_batchPending)
+            return;
+
+        _batchPending = false;
+        Changed?.Invoke();
+    }
+
+    private sealed class Batch : IDisposable
+    {
+        private readonly DiagramDocument _document;
+        private bool _disposed;
+
+        public Batch(DiagramDocument document)
+        {
+            _document = document;
+            _document._batchDepth++;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            _document.EndBatch();
+        }
+    }
+
+    public void MarkSaved()
+    {
+        if (!IsModified)
+            return;
+
+        IsModified = false;
+        ModifiedChanged?.Invoke();
+    }
+
+    public void Add(DiagramShape shape)
+    {
+        Shapes.Add(shape);
+        MarkModified();
+        SelectOnly(shape);
+    }
+
+    public void Remove(DiagramShape shape)
+    {
+        if (!Shapes.Remove(shape))
+            return;
+
+        MarkModified();
+        Deselect(shape);
+
+        // Nothing may point at a shape that is gone.
+        foreach (var orphan in Shapes.Where(other => ReferenceEquals(other.Container, shape)))
+            orphan.Container = null;
+    }
+
+    public void Clear()
+    {
+        if (Shapes.Count == 0)
+            return;
+
+        Shapes.Clear();
+        MarkModified();
+        ClearSelection();
+    }
+
+    /// <summary>Takes on the contents of a freshly loaded document, keeping this instance.</summary>
+    public void ReplaceWith(DiagramDocument source)
+    {
+        PageWidth = source.PageWidth;
+        PageHeight = source.PageHeight;
+
+        Shapes.Clear();
+        Shapes.AddRange(source.Shapes);
+        ClearSelection();
+
+        MarkSaved();
+    }
+
+    /// <summary>
+    /// Topmost shape under the point, or null. <paramref name="slack"/> is extra tolerance in
+    /// page units for thin targets, so a line stays clickable at any zoom.
+    /// </summary>
+    public DiagramShape? HitTest(Point point, double slack = 0)
+    {
+        for (var i = Shapes.Count - 1; i >= 0; i--)
+        {
+            if (Shapes[i].HitTest(point, slack))
+                return Shapes[i];
+        }
+
+        return null;
+    }
+
+    public void BringToFront(DiagramShape shape)
+    {
+        // Selecting the frontmost shape must not count as an edit.
+        if (Shapes.Count == 0 || ReferenceEquals(Shapes[^1], shape))
+            return;
+
+        if (!Shapes.Remove(shape))
+            return;
+
+        Shapes.Add(shape);
+        MarkModified();
+    }
+
+    /// <summary>
+    /// How far a routed connector keeps away from the shapes it passes. Also the length of
+    /// the stub it leaves a connection point by, so lines meet shapes square on.
+    /// </summary>
+    public double RouteClearance { get; set; } = 12;
+
+    /// <summary>
+    /// Refreshes every routed connector. Each one only pays for the search when something it
+    /// depends on has actually moved, so this is cheap to call on every repaint.
+    /// </summary>
+    public void RouteConnectors()
+    {
+        var obstacles = Shapes.Where(shape => shape is not ConnectorShape).ToList();
+
+        foreach (var connector in Shapes.OfType<ConnectorShape>())
+            connector.UpdateRoute(obstacles, RouteClearance);
+    }
+
+    #region Containers
+
+    public IEnumerable<DiagramShape> ChildrenOf(DiagramShape container) =>
+        Shapes.Where(shape => ReferenceEquals(shape.Container, container));
+
+    /// <summary>Everything inside a container, including what is inside its lanes.</summary>
+    public IEnumerable<DiagramShape> DescendantsOf(DiagramShape container)
+    {
+        foreach (var child in ChildrenOf(container).ToList())
+        {
+            yield return child;
+
+            foreach (var deeper in DescendantsOf(child))
+                yield return deeper;
+        }
+    }
+
+    private bool IsInside(DiagramShape shape, DiagramShape possibleAncestor)
+    {
+        for (var container = shape.Container; container is not null; container = container.Container)
+        {
+            if (ReferenceEquals(container, possibleAncestor))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The container a shape should belong to, judged by where its middle falls. The innermost
+    /// wins, so a shape dropped on a lane joins the lane rather than the pool around it. A
+    /// container is never offered one of its own descendants, which would make a loop.
+    /// </summary>
+    public ContainerShape? ContainerFor(DiagramShape shape)
+    {
+        ContainerShape? best = null;
+
+        foreach (var candidate in Shapes.OfType<ContainerShape>())
+        {
+            if (ReferenceEquals(candidate, shape) || IsInside(candidate, shape))
+                continue;
+
+            if (!candidate.Holds(shape.Bounds))
+                continue;
+
+            // Deeper containers are smaller; prefer the tightest fit.
+            if (best is null || Area(candidate.Bounds) <= Area(best.Bounds))
+                best = candidate;
+        }
+
+        return best;
+    }
+
+    private static double Area(Rect rect) => rect.Width * rect.Height;
+
+    /// <summary>
+    /// Puts a shape in a container, or takes it out when given null. A shape is lifted above
+    /// its container in the drawing order, since a container is a backdrop for its contents.
+    /// </summary>
+    public void Adopt(DiagramShape shape, DiagramShape? container)
+    {
+        if (ReferenceEquals(shape.Container, container))
+            return;
+
+        shape.Container = container;
+
+        if (container is not null && Shapes.IndexOf(shape) < Shapes.IndexOf(container))
+        {
+            Shapes.Remove(shape);
+            Shapes.Add(shape);
+        }
+
+        MarkModified();
+    }
+
+    /// <summary>
+    /// Lays a pool's lanes out across its body. Lanes are positioned by the pool rather than by
+    /// their own handles, which is what makes them follow when the pool is moved or resized.
+    /// </summary>
+    public void LayoutContainers()
+    {
+        foreach (var pool in Shapes.OfType<ContainerShape>().Where(c => c.Kind == ShapeKind.Pool))
+        {
+            var lanes = ChildrenOf(pool)
+                .OfType<ContainerShape>()
+                .Where(lane => lane.Kind == ShapeKind.Lane)
+                .ToList();
+
+            if (lanes.Count == 0)
+                continue;
+
+            var body = pool.Body;
+            var height = body.Height / lanes.Count;
+
+            for (var i = 0; i < lanes.Count; i++)
+            {
+                var wanted = new Rect(body.X, body.Y + i * height, body.Width, height);
+
+                if (lanes[i].Bounds != wanted)
+                    lanes[i].Bounds = wanted;
+            }
+        }
+    }
+
+    #endregion
+
+    /// <summary>Keeps a shape inside the page after a move.</summary>
+    public Rect ClampToPage(Rect bounds)
+    {
+        var x = System.Math.Clamp(bounds.X, 0, System.Math.Max(0, PageWidth - bounds.Width));
+        var y = System.Math.Clamp(bounds.Y, 0, System.Math.Max(0, PageHeight - bounds.Height));
+        return new Rect(x, y, bounds.Width, bounds.Height);
+    }
+}
