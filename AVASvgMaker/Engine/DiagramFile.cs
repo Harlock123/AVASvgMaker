@@ -25,9 +25,9 @@ public static partial class DiagramFile
     public const string Extension = "avadiag";
     /// <summary>
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
-    /// 5 containers. Older files still load.
+    /// 5 containers, 6 multiple pages. Older files still load.
     /// </summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -49,6 +49,17 @@ public static partial class DiagramFile
         public int Version { get; set; } = CurrentVersion;
         public double PageWidth { get; set; }
         public double PageHeight { get; set; }
+
+        /// <summary>Version 6 onwards. Version 5 and earlier wrote a single page's shapes below.</summary>
+        public List<PageRecord>? Pages { get; set; }
+
+        /// <summary>How every version up to 5 stored its one page. Still read; no longer written.</summary>
+        public List<ShapeRecord>? Shapes { get; set; }
+    }
+
+    private sealed class PageRecord
+    {
+        public string Name { get; set; } = "Page 1";
         public List<ShapeRecord> Shapes { get; set; } = [];
     }
 
@@ -125,21 +136,48 @@ public static partial class DiagramFile
 
     public static void Write(DiagramDocument document, Stream stream)
     {
-        // Ids are handed out by z-order position so the file stays readable.
+        // Ids are handed out in reading order, across the whole document, so the file stays
+        // readable and no two shapes can collide even though references never cross a page.
         var ids = new Dictionary<DiagramShape, int>();
-        for (var i = 0; i < document.Shapes.Count; i++)
-            ids[document.Shapes[i]] = i + 1;
+        var next = 1;
+
+        foreach (var page in document.Pages)
+        foreach (var shape in page.Shapes)
+            ids[shape] = next++;
 
         var record = new DocumentRecord
         {
             PageWidth = document.PageWidth,
-            PageHeight = document.PageHeight
+            PageHeight = document.PageHeight,
+            Pages = []
         };
 
-        foreach (var shape in document.Shapes)
-            record.Shapes.Add(ToRecord(shape, ids));
+        foreach (var page in document.Pages)
+        {
+            var pageRecord = new PageRecord { Name = page.Name };
+
+            foreach (var shape in page.Shapes)
+                pageRecord.Shapes.Add(ToRecord(shape, ids));
+
+            record.Pages.Add(pageRecord);
+        }
 
         JsonSerializer.Serialize(stream, record, Records.Default.DocumentRecord);
+    }
+
+    /// <summary>
+    /// Deep-copies shapes by taking them through the format, which rebuilds glue and
+    /// containment among the copies instead of leaving them pointing at the originals.
+    /// </summary>
+    public static List<DiagramShape> CopyOf(IReadOnlyList<DiagramShape> shapes)
+    {
+        if (shapes.Count == 0)
+            return [];
+
+        var slice = new DiagramDocument();
+        slice.Shapes.AddRange(shapes);
+
+        return [.. FromJson(ToJson(slice)).Shapes];
     }
 
     private static ShapeRecord ToRecord(DiagramShape shape, IReadOnlyDictionary<DiagramShape, int> ids)
@@ -221,34 +259,53 @@ public static partial class DiagramFile
             document.PageHeight = record.PageHeight;
         }
 
-        // First pass builds the shapes, second pass glues connectors to them, so a
-        // connector can reference a shape that is drawn above it.
-        var byId = new Dictionary<int, DiagramShape>();
+        // Up to version 5 a document was one page, written without a page record around it.
+        var pageRecords = record.Pages is { Count: > 0 }
+            ? record.Pages
+            : [new PageRecord { Shapes = record.Shapes ?? [] }];
 
-        foreach (var shapeRecord in record.Shapes)
+        var pages = new List<DiagramPage>();
+
+        for (var p = 0; p < pageRecords.Count; p++)
         {
-            var shape = FromRecord(shapeRecord);
-            document.Shapes.Add(shape);
-            byId[shapeRecord.Id] = shape;
+            var pageRecord = pageRecords[p];
+            var page = new DiagramPage(string.IsNullOrWhiteSpace(pageRecord.Name)
+                ? $"Page {p + 1}"
+                : pageRecord.Name);
+
+            // First pass builds the shapes, second pass glues connectors to them, so a
+            // connector can reference a shape that is drawn above it. The table is per page,
+            // because nothing on one page may reference anything on another.
+            var byId = new Dictionary<int, DiagramShape>();
+
+            foreach (var shapeRecord in pageRecord.Shapes)
+            {
+                var shape = FromRecord(shapeRecord);
+                page.Shapes.Add(shape);
+                byId[shapeRecord.Id] = shape;
+            }
+
+            // Containment is resolved in the same second pass as glue, and for the same
+            // reason: a shape can name a container that has not been built yet.
+            for (var i = 0; i < pageRecord.Shapes.Count; i++)
+                page.Shapes[i].Container = Glued(pageRecord.Shapes[i].ContainerId, byId);
+
+            for (var i = 0; i < pageRecord.Shapes.Count; i++)
+            {
+                if (pageRecord.Shapes[i].Connector is not { } connectorRecord)
+                    continue;
+
+                if (page.Shapes[i] is not ConnectorShape connector)
+                    continue;
+
+                connector.StartShape = Glued(connectorRecord.StartShapeId, byId);
+                connector.EndShape = Glued(connectorRecord.EndShapeId, byId);
+            }
+
+            pages.Add(page);
         }
 
-        // Containment is resolved in the same second pass as glue, and for the same reason:
-        // a shape can name a container that has not been built yet.
-        for (var i = 0; i < record.Shapes.Count; i++)
-            document.Shapes[i].Container = Glued(record.Shapes[i].ContainerId, byId);
-
-        for (var i = 0; i < record.Shapes.Count; i++)
-        {
-            if (record.Shapes[i].Connector is not { } connectorRecord)
-                continue;
-
-            if (document.Shapes[i] is not ConnectorShape connector)
-                continue;
-
-            connector.StartShape = Glued(connectorRecord.StartShapeId, byId);
-            connector.EndShape = Glued(connectorRecord.EndShapeId, byId);
-        }
-
+        document.SetPages(pages);
         document.MarkSaved();
         return document;
     }

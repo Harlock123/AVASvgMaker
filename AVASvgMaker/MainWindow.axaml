@@ -122,6 +122,21 @@
                 <MenuItem Header="Send to bac_k" InputGesture="Ctrl+Shift+B" Tag="Back"
                           Click="OnOrderClick" />
             </MenuItem>
+            <MenuItem Header="_Page">
+                <MenuItem Header="_New page" InputGesture="Ctrl+Shift+P" Click="OnNewPageClick" />
+                <MenuItem Header="_Duplicate page" Click="OnDuplicatePageClick" />
+                <MenuItem Header="_Rename page..." Click="OnRenamePageClick" />
+                <MenuItem x:Name="DeletePageMenuItem" Header="De_lete page" Click="OnDeletePageClick" />
+                <Separator />
+                <MenuItem x:Name="PreviousPageMenuItem" Header="_Previous page"
+                          InputGesture="Ctrl+PageUp" Click="OnPreviousPageClick" />
+                <MenuItem x:Name="NextPageMenuItem" Header="Ne_xt page"
+                          InputGesture="Ctrl+PageDown" Click="OnNextPageClick" />
+                <Separator />
+                <MenuItem x:Name="MovePageLeftMenuItem" Header="Move page _left" Click="OnMovePageLeftClick" />
+                <MenuItem x:Name="MovePageRightMenuItem" Header="Move page _right" Click="OnMovePageRightClick" />
+            </MenuItem>
+
             <MenuItem Header="_View">
                 <MenuItem Header="Zoom _in" InputGesture="Ctrl+OemPlus" Click="OnZoomInClick" />
                 <MenuItem Header="Zoom _out" InputGesture="Ctrl+OemMinus" Click="OnZoomOutClick" />
@@ -250,6 +265,8 @@
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
                             VerticalAlignment="Center">
+                    <TextBlock x:Name="PageText" Text="" FontSize="12" Opacity="0.85"
+                               VerticalAlignment="Center" Margin="0,0,10,0" />
                     <Button Content="-" Width="26" Padding="0" Click="OnZoomOutClick"
                             ToolTip.Tip="Zoom out (Ctrl+-)" />
                     <ComboBox x:Name="ZoomBox" Width="92" SelectedIndex="3"
@@ -348,11 +365,15 @@
                 Content="&#x203A;" ToolTip.Tip="Hide the properties panel (F10)"
                 Click="OnTogglePropertiesClick" />
 
-        <!-- The page takes whatever is left -->
-        <ScrollViewer Background="{x:Static views:AppTheme.Workspace}"
-                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-            <views:DrawingCanvas x:Name="Canvas"
-                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </ScrollViewer>
+        <!-- The page takes whatever is left, with its page tabs beneath it -->
+        <DockPanel>
+            <views:PageTabStrip x:Name="PageTabs" DockPanel.Dock="Bottom" />
+
+            <ScrollViewer Background="{x:Static views:AppTheme.Workspace}"
+                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <views:DrawingCanvas x:Name="Canvas"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </ScrollViewer>
+        </DockPanel>
     </DockPanel>
 </Window>

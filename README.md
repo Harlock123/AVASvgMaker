@@ -36,6 +36,7 @@ Or [build it yourself](#building).
 
 - **96 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML and network, in categories that fold away, with a search box
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
+- **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, reorder and delete
 - **Drag and drop** - drag a stencil onto the page, or click a stencil and then click where you want it
 - **Grid snap** - positions and sizes snap to the grid, switchable between 5, 10, 20, 25 and 50 px
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
@@ -62,7 +63,7 @@ Or [build it yourself](#building).
 
 - **Save and load** - a native `.avadiag` document that keeps what SVG export cannot: glue, ports, hand-placed bends, containment and z-order
 - **Six export formats** - SVG and PDF as vectors, PNG, JPEG, WebP and BMP as pictures
-- **Vector export** - SVG writes real SVG primitives, not a bitmap trace; PDF comes out the size the page says it is, with the text still selectable
+- **Vector export** - SVG writes real SVG primitives, not a bitmap trace; PDF comes out the size the page says it is, with the text still selectable, and carries every page of a document in one file
 - **Picture export** - the page rendered at 1x to 4x, on white, with no grid or selection handles in the picture
 - **Six platforms** - Windows, macOS and Linux, on both x64 and ARM, each a single self-contained executable
 
@@ -102,9 +103,33 @@ share one outline and differ only in that marker, which is exactly how the notat
 defined: the four gateways *are* one diamond with four different marks in it. The same definition produces both the
 on-screen geometry and the exported SVG, so the two cannot drift apart.
 
+## Pages
+
+A document holds as many pages as you like. They appear as tabs along the bottom of the
+drawing area once there is more than one - a single page needs no tab bar, so it does not get
+one. Click a tab to turn to that page, double-click it to rename it, or right-click for the
+rest: duplicate, delete, move left, move right. The **Page** menu carries the same commands,
+with `Ctrl+PageUp` and `Ctrl+PageDown` to turn pages and `Ctrl+Shift+P` to add one.
+
+Pages are independent. A connector glues to shapes on its own page and a container holds
+shapes on its own page, so nothing on one page can point at anything on another - which is
+what makes a page safe to delete, duplicate or reorder without looking at the rest of the
+document. Duplicating a page copies its contents through the file format, so the copies are
+real copies with their own glue rather than references shared with the page they came from.
+Deleting a page with anything on it asks first, since there is no other way back to it.
+
+The **page size belongs to the document**, not to a page, so every page of a document prints
+on the same paper. The selection does not follow you across pages, and a label part-way
+through being typed is finished on the page it was started on.
+
+**Which page is in front of you is not an edit.** Like the selection, it is carried alongside
+the undo history rather than recorded in it, so turning pages never fills the history with
+steps - but undo still lands you back on the page an edit was made on, with the selection as
+it stood. Adding, deleting, renaming and reordering pages *are* edits, and undo as usual.
+
 ## Page setup and image export
 
-**File -> Page set up** sets the page the drawing sits on. Pick one of the six presets -
+**File -> Page set up** sets the paper for every page of the document. Pick one of the six presets -
 Letter, Legal, Tabloid, A3, A4 or A5 - or type a width and height; picking a preset or
 flipping the orientation fills the boxes in, and typing your own numbers moves the size
 box to *Custom*. A **Fit to the drawing** button sizes the page to what is on it, with a
@@ -121,10 +146,14 @@ selection handles, no workspace around it, whatever the screen happens to be sho
 Containers are laid out and connectors routed before the render, so an export straight after
 opening a file matches what the app would draw.
 
-**PDF** is a vector export, so there is nothing to settle first - it goes straight to the
-file picker. The page comes out its true physical size, so a Letter page prints on Letter
-paper, and the text stays selectable and searchable rather than being flattened into
-outlines. This is the one to send to a printer or attach to a ticket.
+**PDF** is a vector export, so there is no size to settle first. A page comes out its true
+physical size, so a Letter page prints on Letter paper, and the text stays selectable and
+searchable rather than being flattened into outlines. This is the one to send to a printer or
+attach to a ticket.
+
+PDF is also the only export that can hold a whole document, so it is the only one that asks:
+a document of several pages offers **All pages** or **This page only**. Every other export
+writes a single picture, and writes the page in front of you.
 
 The four **picture** formats share one dialog: 1x, 2x, 3x or 4x, with the pixel size each
 scale produces shown against it, and anything over 100 megapixels refused. JPEG and WebP add
@@ -141,18 +170,20 @@ a quality setting, because they are the two that throw detail away.
 
 | | |
 |---|---|
-| **`.avadiag`** | The native format - JSON, human-readable and diffable. Round-trips everything: shapes, labels, colours, z-order, page size, and the glue, ports and routing of connectors. This is the one to save your work in |
+| **`.avadiag`** | The native format - JSON, human-readable and diffable. Round-trips everything: pages and their names, shapes, labels, colours, z-order, page size, and the glue, ports and routing of connectors. This is the one to save your work in |
 | **`.svg`** | Export only. Standards-compliant SVG for handing to another tool. Lossy as a working format: glue and tool state are not representable, so exports cannot be reopened for editing |
 | **`.png`** | Export only. The page rendered at 1x, 2x, 3x or 4x, for pasting into a document or a chat where SVG is not welcome |
 | **`.jpg`** | Export only. Lossy, no transparency, quality adjustable. There when something insists on JPEG |
 | **`.webp`** | Export only. Lossy, quality adjustable. Smaller than PNG at moderate quality |
 | **`.bmp`** | Export only. The same render as the PNG, written as a 24-bit uncompressed Windows bitmap, for tools that will take nothing else. Much the larger file for exactly the same picture |
-| **`.pdf`** | Export only. A vector page at its true physical size, with the text left as text. The one to print or to attach |
+| **`.pdf`** | Export only. Vector pages at their true physical size, with the text left as text - the whole document in one file, or just the page you are on. The one to print or to attach |
 
 A file records its format id and a version number, and the reader refuses both foreign JSON
 and files written by a future version rather than loading them incorrectly. Version 2 added
 connection ports and routing, version 3 hand-placed bends, and version 4 the line style;
-older files still load, and version 1 connectors keep their original straight routing. Version 5 added containers. The on-disk
+older files still load, and version 1 connectors keep their original straight routing. Version 5
+added containers, and version 6 multiple pages - a version 5 file, which had no page record
+around its shapes, loads as a document of one page. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -183,6 +214,7 @@ fields because its end points define it.
 | **File menu** | New, Open, Save, Save As, Page set up, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), and the four drawing-order commands |
+| **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, and folding either side panel away - plus a zoom box in the status bar |
 | **Select / Text box / Connector** | What a click on the page does. Text and Connector drop back to Select after one use of the text tool; the connector tool stays armed so several can be drawn in a row |
 | **Start / End** | The cap on each end - see below |
@@ -282,6 +314,8 @@ nothing shows through and they read correctly whatever is behind them.
 | `Ctrl+X` / `Ctrl+C` / `Ctrl+V` | Cut, Copy, Paste |
 | `Ctrl+D` | Duplicate the selection |
 | `Ctrl+A` | Select all |
+| `Ctrl+Shift+P` | Add a page |
+| `Ctrl+PageUp` / `Ctrl+PageDown` | Previous page, next page |
 | `Ctrl+Shift+F` / `Ctrl+Shift+B` | Bring to front, send to back |
 | `Ctrl+]` / `Ctrl+[` | Bring forward, send backward |
 | `Ctrl+wheel` | Zoom about the pointer |
@@ -464,7 +498,8 @@ AVASvgMaker/
     ShapeFactory.cs      Kind -> shape, the stencil list, and display names
     PageSize.cs          The paper presets, and matching a size back to one
   Engine/     Document state, with no UI dependencies
-    DiagramDocument.cs   Page size, z-ordered shape list, hit testing, clamping, change events
+    DiagramDocument.cs   Pages, page size, z-ordered shape list, hit testing, clamping, change events
+    DiagramPage.cs       One page: a name and the shapes on it
     DiagramFile.cs       The native .avadiag format - on-disk records, read and write
     ShapeClipboard.cs    Copy and paste, carried as the same JSON
     ShapeArranger.cs     Aligning, spacing, matching sizes and drawing order
@@ -483,6 +518,8 @@ AVASvgMaker/
     ShapePreview.cs      A stencil thumbnail
     ColorSwatchPicker.cs A colour button and palette that only reports real choices
     ConfirmDialog.cs     A three-way prompt, since Avalonia has no message box
+    TextPromptDialog.cs  One line of text, for renaming a page
+    PageTabStrip.cs      The page tabs along the bottom of the drawing area
     PageSetupDialog.cs   Paper size, orientation, and fit-to-drawing
     RasterExportDialog.cs  Export scale and quality, and the pixel size it comes to
 
@@ -587,6 +624,12 @@ Images/                  Screenshots used above
 - Because a restore rebuilds every shape, **no shape reference survives an undo**. Anything
   holding one - the selection, the inline editor's target, an in-flight drag - is restored by
   index or dropped in `DrawingCanvas.CancelInteraction`.
+- Pages are a list on the document, and `Shapes` is the current page's list rather than a
+  field of its own. That is what keeps the canvas, the arranger, the clipboard and the
+  exporters unaware that there is more than one page: they all go through `Shapes` and get the
+  page in front of the user. The exporters that need another page - the PDF writer - ask for it
+  by name through `Refresh(page)`, which switches without raising the events a real page turn
+  would.
 - The clipboard is the file format with a subset of the shapes, which is what makes pasted
   shapes real copies rather than shared references. A connector copied without the shape it
   was glued to keeps its position: `DiagramFile` freezes such an end at its resolved point
@@ -646,7 +689,8 @@ Natural next steps, roughly in order of usefulness:
 - Resizing a multi-selection as a group, and grouping proper
 - Rulers, margins and smart guides
 - Lanes with individually adjustable heights
-- Multi-page documents, which the PDF writer could then emit as one file
+- Dragging a page tab to reorder it, rather than the menu commands
+- Per-page paper sizes, so a document can mix portrait and landscape
 
 ## License
 

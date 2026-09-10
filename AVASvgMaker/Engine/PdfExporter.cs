@@ -25,14 +25,13 @@ public static class PdfExporter
     /// </summary>
     private const double PointsPerPixel = 72.0 / 96.0;
 
-    public static async Task ExportAsync(DiagramDocument document, Stream stream, string? title)
+    /// <summary>
+    /// Writes the whole document, one PDF page per diagram page, or just the page being
+    /// edited when <paramref name="allPages"/> is false.
+    /// </summary>
+    public static async Task ExportAsync(
+        DiagramDocument document, Stream stream, string? title, bool allPages = true)
     {
-        // Routes and lane positions are refreshed while painting on screen; an export must
-        // not depend on the page having been looked at first.
-        document.LayoutContainers();
-        document.NormaliseOrder();
-        document.RouteConnectors();
-
         var metadata = new SKDocumentPdfMetadata
         {
             Creator = "AVASvgMaker",
@@ -46,15 +45,26 @@ public static class PdfExporter
         var width = document.PageWidth * PointsPerPixel;
         var height = document.PageHeight * PointsPerPixel;
 
-        var canvas = pdf.BeginPage((float)width, (float)height);
+        var pages = allPages ? document.Pages : [document.CurrentPage];
 
-        var page = new PageVisual(document);
-        page.Measure(new Size(width, height));
-        page.Arrange(new Rect(0, 0, width, height));
+        foreach (var page in pages)
+        {
+            // Routes and lane positions are refreshed while painting on screen. Only the page
+            // being edited has been painted, so every page is brought up to date here rather
+            // than the export depending on which ones have been looked at.
+            document.Refresh(page);
 
-        await DrawingContextHelper.RenderAsync(canvas, page);
+            var canvas = pdf.BeginPage((float)width, (float)height);
 
-        pdf.EndPage();
+            var visual = new PageVisual(document, page);
+            visual.Measure(new Size(width, height));
+            visual.Arrange(new Rect(0, 0, width, height));
+
+            await DrawingContextHelper.RenderAsync(canvas, visual);
+
+            pdf.EndPage();
+        }
+
         pdf.Close();
     }
 
@@ -67,7 +77,7 @@ public static class PdfExporter
     /// carrying. Skia's <c>RasterDpi</c> would scale the content too - it divides by it - but
     /// that is a side effect of a setting that means something else, so it is left alone.
     /// </summary>
-    private sealed class PageVisual(DiagramDocument document) : Control
+    private sealed class PageVisual(DiagramDocument document, DiagramPage page) : Control
     {
         public override void Render(DrawingContext context)
         {
@@ -77,7 +87,7 @@ public static class PdfExporter
             context.DrawRectangle(Brushes.White, null,
                 new Rect(0, 0, document.PageWidth, document.PageHeight));
 
-            foreach (var shape in document.Shapes)
+            foreach (var shape in page.Shapes)
                 shape.Render(context);
         }
     }

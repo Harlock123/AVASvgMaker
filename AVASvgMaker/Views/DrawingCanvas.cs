@@ -306,9 +306,7 @@ public class DrawingCanvas : Decorator
 
     public override void Render(DrawingContext context)
     {
-        Document.LayoutContainers();
-        Document.NormaliseOrder();
-        Document.RouteConnectors();
+        Document.Refresh();
 
         context.DrawRectangle(WorkspaceBrush, null, new Rect(Bounds.Size));
 

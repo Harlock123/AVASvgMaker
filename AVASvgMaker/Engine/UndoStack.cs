@@ -40,12 +40,16 @@ public class UndoStack
 
         document.Changed += OnDocumentChanged;
         document.SelectionChanged += OnSelectionChanged;
+        document.PageChanged += OnSelectionChanged;
     }
 
-    /// <summary>Selection is not part of the saved document, so it is carried alongside the snapshot.</summary>
-    private sealed record Snapshot(string Json, int[] SelectedIndices);
+    /// <summary>
+    /// Neither the selection nor which page is being looked at is part of the saved document,
+    /// so both are carried alongside the snapshot instead.
+    /// </summary>
+    private sealed record Snapshot(string Json, int PageIndex, int[] SelectedIndices);
 
-    private Snapshot Capture() => new(DiagramFile.ToJson(_document), SelectedIndices());
+    private Snapshot Capture() => new(DiagramFile.ToJson(_document), _document.PageIndex, SelectedIndices());
 
     private int[] SelectedIndices() => _document.Selection
         .Select(shape => _document.Shapes.IndexOf(shape))
@@ -53,16 +57,17 @@ public class UndoStack
         .ToArray();
 
     /// <summary>
-    /// Selection moves without changing the document, so it is folded into the current
-    /// snapshot rather than recorded as a step of its own. Undo then restores the
-    /// selection as it stood just before the edit.
+    /// Selecting something, or turning to another page, moves without changing the document,
+    /// so both are folded into the current snapshot rather than recorded as steps of their
+    /// own. Undo then lands back on the page the edit was made on, with the selection as it
+    /// stood just before it.
     /// </summary>
     private void OnSelectionChanged()
     {
         if (_restoring)
             return;
 
-        _current = _current with { SelectedIndices = SelectedIndices() };
+        _current = _current with { PageIndex = _document.PageIndex, SelectedIndices = SelectedIndices() };
     }
 
     private void OnDocumentChanged()
@@ -127,6 +132,7 @@ public class UndoStack
         try
         {
             _document.ReplaceWith(DiagramFile.FromJson(snapshot.Json));
+            _document.PageIndex = snapshot.PageIndex;
 
             _document.SetSelection(snapshot.SelectedIndices
                 .Where(index => index >= 0 && index < _document.Shapes.Count)

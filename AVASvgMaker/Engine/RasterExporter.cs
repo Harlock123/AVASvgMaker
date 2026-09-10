@@ -67,9 +67,7 @@ public static class RasterExporter
     {
         // Routes and lane positions are refreshed while painting on screen; an export must
         // not depend on the page having been looked at first.
-        document.LayoutContainers();
-        document.NormaliseOrder();
-        document.RouteConnectors();
+        document.Refresh();
 
         var size = SizeAt(document, scale);
 

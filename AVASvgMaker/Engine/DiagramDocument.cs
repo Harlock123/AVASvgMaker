@@ -6,14 +6,60 @@ using AVASvgMaker.Models;
 
 namespace AVASvgMaker.Engine;
 
-/// <summary>The page and the shapes on it. Index order in <see cref="Shapes"/> is z-order.</summary>
+/// <summary>
+/// A document: one or more pages, all the same size, and the shapes on each.
+///
+/// Everything that edits the drawing works through <see cref="Shapes"/>, which is the current
+/// page's shape list. That is what keeps the rest of the app - the canvas, the arranger, the
+/// clipboard, the exporters - unaware that there is more than one page at all.
+/// </summary>
 public class DiagramDocument
 {
-    // US Letter at 96 DPI.
+    // US Letter at 96 DPI. The size belongs to the document rather than to a page, so every
+    // page of a document prints on the same paper.
     public double PageWidth { get; set; } = 816;
     public double PageHeight { get; set; } = 1056;
 
-    public List<DiagramShape> Shapes { get; } = new();
+    private readonly List<DiagramPage> _pages = [new DiagramPage("Page 1")];
+    private int _pageIndex;
+
+    public IReadOnlyList<DiagramPage> Pages => _pages;
+
+    public DiagramPage CurrentPage => _pages[_pageIndex];
+
+    /// <summary>
+    /// Which page is being edited. Changing it is not an edit - like the selection, it is
+    /// carried alongside the undo history rather than recorded in it.
+    /// </summary>
+    public int PageIndex
+    {
+        get => _pageIndex;
+        set
+        {
+            var clamped = Math.Clamp(value, 0, _pages.Count - 1);
+
+            if (clamped == _pageIndex)
+                return;
+
+            PageChanging?.Invoke();
+
+            _pageIndex = clamped;
+            ClearSelection();
+            PageChanged?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Raised just before the page being edited changes, so a label part-way through being
+    /// typed is finished on the page it belongs to rather than following the move.
+    /// </summary>
+    public event Action? PageChanging;
+
+    /// <summary>Raised when pages are added, removed, renamed, reordered or switched between.</summary>
+    public event Action? PageChanged;
+
+    /// <summary>The shapes on the current page. Index order is z-order.</summary>
+    public List<DiagramShape> Shapes => _pages[_pageIndex].Shapes;
 
     private readonly List<DiagramShape> _selection = [];
 
@@ -197,12 +243,186 @@ public class DiagramDocument
         PageWidth = source.PageWidth;
         PageHeight = source.PageHeight;
 
-        Shapes.Clear();
-        Shapes.AddRange(source.Shapes);
+        _pages.Clear();
+        _pages.AddRange(source._pages);
+
+        // Back to the first page. Undo puts the page back itself, from the snapshot.
+        _pageIndex = 0;
+
         ClearSelection();
+        PageChanged?.Invoke();
 
         MarkSaved();
     }
+
+    #region Pages
+
+    /// <summary>
+    /// Replaces every page, as the reader does after parsing a file. A document always has at
+    /// least one page, so an empty list becomes a single blank one.
+    /// </summary>
+    public void SetPages(IEnumerable<DiagramPage> pages)
+    {
+        var replacement = pages.ToList();
+
+        if (replacement.Count == 0)
+            replacement.Add(new DiagramPage("Page 1"));
+
+        _pages.Clear();
+        _pages.AddRange(replacement);
+        _pageIndex = 0;
+
+        ClearSelection();
+        PageChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// A name no other page is using. Pages are numbered from the count rather than from the
+    /// highest name in use, so the obvious name is taken when it is free.
+    /// </summary>
+    private string UnusedPageName()
+    {
+        for (var n = _pages.Count + 1; ; n++)
+        {
+            var name = $"Page {n}";
+
+            if (!_pages.Any(page => string.Equals(page.Name, name, StringComparison.Ordinal)))
+                return name;
+        }
+    }
+
+    /// <summary>Adds an empty page after the given position and makes it current.</summary>
+    public DiagramPage InsertPage(int position)
+    {
+        PageChanging?.Invoke();
+
+        var page = new DiagramPage(UnusedPageName());
+
+        _pages.Insert(Math.Clamp(position, 0, _pages.Count), page);
+        _pageIndex = _pages.IndexOf(page);
+
+        ClearSelection();
+        MarkModified();
+        PageChanged?.Invoke();
+
+        return page;
+    }
+
+    public DiagramPage AddPage() => InsertPage(_pages.Count);
+
+    /// <summary>
+    /// Copies a page, contents and all, and makes the copy current. The copy is taken through
+    /// the file format, so the new shapes are genuine copies with their own glue and
+    /// containment rather than references shared with the page they came from.
+    /// </summary>
+    public DiagramPage DuplicatePage(int index)
+    {
+        PageChanging?.Invoke();
+
+        index = Math.Clamp(index, 0, _pages.Count - 1);
+
+        var copy = new DiagramPage(UnusedPageName());
+        copy.Shapes.AddRange(DiagramFile.CopyOf(_pages[index].Shapes));
+
+        _pages.Insert(index + 1, copy);
+        _pageIndex = index + 1;
+
+        ClearSelection();
+        MarkModified();
+        PageChanged?.Invoke();
+
+        return copy;
+    }
+
+    /// <summary>Removes a page. The last page cannot be removed - a document always has one.</summary>
+    public bool RemovePage(int index)
+    {
+        PageChanging?.Invoke();
+
+        if (_pages.Count <= 1 || index < 0 || index >= _pages.Count)
+            return false;
+
+        _pages.RemoveAt(index);
+        _pageIndex = Math.Clamp(_pageIndex > index ? _pageIndex - 1 : _pageIndex, 0, _pages.Count - 1);
+
+        ClearSelection();
+        MarkModified();
+        PageChanged?.Invoke();
+
+        return true;
+    }
+
+    public bool RenamePage(int index, string name)
+    {
+        name = name.Trim();
+
+        if (index < 0 || index >= _pages.Count || name.Length == 0 ||
+            string.Equals(_pages[index].Name, name, StringComparison.Ordinal))
+            return false;
+
+        _pages[index].Name = name;
+
+        MarkModified();
+        PageChanged?.Invoke();
+
+        return true;
+    }
+
+    /// <summary>Moves a page to a new position, carrying the current-page marker with it.</summary>
+    public bool MovePage(int from, int to)
+    {
+        to = Math.Clamp(to, 0, _pages.Count - 1);
+
+        if (from < 0 || from >= _pages.Count || from == to)
+            return false;
+
+        var moving = _pages[from];
+        var current = _pages[_pageIndex];
+
+        _pages.RemoveAt(from);
+        _pages.Insert(to, moving);
+        _pageIndex = _pages.IndexOf(current);
+
+        MarkModified();
+        PageChanged?.Invoke();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Brings a page up to date: lane layout, drawing order and connector routes. The canvas
+    /// does this as it paints, so it is only worth calling for a page that is not on screen -
+    /// which is every page but one when a whole document is being exported.
+    /// </summary>
+    public void Refresh(DiagramPage? page = null)
+    {
+        var saved = _pageIndex;
+
+        if (page is not null)
+        {
+            var index = _pages.IndexOf(page);
+
+            if (index < 0)
+                return;
+
+            // Switched directly rather than through the property, so no page-change or
+            // selection event escapes: this is a read of another page, not a move to it.
+            _pageIndex = index;
+        }
+
+        try
+        {
+            LayoutContainers();
+            NormaliseOrder();
+            RouteConnectors();
+        }
+        finally
+        {
+            _pageIndex = saved;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Topmost shape under the point, or null. <paramref name="slack"/> is extra tolerance in

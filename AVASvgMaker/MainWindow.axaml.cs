@@ -71,6 +71,14 @@ public partial class MainWindow : Window
 
         Canvas.ZoomChanged += SyncZoomBox;
 
+        // A label part-way through being typed belongs to the page it was started on.
+        Canvas.Document.PageChanging += Canvas.CommitEdit;
+        Canvas.Document.PageChanged += SyncPages;
+
+        PageTabs.Attach(Canvas.Document);
+        PageTabs.RenameRequested += index => _ = RenamePageAsync(index);
+        PageTabs.DeleteRequested += index => _ = DeletePageAsync(index);
+
         _history = new UndoStack(Canvas.Document);
         _history.StateChanged += SyncHistoryMenu;
 
@@ -90,8 +98,96 @@ public partial class MainWindow : Window
         UpdateTitle();
         SyncHistoryMenu();
         SyncProperties();
+        SyncPages();
         Canvas.ReportStatus();
     }
+
+    #region Pages
+
+    private void OnNewPageClick(object? sender, RoutedEventArgs e) => Canvas.Document.AddPage();
+
+    private void OnDuplicatePageClick(object? sender, RoutedEventArgs e) =>
+        Canvas.Document.DuplicatePage(Canvas.Document.PageIndex);
+
+    private void OnRenamePageClick(object? sender, RoutedEventArgs e) =>
+        _ = RenamePageAsync(Canvas.Document.PageIndex);
+
+    private void OnDeletePageClick(object? sender, RoutedEventArgs e) =>
+        _ = DeletePageAsync(Canvas.Document.PageIndex);
+
+    private void OnPreviousPageClick(object? sender, RoutedEventArgs e) => Canvas.Document.PageIndex--;
+
+    private void OnNextPageClick(object? sender, RoutedEventArgs e) => Canvas.Document.PageIndex++;
+
+    private void OnMovePageLeftClick(object? sender, RoutedEventArgs e) =>
+        Canvas.Document.MovePage(Canvas.Document.PageIndex, Canvas.Document.PageIndex - 1);
+
+    private void OnMovePageRightClick(object? sender, RoutedEventArgs e) =>
+        Canvas.Document.MovePage(Canvas.Document.PageIndex, Canvas.Document.PageIndex + 1);
+
+    private async Task RenamePageAsync(int index)
+    {
+        var document = Canvas.Document;
+
+        if (index < 0 || index >= document.Pages.Count)
+            return;
+
+        var name = await TextPromptDialog.ShowAsync(
+            this, "Rename page", "Page name", document.Pages[index].Name);
+
+        if (name is not null)
+            document.RenamePage(index, name);
+    }
+
+    /// <summary>
+    /// Deleting a page takes its contents with it and there is no other way back to them, so
+    /// a page with anything on it asks first.
+    /// </summary>
+    private async Task DeletePageAsync(int index)
+    {
+        var document = Canvas.Document;
+
+        if (index < 0 || index >= document.Pages.Count || document.Pages.Count <= 1)
+            return;
+
+        var page = document.Pages[index];
+
+        if (page.Shapes.Count > 0)
+        {
+            var answer = await ConfirmDialog.ShowAsync(this,
+                $"Delete \"{page.Name}\" and the {page.Shapes.Count} " +
+                $"{(page.Shapes.Count == 1 ? "shape" : "shapes")} on it?",
+                "Delete", "Keep");
+
+            if (answer != ConfirmResult.Primary)
+                return;
+        }
+
+        document.RemovePage(index);
+    }
+
+    /// <summary>Follows the page list: the menu, the indicator, and what the canvas is drawing.</summary>
+    private void SyncPages()
+    {
+        var document = Canvas.Document;
+        var count = document.Pages.Count;
+        var index = document.PageIndex;
+
+        DeletePageMenuItem.IsEnabled = count > 1;
+        PreviousPageMenuItem.IsEnabled = index > 0;
+        NextPageMenuItem.IsEnabled = index < count - 1;
+        MovePageLeftMenuItem.IsEnabled = index > 0;
+        MovePageRightMenuItem.IsEnabled = index < count - 1;
+
+        PageText.Text = count > 1
+            ? $"{document.CurrentPage.Name} - {index + 1} of {count}"
+            : string.Empty;
+
+        Canvas.CancelInteraction();
+        Canvas.InvalidateVisual();
+    }
+
+    #endregion
 
     #region Arranging
 
@@ -830,6 +926,18 @@ public partial class MainWindow : Window
                 OnNewClick(sender, e);
                 break;
 
+            case Key.P when shift:
+                OnNewPageClick(sender, e);
+                break;
+
+            case Key.PageUp:
+                Canvas.Document.PageIndex--;
+                break;
+
+            case Key.PageDown:
+                Canvas.Document.PageIndex++;
+                break;
+
             case Key.O:
                 OnOpenClick(sender, e);
                 break;
@@ -987,6 +1095,23 @@ public partial class MainWindow : Window
     {
         Canvas.CommitEdit();
 
+        var document = Canvas.Document;
+        var allPages = true;
+
+        // PDF is the one export that can hold a whole document, so it is the one that has to
+        // ask. Everything else writes a single picture, and so writes the page in front of you.
+        if (document.Pages.Count > 1)
+        {
+            var answer = await ConfirmDialog.ShowAsync(this,
+                $"This document has {document.Pages.Count} pages.",
+                "All pages", "This page only");
+
+            if (answer == ConfirmResult.Cancel)
+                return;
+
+            allPages = answer == ConfirmResult.Primary;
+        }
+
         var file = await AskWhereToPutAsync("PDF", "pdf",
             new FilePickerFileType("PDF document")
             {
@@ -1001,13 +1126,17 @@ public partial class MainWindow : Window
         {
             await using var stream = await file.OpenWriteAsync();
             await PdfExporter.ExportAsync(
-                Canvas.Document, stream, Path.GetFileNameWithoutExtension(file.Name));
+                document, stream, Path.GetFileNameWithoutExtension(file.Name), allPages);
             await stream.FlushAsync();
 
             if (stream.CanSeek)
                 stream.SetLength(stream.Position);
 
-            StatusText.Text = $"Exported {file.Name}";
+            var written = allPages ? document.Pages.Count : 1;
+
+            StatusText.Text = written == 1
+                ? $"Exported {file.Name}"
+                : $"Exported {file.Name} - {written} pages";
         }
         catch (Exception ex)
         {
