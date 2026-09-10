@@ -131,6 +131,10 @@
                 <MenuItem Header="Send to bac_k" InputGesture="Ctrl+Shift+B" Tag="Back"
                           Click="OnOrderClick" />
                 <Separator />
+                <MenuItem Header="Rotate _left" Tag="-90" Click="OnRotateClick" />
+                <MenuItem Header="Rotate _right" Tag="90" Click="OnRotateClick" />
+                <MenuItem Header="_Straighten" Tag="0" Click="OnRotateClick" />
+                <Separator />
                 <MenuItem Header="_Group" InputGesture="Ctrl+G" Click="OnGroupClick" />
                 <MenuItem Header="_Ungroup" InputGesture="Ctrl+Shift+G" Click="OnUngroupClick" />
                 <Separator />

@@ -69,6 +69,42 @@ public abstract class DiagramShape
     /// </summary>
     public int GroupId { get; set; }
 
+    /// <summary>
+    /// How far the shape is turned, in degrees clockwise about the middle of its bounds.
+    ///
+    /// Rotation is a way of drawing the shape rather than a change to it: <see cref="Bounds"/>
+    /// stays the upright rectangle it always was, and moving, resizing and snapping all go on
+    /// working in those terms. Only three things have to know - drawing, hit testing, and where
+    /// the connection points are - which is why it can be added without disturbing the rest.
+    /// </summary>
+    public double Rotation { get; set; }
+
+    /// <summary>Whether turning the shape means anything. A lane is placed by its pool; a
+    /// connector is a path between two points and has no angle of its own.</summary>
+    public virtual bool CanRotate => true;
+
+    /// <summary>True when the shape is actually turned, allowing for rounding.</summary>
+    public bool IsRotated => Math.Abs(Rotation) > 0.01;
+
+    /// <summary>The turn itself, about the middle of the bounds.</summary>
+    protected Matrix RotationMatrix
+    {
+        get
+        {
+            var centre = Bounds.Center;
+
+            return Matrix.CreateTranslation(-centre.X, -centre.Y)
+                   * Matrix.CreateRotation(Rotation * Math.PI / 180)
+                   * Matrix.CreateTranslation(centre.X, centre.Y);
+        }
+    }
+
+    /// <summary>Turns a page point into the upright frame the shape is described in.</summary>
+    public Point Unrotate(Point point) => Upright(point);
+
+    protected Point Upright(Point point) =>
+        IsRotated && RotationMatrix.TryInvert(out var back) ? point.Transform(back) : point;
+
     protected DiagramShape(Rect bounds)
     {
         _bounds = bounds;
@@ -96,6 +132,7 @@ public abstract class DiagramShape
     ];
 
     private Rect _attachBounds;
+    private double _attachRotation;
     private Point[]? _attachPoints;
 
     /// <summary>
@@ -116,11 +153,21 @@ public abstract class DiagramShape
 
             // Worked out afresh only when the shape has actually changed size or place; the
             // router asks for these constantly.
-            if (_attachPoints is not null && _attachBounds == bounds)
+            if (_attachPoints is not null && _attachBounds == bounds &&
+                Math.Abs(_attachRotation - Rotation) < 0.0001)
                 return _attachPoints;
 
             _attachBounds = bounds;
+            _attachRotation = Rotation;
             _attachPoints = AttachPoints(bounds);
+
+            if (IsRotated)
+            {
+                var turn = RotationMatrix;
+
+                for (var i = 0; i < _attachPoints.Length; i++)
+                    _attachPoints[i] = _attachPoints[i].Transform(turn);
+            }
 
             return _attachPoints;
         }
@@ -185,8 +232,28 @@ public abstract class DiagramShape
     }
 
     /// <summary>The direction a connector should leave the given connection point.</summary>
-    public Vector ConnectionDirection(int index) =>
-        index >= 0 && index < ConnectionDirections.Length ? ConnectionDirections[index] : default;
+    /// <summary>
+    /// The direction a connector should leave the given connection point, turned with the
+    /// shape so a line still leaves a rotated box square on to the side it is attached to.
+    /// </summary>
+    public Vector ConnectionDirection(int index)
+    {
+        if (index < 0 || index >= ConnectionDirections.Length)
+            return default;
+
+        var direction = ConnectionDirections[index];
+
+        if (!IsRotated)
+            return direction;
+
+        var radians = Rotation * Math.PI / 180;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+
+        return new Vector(
+            direction.X * cos - direction.Y * sin,
+            direction.X * sin + direction.Y * cos);
+    }
 
     #endregion
 
@@ -195,8 +262,25 @@ public abstract class DiagramShape
 
     public void Render(DrawingContext context) => Render(context, true);
 
-    /// <summary>Draws the shape; <paramref name="withText"/> is false while its label is being edited.</summary>
-    public virtual void Render(DrawingContext context, bool withText)
+    /// <summary>
+    /// Draws the shape, turned if it is turned. Every shape goes through here, so no subclass
+    /// has to know about rotation: they draw themselves upright in <see cref="Draw"/> and the
+    /// transform is pushed around them.
+    /// </summary>
+    public void Render(DrawingContext context, bool withText)
+    {
+        if (!IsRotated)
+        {
+            Draw(context, withText);
+            return;
+        }
+
+        using var turned = context.PushTransform(RotationMatrix);
+        Draw(context, withText);
+    }
+
+    /// <summary>Draws the shape upright; <paramref name="withText"/> is false while its label is being edited.</summary>
+    protected virtual void Draw(DrawingContext context, bool withText)
     {
         var brush = new SolidColorBrush(Fill);
         context.DrawGeometry(brush, CreatePen(), CreateGeometry());
@@ -224,13 +308,21 @@ public abstract class DiagramShape
         };
     }
 
-    public virtual bool HitTest(Point point) => CreateGeometry().FillContains(point);
+    /// <summary>
+    /// Whether the point is on the shape. A turned shape is tested by turning the point back
+    /// rather than by turning the shape: the geometry is only ever built upright.
+    /// </summary>
+    public bool HitTest(Point point) => HitTestUpright(Upright(point));
 
     /// <summary>
     /// Hit test with slack, in page units, for targets too thin to click accurately.
     /// Filled shapes ignore it; a line needs it, and needs more of it when zoomed out.
     /// </summary>
-    public virtual bool HitTest(Point point, double slack) => HitTest(point);
+    public bool HitTest(Point point, double slack) => HitTestUpright(Upright(point), slack);
+
+    protected virtual bool HitTestUpright(Point point) => CreateGeometry().FillContains(point);
+
+    protected virtual bool HitTestUpright(Point point, double slack) => HitTestUpright(point);
 
     #region Text
 
@@ -350,12 +442,21 @@ public abstract class DiagramShape
     {
         var sb = new StringBuilder();
 
+        // The turn is written once, round the whole shape, so the element inside it stays the
+        // upright one the exporter already knew how to write.
+        if (IsRotated)
+            sb.AppendLine($"  <g transform=\"rotate({Num(Rotation)} " +
+                          $"{Num(Bounds.Center.X)} {Num(Bounds.Center.Y)})\">");
+
         var body = SvgBody();
         if (!string.IsNullOrEmpty(body))
             sb.AppendLine("  " + body);
 
         if (!string.IsNullOrWhiteSpace(Text))
             sb.Append(SvgText());
+
+        if (IsRotated)
+            sb.AppendLine("  </g>");
 
         return sb.ToString();
     }

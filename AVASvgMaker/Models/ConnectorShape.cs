@@ -23,6 +23,8 @@ public class ConnectorShape : DiagramShape
 
     public override ShapeKind Kind => ShapeKind.Connector;
 
+    public override bool CanRotate => false;
+
     public override bool IsBoxResizable => false;
 
     public Point Start { get; set; }
@@ -439,9 +441,9 @@ public class ConnectorShape : DiagramShape
         return geometry;
     }
 
-    public override bool HitTest(Point point) => HitTest(point, HitTolerance);
+    protected override bool HitTestUpright(Point point) => HitTestUpright(point, HitTolerance);
 
-    public override bool HitTest(Point point, double slack)
+    protected override bool HitTestUpright(Point point, double slack)
     {
         var tolerance = Math.Max(slack, HitTolerance);
         var path = Path;
@@ -477,7 +479,7 @@ public class ConnectorShape : DiagramShape
 
     #region Rendering
 
-    public override void Render(DrawingContext context, bool withText)
+    protected override void Draw(DrawingContext context, bool withText)
     {
         var path = Path.ToList();
 

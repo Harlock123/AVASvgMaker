@@ -513,6 +513,39 @@ public class DiagramDocument
         }
     }
 
+    /// <summary>
+    /// Turns whatever is given, each about its own middle. Turning a selection about the
+    /// middle of the selection would move the shapes as well as turn them, which is a
+    /// different operation and not the one a rotate handle offers.
+    /// </summary>
+    public bool Rotate(IEnumerable<DiagramShape> shapes, double degrees, bool absolute = false)
+    {
+        var turned = false;
+
+        foreach (var shape in shapes.Where(shape => shape.CanRotate))
+        {
+            var wanted = Normalise(absolute ? degrees : shape.Rotation + degrees);
+
+            if (Math.Abs(wanted - shape.Rotation) < 0.0001)
+                continue;
+
+            shape.Rotation = wanted;
+            turned = true;
+        }
+
+        if (turned)
+            MarkModified();
+
+        return turned;
+    }
+
+    /// <summary>Keeps an angle in 0..360, so a shape turned all the way round reads as upright.</summary>
+    public static double Normalise(double degrees)
+    {
+        var turned = degrees % 360;
+        return turned < 0 ? turned + 360 : turned;
+    }
+
     #region Groups
 
     /// <summary>

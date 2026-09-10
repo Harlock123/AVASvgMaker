@@ -36,6 +36,8 @@ public class ContainerShape : DiagramShape
     public HeaderEdge Header { get; }
 
     /// <summary>A lane is positioned by the pool that owns it, not by its own handles.</summary>
+    public override bool CanRotate => false;
+
     public override bool IsBoxResizable => _kind != ShapeKind.Lane;
 
     /// <summary>
@@ -67,7 +69,7 @@ public class ContainerShape : DiagramShape
 
     public override Geometry CreateGeometry() => new RectangleGeometry(Bounds);
 
-    public override void Render(DrawingContext context, bool withText)
+    protected override void Draw(DrawingContext context, bool withText)
     {
         var pen = CreatePen();
 
@@ -114,9 +116,9 @@ public class ContainerShape : DiagramShape
     }
 
     /// <summary>The title band and the border, but not the space inside.</summary>
-    public override bool HitTest(Point point) => HitTest(point, 0);
+    protected override bool HitTestUpright(Point point) => HitTestUpright(point, 0);
 
-    public override bool HitTest(Point point, double slack)
+    protected override bool HitTestUpright(Point point, double slack)
     {
         if (HeaderBounds.Contains(point))
             return true;

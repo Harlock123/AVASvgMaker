@@ -40,6 +40,7 @@ public class DrawingCanvas : Decorator
         ReorderingLane,
         ResizingLane,
         ResizingSelection,
+        Rotating,
         DrawingConnector,
         Marquee
     }
@@ -88,6 +89,9 @@ public class DrawingCanvas : Decorator
 
     private static readonly IBrush GuideBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x4A, 0x8A));
 
+    /// <summary>The handle that turns a shape, round rather than square so it reads differently.</summary>
+    private static readonly IBrush RotateHandleBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD8, 0x66));
+
     /// <summary>A bend that letting go of would remove.</summary>
     private static readonly IBrush DoomedHandleBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x5A, 0x4A));
 
@@ -107,6 +111,12 @@ public class DrawingCanvas : Decorator
     /// <summary>Set while a bend is being dragged and has come back onto the line.</summary>
     private bool _bendDoomed;
 
+    /// <summary>How far above the shape the turn handle sits, in screen pixels.</summary>
+    private const double RotateHandleReach = 22;
+
+    /// <summary>What the turn snaps to while shift is held.</summary>
+    private const double RotateStep = 15;
+
     /// <summary>How near an edge has to come before a drag lines up with it, in screen pixels.</summary>
     private const double GuideReachPixels = 6;
 
@@ -115,6 +125,9 @@ public class DrawingCanvas : Decorator
 
     /// <summary>The lines to draw showing what the current drag has lined up with.</summary>
     private readonly List<(Point A, Point B)> _guides = [];
+
+    /// <summary>How far the pointer was from the shape's own angle when a turn began.</summary>
+    private double _rotateGrip;
 
     /// <summary>Where each shape of a selection stood when a stretch of the whole lot began.</summary>
     private readonly List<(DiagramShape Shape, Rect Start, Point[] Points)> _scaling = [];
@@ -559,6 +572,18 @@ public class DrawingCanvas : Decorator
             foreach (var handle in SelectionHandles(selection[0]))
                 context.DrawRectangle(HandleBrush, outline, handle);
 
+            // The turn handle, on a stalk from the top of the shape so it is clear what it
+            // belongs to and clear that it is not another corner to drag.
+            if (RotateHandle(selection[0]) is { } turn)
+            {
+                var bounds = selection[0].Bounds;
+                var top = Turned(selection[0], new Point(bounds.Center.X, bounds.Top));
+
+                context.DrawLine(ScreenPen(SelectionBrush, 1), top, turn.Center);
+                context.DrawEllipse(RotateHandleBrush, outline, turn.Center,
+                    turn.Width / 2, turn.Height / 2);
+            }
+
             return;
         }
 
@@ -634,14 +659,56 @@ public class DrawingCanvas : Decorator
     }
 
     /// <summary>Eight box handles for a shape, or the connector handles above.</summary>
-    private Rect[] SelectionHandles(DiagramShape shape) => shape is ConnectorShape connector
-        ? ConnectorHandles(connector).Select(handle => handle.Rect).ToArray()
-        : BoxHandles(shape.Bounds);
+    /// <summary>The handles as drawn, for the tests to look at.</summary>
+    internal Rect[] HandlesForTest(DiagramShape shape) => SelectionHandles(shape);
+
+    private Rect[] SelectionHandles(DiagramShape shape)
+    {
+        if (shape is ConnectorShape connector)
+            return ConnectorHandles(connector).Select(handle => handle.Rect).ToArray();
+
+        // The handles ride round with the shape, so the corner you grab is the corner you see.
+        return BoxPoints(shape.Bounds)
+            .Select(point => HandleRect(Turned(shape, point)))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Where the turn handle sits: above the top of the shape, on a short stalk, in the frame
+    /// the shape is already turned into so it travels round with it.
+    /// </summary>
+    private Rect? RotateHandle(DiagramShape shape)
+    {
+        if (!shape.CanRotate)
+            return null;
+
+        var bounds = shape.Bounds;
+        var above = new Point(bounds.Center.X, bounds.Top - Screen(RotateHandleReach));
+
+        return HandleRect(Turned(shape, above));
+    }
+
+    /// <summary>A point in the shape's upright frame, moved to where the turn puts it.</summary>
+    private static Point Turned(DiagramShape shape, Point point)
+    {
+        if (!shape.IsRotated)
+            return point;
+
+        var centre = shape.Bounds.Center;
+        var radians = shape.Rotation * Math.PI / 180;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+        var dx = point.X - centre.X;
+        var dy = point.Y - centre.Y;
+
+        return new Point(centre.X + dx * cos - dy * sin, centre.Y + dx * sin + dy * cos);
+    }
 
     /// <summary>The eight handles round a rectangle, in the order the resize maths expects.</summary>
-    private Rect[] BoxHandles(Rect bounds)
-    {
-        Point[] points =
+    private Rect[] BoxHandles(Rect bounds) =>
+        BoxPoints(bounds).Select(point => HandleRect(point)).ToArray();
+
+    private static Point[] BoxPoints(Rect bounds) =>
         [
             new(bounds.Left, bounds.Top),
             new(bounds.Center.X, bounds.Top),
@@ -652,9 +719,6 @@ public class DrawingCanvas : Decorator
             new(bounds.Left, bounds.Bottom),
             new(bounds.Left, bounds.Center.Y)
         ];
-
-        return points.Select(point => HandleRect(point)).ToArray();
-    }
 
     /// <summary>
     /// The box the handles of a multiple selection sit on, and the box a stretch maps out of.
@@ -1004,6 +1068,13 @@ public class DrawingCanvas : Decorator
 
         var pagePoint = ToPage(point.Position);
 
+        if (Document.Selection.Count == 1 && Document.Selected is { } turnable &&
+            RotateHandle(turnable) is { } spot && spot.Inflate(Screen(2)).Contains(pagePoint))
+        {
+            BeginRotate(turnable, pagePoint, e);
+            return;
+        }
+
         var handle = HandleAt(pagePoint);
 
         if (handle >= 0 && Document.Selection.Count > 1)
@@ -1320,10 +1391,18 @@ public class DrawingCanvas : Decorator
 
             case DragMode.Resizing when Document.Selection.Count == 1:
                 var sizing = Document.Selection[0];
-                sizing.Bounds = Document.ClampToPage(Resize(_dragStartBounds, _activeHandle, pagePoint));
+
+                // A turned shape is resized in the frame it is described in - its bounds are
+                // still the upright rectangle - so the pointer is turned back to meet it.
+                sizing.Bounds = Document.ClampToPage(
+                    Resize(_dragStartBounds, _activeHandle, sizing.Unrotate(pagePoint)));
                 _dragChanged = true;
                 InvalidateVisual();
                 ReportStatus();
+                return;
+
+            case DragMode.Rotating when Document.Selected is { } turning:
+                RotateTo(turning, pagePoint, e.KeyModifiers);
                 return;
 
             case DragMode.ResizingSelection:
@@ -1756,6 +1835,13 @@ public class DrawingCanvas : Decorator
             return;
         }
 
+        if (Document.Selection.Count == 1 && Document.Selected is { } turnable &&
+            RotateHandle(turnable) is { } spot && spot.Inflate(Screen(2)).Contains(pagePoint))
+        {
+            Cursor = new Cursor(StandardCursorType.Hand);
+            return;
+        }
+
         var handle = HandleAt(pagePoint);
 
         StandardCursorType cursor;
@@ -1852,6 +1938,36 @@ public class DrawingCanvas : Decorator
 
         return false;
     }
+
+    private void BeginRotate(DiagramShape shape, Point pagePoint, PointerPressedEventArgs e)
+    {
+        _dragMode = DragMode.Rotating;
+
+        // Remembered as the difference between where the pointer is and where the shape is
+        // already turned to, so the shape does not jump to meet the pointer on the first move.
+        _rotateGrip = Angle(shape.Bounds.Center, pagePoint) - shape.Rotation;
+
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    private void RotateTo(DiagramShape shape, Point pagePoint, KeyModifiers modifiers)
+    {
+        var wanted = Angle(shape.Bounds.Center, pagePoint) - _rotateGrip;
+
+        if (modifiers.HasFlag(KeyModifiers.Shift))
+            wanted = Math.Round(wanted / RotateStep) * RotateStep;
+
+        if (!Document.Rotate([shape], wanted, absolute: true))
+            return;
+
+        _dragChanged = true;
+        InvalidateVisual();
+        ReportStatus();
+    }
+
+    private static double Angle(Point centre, Point point) =>
+        Math.Atan2(point.Y - centre.Y, point.X - centre.X) * 180 / Math.PI + 90;
 
     private void ScaleSelection(Point pagePoint)
     {
@@ -2396,7 +2512,8 @@ public class DrawingCanvas : Decorator
             { } shape =>
                 $"{ShapeFactory.DisplayName(shape.Kind)}  " +
                 $"X {shape.Bounds.X:0}  Y {shape.Bounds.Y:0}  " +
-                $"W {shape.Bounds.Width:0}  H {shape.Bounds.Height:0}",
+                $"W {shape.Bounds.Width:0}  H {shape.Bounds.Height:0}" +
+                (shape.IsRotated ? $"  {shape.Rotation:0}°" : string.Empty),
             _ => Tool switch
             {
                 EditorTool.Connector => "Drag between two shapes to connect them",

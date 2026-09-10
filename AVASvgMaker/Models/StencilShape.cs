@@ -25,7 +25,7 @@ public class StencilShape : DiagramShape
     public override Geometry CreateGeometry() =>
         StencilPath.ToGeometry(_stencil.Outline ?? "M 0,0 L 1,0 L 1,1 L 0,1 Z", Bounds);
 
-    public override void Render(DrawingContext context, bool withText)
+    protected override void Draw(DrawingContext context, bool withText)
     {
         var pen = CreatePen();
 

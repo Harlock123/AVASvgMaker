@@ -170,6 +170,31 @@ public partial class MainWindow : Window
             StatusText.Text = $"Deleted \"{stencil.Name}\"";
     }
 
+    /// <summary>
+    /// Turns the selection. Each shape turns about its own middle rather than the middle of
+    /// the selection, so nothing moves that was not asked to move.
+    /// </summary>
+    private void OnRotateClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag } || !double.TryParse(tag, out var degrees))
+            return;
+
+        var document = Canvas.Document;
+        var turnable = document.Selection.Where(shape => shape.CanRotate).ToList();
+
+        if (turnable.Count == 0)
+        {
+            StatusText.Text = "Select something that can be turned";
+            return;
+        }
+
+        // Straighten is an angle to arrive at; the others are an amount to turn by.
+        if (document.Rotate(turnable, degrees, absolute: degrees == 0))
+            StatusText.Text = degrees == 0 ? "Straightened" : $"Turned {Math.Abs(degrees):0}°";
+
+        Canvas.InvalidateVisual();
+    }
+
     private void OnGroupClick(object? sender, RoutedEventArgs e)
     {
         var document = Canvas.Document;

@@ -50,7 +50,7 @@ public class CylinderShape : DiagramShape
         return geometry;
     }
 
-    public override void Render(DrawingContext context, bool withText)
+    protected override void Draw(DrawingContext context, bool withText)
     {
         var brush = new SolidColorBrush(Fill);
         var pen = CreatePen();

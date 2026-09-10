@@ -46,6 +46,7 @@ Or [build it yourself](#building).
 - **Smart guides** - dragging a shape lines it up with the edges and middles of the others, and shows what it caught on
 - **Margin guide** - a dashed inset per page, to keep work clear of the edge
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
+- **Rotation** - drag the handle above a shape to turn it, or turn a selection in right angles from the menu
 
 **Connectors**
 
@@ -258,14 +259,15 @@ and files written by a future version rather than loading them incorrectly. Vers
 connection ports and routing, version 3 hand-placed bends, and version 4 the line style;
 older files still load, and version 1 connectors keep their original straight routing. Version 5
 added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
-heights, version 9 the font a label is in, version 10 grouping, and version 11 the margin
-guide. Older files still load: a version 5 file, which
+heights, version 9 the font a label is in, version 10 grouping, version 11 the margin guide,
+and version 12 rotation. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
 drawn; a file up to version 8 has no font settings, so its labels come back plain and centred,
 which is how they were drawn; a file up to version 9 has no groups, because there were none to have; and
-a file up to version 10 has no margins, so its pages come back without one. The on-disk
+a file up to version 10 has no margins, so its pages come back without one; and a file up to
+version 11 has no angles, so its shapes come back upright. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -295,7 +297,7 @@ fields because its end points define it.
 |---|---|
 | **File menu** | New, Open, Save, Save As, Page set up, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, and saving a selection as a shape of your own |
-| **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, grouping and ungrouping, and evening a pool's lane heights |
+| **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, rotating left, right or straight, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, rulers, smart guides, and folding either side panel away - plus a zoom box in the status bar |
 | **Select / Text box / Connector** | What a click on the page does. Text and Connector drop back to Select after one use of the text tool; the connector tool stays armed so several can be drawn in a row |
@@ -334,6 +336,34 @@ sets the formatting for the next shape drawn, so a colour can
 be chosen once and then used for several shapes. Formatting a selection also updates that
 default. A new text box keeps its transparent fill rather than taking the current one, but it
 can still be given a fill afterwards.
+
+## Rotation
+
+![Turned shapes](Images/rotation.png)
+
+A selected shape carries a round handle on a stalk above it: drag that to turn the shape about
+its middle, holding `Shift` to snap to 15°. **Arrange -> Rotate left**, **Rotate right** and
+**Straighten** do it in right angles, to a whole selection at once. Each shape turns about its
+own middle rather than about the middle of the selection - turning a selection as one block
+would move the shapes as well as turn them, which is a different thing to want and not what a
+turn handle offers.
+
+**Rotation is a way of drawing a shape rather than a change to it.** `Bounds` stays the upright
+rectangle it always was, so moving, resizing, snapping, aligning, distributing and clamping all
+go on working in exactly the terms they did. Only three things have to know about the angle:
+drawing, hit testing, and where the connection points are - which is why this could be added
+without disturbing the rest.
+
+That decision shows through in ways worth knowing. A turned shape is hit-tested by turning the
+*pointer* back rather than by turning the shape, so the geometry is only ever built upright. Its
+resize handles ride round with it, and resizing works in the shape's own frame, so the corner
+you grab is the corner that moves. A connector glued to a turned shape leaves from the turned
+connection point, in the turned direction, so it still meets the shape square on. The selection
+box and the marquee, though, stay upright - they are drawn round the bounds, not round the
+turned outline.
+
+A connector has no angle of its own, being a path between two points; a lane is placed by its
+pool. Neither offers a turn handle, and the menu commands skip them.
 
 ## Grouping
 
@@ -475,7 +505,8 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag on empty page | Sweep a marquee; it takes the shapes it fully encloses |
 | Drag any selected shape | Move the whole selection together |
 | Drag a shape | Move it. It lines up with the edges and middles of the other shapes where it comes close to one, and falls back to the grid on whichever axis nothing lined up |
-| Drag a handle | Resize, snapped to the grid |
+| Drag a handle | Resize, snapped to the grid. On a turned shape the handles ride round with it, and the corner you grab is the corner that moves |
+| Drag the round handle above a shape | Turn it about its middle; hold `Shift` to snap to 15° |
 | Drag a handle on a multiple selection | Stretch the whole selection, each shape keeping its place and size in proportion |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
 | Drag a connector's end handle | Re-route it; drop on a shape to glue, on the page to un-glue |
@@ -921,7 +952,6 @@ been worked through.
 
 Where it would go next, if it went anywhere:
 
-- Rotating a shape, which nothing in the geometry currently allows for
 - Reading an SVG back in, which is a different and much larger problem than writing one
 - Data behind a shape - fields, and a way to show them - which is what separates a diagram tool
   from a drawing one

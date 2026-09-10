@@ -22,10 +22,10 @@ public class TextBoxShape : DiagramShape
 
     public override Geometry CreateGeometry() => new RectangleGeometry(Bounds);
 
-    public override void Render(DrawingContext context, bool withText)
+    protected override void Draw(DrawingContext context, bool withText)
     {
         if (Fill != Colors.Transparent || Stroke != Colors.Transparent)
-            base.Render(context, withText);
+            base.Draw(context, withText);
         else if (string.IsNullOrWhiteSpace(Text))
             context.DrawRectangle(null, GuidePen, Bounds);
 
@@ -34,7 +34,7 @@ public class TextBoxShape : DiagramShape
     }
 
     /// <summary>A text box is always clickable, including while it is empty.</summary>
-    public override bool HitTest(Point point) => Bounds.Contains(point);
+    protected override bool HitTestUpright(Point point) => Bounds.Contains(point);
 
     protected override string SvgBody() =>
         Fill == Colors.Transparent && Stroke == Colors.Transparent
