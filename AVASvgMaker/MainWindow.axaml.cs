@@ -95,6 +95,8 @@ public partial class MainWindow : Window
                                   "to redraw at that scale";
         }
 
+        FillFontList();
+
         UpdateTitle();
         SyncHistoryMenu();
         SyncProperties();
@@ -362,6 +364,64 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Fills the font list with what is actually installed, with the application's own font at
+    /// the top. Offering fonts the machine does not have would only produce labels that draw
+    /// in something else.
+    /// </summary>
+    private void FillFontList()
+    {
+        FontBox.Items.Add(new ComboBoxItem { Content = "Default font", Tag = string.Empty });
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var family in FontManager.Current.SystemFonts
+                     .Select(f => f.Name)
+                     .Where(name => !string.IsNullOrWhiteSpace(name) && seen.Add(name))
+                     .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            FontBox.Items.Add(new ComboBoxItem { Content = family, Tag = family });
+        }
+
+        FontBox.SelectedIndex = 0;
+    }
+
+    private void OnFontChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (Canvas is null || _syncing)
+            return;
+
+        Canvas.SetFontName(FontBox.SelectedItem is ComboBoxItem { Tag: string name } ? name : string.Empty);
+    }
+
+    private void OnBoldClick(object? sender, RoutedEventArgs e)
+    {
+        if (_syncing)
+            return;
+
+        Canvas.SetBold(BoldToggle.IsChecked == true);
+    }
+
+    private void OnItalicClick(object? sender, RoutedEventArgs e)
+    {
+        if (_syncing)
+            return;
+
+        Canvas.SetItalic(ItalicToggle.IsChecked == true);
+    }
+
+    /// <summary>The three alignment buttons behave as one group: picking one drops the others.</summary>
+    private void OnTextAlignClick(object? sender, RoutedEventArgs e)
+    {
+        if (_syncing || sender is not ToggleButton { Tag: string tag })
+            return;
+
+        var wanted = Enum.TryParse<TextAlign>(tag, out var value) ? value : TextAlign.Center;
+
+        Canvas.SetTextAlign(wanted);
+        SyncProperties();
+    }
+
+    /// <summary>
     /// Shows the formatting of the selection, or of the defaults when nothing is selected.
     /// Where the selected shapes disagree the control shows a mixed state rather than the
     /// first shape's value, which would claim a uniformity that is not there.
@@ -406,6 +466,17 @@ public partial class MainWindow : Window
         Choose(LineStyleBox, style.StrokeStyle.ToString(), Differs(selection, s => s.StrokeStyle));
         Choose(LineWeightBox, Whole(style.StrokeThickness), Differs(selection, s => s.StrokeThickness));
         Choose(FontSizeBox, Whole(style.FontSize), Differs(selection, s => s.FontSize));
+        Choose(FontBox, style.FontName, Differs(selection, s => s.FontName));
+
+        // A mixed selection leaves the toggle indeterminate rather than claiming either state.
+        BoldToggle.IsChecked = Differs(selection, s => s.Bold) ? null : style.Bold;
+        ItalicToggle.IsChecked = Differs(selection, s => s.Italic) ? null : style.Italic;
+
+        var alignMixed = Differs(selection, s => s.TextAlign);
+
+        AlignLeftToggle.IsChecked = !alignMixed && style.TextAlign == TextAlign.Left;
+        AlignCenterToggle.IsChecked = !alignMixed && style.TextAlign == TextAlign.Center;
+        AlignRightToggle.IsChecked = !alignMixed && style.TextAlign == TextAlign.Right;
 
         _syncing = wasSyncing;
     }

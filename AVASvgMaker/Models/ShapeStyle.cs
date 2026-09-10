@@ -12,7 +12,11 @@ public record ShapeStyle(
     Color TextColor,
     double StrokeThickness,
     StrokeStyle StrokeStyle,
-    double FontSize)
+    double FontSize,
+    string FontName,
+    bool Bold,
+    bool Italic,
+    TextAlign TextAlign)
 {
     public static readonly ShapeStyle Default = new(
         DiagramShape.DefaultFill,
@@ -20,7 +24,11 @@ public record ShapeStyle(
         DiagramShape.DefaultTextColor,
         2,
         StrokeStyle.Solid,
-        13);
+        13,
+        string.Empty,
+        false,
+        false,
+        TextAlign.Center);
 
     public static ShapeStyle From(DiagramShape shape) => new(
         shape.Fill,
@@ -28,7 +36,11 @@ public record ShapeStyle(
         shape.TextColor,
         shape.StrokeThickness,
         shape.StrokeStyle,
-        shape.FontSize);
+        shape.FontSize,
+        shape.FontName,
+        shape.Bold,
+        shape.Italic,
+        shape.TextAlign);
 
     public void ApplyTo(DiagramShape shape)
     {
@@ -45,5 +57,9 @@ public record ShapeStyle(
     {
         shape.TextColor = TextColor;
         shape.FontSize = FontSize;
+        shape.FontName = FontName;
+        shape.Bold = Bold;
+        shape.Italic = Italic;
+        shape.TextAlign = TextAlign;
     }
 }

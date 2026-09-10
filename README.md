@@ -46,7 +46,7 @@ Or [build it yourself](#building).
 - **Connection points** - every shape offers attachment points at the middle of each edge; they light up while a connector is being drawn and the end snaps to the nearest one
 - **Glue** - an end dropped on a shape sticks to it and tracks the shape as it moves and resizes
 - **Right-angle routing** - routed connectors keep clear of the shapes in their way, put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved or resized
-- **Adjustable bends** - a selected connector offers a grab point on each end, on every bend, and on the middle of every segment; dragging a middle point adds bends, which bring grab points of their own
+- **Adjustable bends** - a selected connector offers a grab point on each end, on every bend, and on the middle of every segment; dragging a middle point adds bends, and dropping one back on the line takes it away again
 - **Twelve line ends** - including the hollow arrow and diamond that UML needs, and the entity-relationship crow's foot family
 
 **Editing**
@@ -56,7 +56,7 @@ Or [build it yourself](#building).
 - **Copy, paste and duplicate** - copies carry as the same JSON the file format uses, so shapes paste into another instance of the app
 - **Align, distribute and match size** - line a selection up on any edge, space it evenly, or size it to the shape selected last
 - **Drawing order** - bring to front, forward, backward, send to back, for one shape or a group
-- **Shape formatting** - fill and line colour, line style and weight, text colour and size, applied to the whole selection from a properties panel
+- **Shape formatting** - fill and line colour, line style and weight, and for text the colour, size, font, bold, italic and alignment, applied to the whole selection from a properties panel
 - **Containers and swimlanes** - pools, lanes and grouping boxes that hold what is dropped into them and carry it when they move, with lanes you can drag to different heights
 
 **Getting work in and out**
@@ -193,11 +193,13 @@ A file records its format id and a version number, and the reader refuses both f
 and files written by a future version rather than loading them incorrectly. Version 2 added
 connection ports and routing, version 3 hand-placed bends, and version 4 the line style;
 older files still load, and version 1 connectors keep their original straight routing. Version 5
-added containers, version 6 multiple pages, version 7 a paper size per page, and version 8
-lane heights. Older files still load: a version 5 file, which had no page record around its
-shapes, becomes a document of one page; a file up to version 6, which kept one size for the
-whole document, puts that size on every page it has; and a file up to version 7 has no lane
-shares, so its pools come back evenly divided, which is how they were drawn. The on-disk
+added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
+heights, and version 9 the font a label is in. Older files still load: a version 5 file, which
+had no page record around its shapes, becomes a document of one page; a file up to version 6,
+which kept one size for the whole document, puts that size on every page it has; a file up to
+version 7 has no lane shares, so its pools come back evenly divided, which is how they were
+drawn; and a file up to version 8 has no font settings, so its labels come back plain and
+centred, which is how they were drawn. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -250,10 +252,16 @@ Down the right-hand side, applying to everything selected:
 |---|---|
 | **Fill** | Colour from a 24-swatch palette or a hex value, or None for a shape with no fill at all |
 | **Line** | Colour or None, style (solid, dashed, dotted), and weight |
-| **Text** | Colour and size |
+| **Text** | Colour, size, font, bold, italic, and whether the label sits left, centred or right in its shape |
 
-Where the selected shapes disagree, a control shows a dash rather than the first shape's
-value - choosing something then applies it to all of them. With nothing selected the panel
+The font list is what is actually installed on the machine, with the application's own font
+at the top; offering fonts that are not there would only produce labels that draw in something
+else. An exported SVG names the font with a generic behind it, so a drawing handed to someone
+without that font still reads.
+
+Where the selected shapes disagree, a control shows a dash - or, for bold and italic, sits
+between on and off - rather than the first shape's value; choosing something then applies it
+to all of them. With nothing selected the panel
 sets the formatting for the next shape drawn, so a colour can
 be chosen once and then used for several shapes. Formatting a selection also updates that
 default. A new text box keeps its transparent fill rather than taking the current one, but it
@@ -354,9 +362,9 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag a handle | Resize, snapped to the grid |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
 | Drag a connector's end handle | Re-route it; drop on a shape to glue, on the page to un-glue |
-| Drag a connector's corner handle | Move that bend; the segments either side keep their right angles |
+| Drag a connector's corner handle | Move that bend; the segments either side keep their right angles. Drop it back on the line between its neighbours and it is taken out - the handle turns red first, so you can see it coming |
 | Drag a connector's midpoint handle | Slide that segment sideways. Where it meets a shape, new bends appear rather than tearing it off |
-| Double-click a bend | Take it out again |
+| Double-click a bend | Take it out again, without having to drag it anywhere |
 | Edit > Reset connector route | Hand the selected connectors back to the router |
 | Double-click a shape, or `F2` | Edit its label in place |
 | Text tool, click the page | Add a text box and start typing |
@@ -685,6 +693,13 @@ Images/                  Screenshots used above
   leaves glued ends alone, since the shape already positions them.
 - Handles are only offered for a selection of one; a group shows a dashed bounding box.
   Resizing several shapes at once is not implemented yet.
+- A bend is removed by dropping it where it stops bending anything - within a few pixels of
+  the straight line between its neighbours - rather than by dragging it far away. Far away is
+  how a bend is *placed*, so that gesture was not available; near the line it is doing nothing,
+  which makes removing it there the only reading that does not fight the way bends are shaped.
+  The router already dropped exactly collinear points, but only to within a rounding error and
+  with nothing on screen to say so; the drop has a real tolerance and colours the handle while
+  it is in range.
 - A lane's height is stored as a share rather than a height because the pool, not the lane,
   decides the geometry. A stored height would have to be rewritten every time the pool was
   resized, and would drift out of step the moment one of those rewrites was missed; shares are
@@ -718,10 +733,8 @@ Images/                  Screenshots used above
 
 Natural next steps, roughly in order of usefulness:
 
-- Font family, bold and italic, and text alignment within a shape
 - Connection points on the outline of round and angled shapes, rather than on the bounding box
 - Custom stencils saved from a drawing
-- Dragging a bend off the line to delete it, as an alternative to double-clicking
 - Letting routed connectors avoid each other, not only the shapes
 - Resizing a multi-selection as a group, and grouping proper
 - Rulers, margins and smart guides

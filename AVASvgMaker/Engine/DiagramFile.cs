@@ -25,10 +25,10 @@ public static partial class DiagramFile
     public const string Extension = "avadiag";
     /// <summary>
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
-    /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights.
-    /// Older files still load.
+    /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights,
+    /// 9 the font a label is in. Older files still load.
     /// </summary>
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -98,6 +98,19 @@ public static partial class DiagramFile
         public string StrokeStyle { get; set; } = nameof(Models.StrokeStyle.Solid);
 
         public double FontSize { get; set; } = 13;
+
+        /// <summary>
+        /// Version 9 onwards, and each written only when it differs from what every shape had
+        /// before it existed - so an ordinary label adds nothing to the file.
+        /// </summary>
+        public string? FontName { get; set; }
+
+        public bool? Bold { get; set; }
+
+        public bool? Italic { get; set; }
+
+        /// <summary>Centred is what every label was before version 9, and so the default.</summary>
+        public string? TextAlign { get; set; }
 
         /// <summary>The container this shape sits in, by id. Absent when it sits on the page.</summary>
         public int? ContainerId { get; set; }
@@ -220,6 +233,10 @@ public static partial class DiagramFile
             StrokeThickness = shape.StrokeThickness,
             StrokeStyle = shape.StrokeStyle.ToString(),
             FontSize = shape.FontSize,
+            FontName = string.IsNullOrEmpty(shape.FontName) ? null : shape.FontName,
+            Bold = shape.Bold ? true : null,
+            Italic = shape.Italic ? true : null,
+            TextAlign = shape.TextAlign == Models.TextAlign.Center ? null : shape.TextAlign.ToString(),
             ContainerId = IdOf(shape.Container, ids),
             LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
                         && Math.Abs(lane.LaneShare - 1) > 1e-9
@@ -377,6 +394,10 @@ public static partial class DiagramFile
         shape.StrokeThickness = record.StrokeThickness > 0 ? record.StrokeThickness : 2;
         shape.StrokeStyle = Parse(record.StrokeStyle, Models.StrokeStyle.Solid);
         shape.FontSize = record.FontSize > 0 ? record.FontSize : 13;
+        shape.FontName = record.FontName ?? string.Empty;
+        shape.Bold = record.Bold ?? false;
+        shape.Italic = record.Italic ?? false;
+        shape.TextAlign = Parse(record.TextAlign, Models.TextAlign.Center);
 
         // Absent before version 8, and absent since for any lane on the standard share.
         if (shape is ContainerShape { Kind: ShapeKind.Lane } lane && record.LaneShare is { } share && share > 0)

@@ -13,6 +13,13 @@
         <Style Selector="Border.group">
             <Setter Property="Margin" Value="0,0,10,0" />
         </Style>
+        <Style Selector="Path.alignIcon">
+            <Setter Property="Stroke" Value="{Binding $parent[ToggleButton].Foreground}" />
+            <Setter Property="StrokeThickness" Value="1.5" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
         <Style Selector="Rectangle.separator">
             <Setter Property="Width" Value="1" />
             <Setter Property="Height" Value="22" />
@@ -347,6 +354,29 @@
                             <ComboBoxItem Tag="24">24 pt</ComboBoxItem>
                             <ComboBoxItem Tag="32">32 pt</ComboBoxItem>
                         </ComboBox>
+                    </StackPanel>
+
+                    <ComboBox x:Name="FontBox" HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                              SelectionChanged="OnFontChanged" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,6,0,0">
+                        <ToggleButton x:Name="BoldToggle" Width="30" Padding="0" FontWeight="Bold"
+                                      Content="B" ToolTip.Tip="Bold" Click="OnBoldClick" />
+                        <ToggleButton x:Name="ItalicToggle" Width="30" Padding="0" FontStyle="Italic"
+                                      Content="I" ToolTip.Tip="Italic" Click="OnItalicClick" />
+                        <Rectangle Classes="separator" Margin="4,0" />
+                        <ToggleButton x:Name="AlignLeftToggle" Width="30" Padding="0" Tag="Left"
+                                      ToolTip.Tip="Align left" Click="OnTextAlignClick">
+                            <Path Classes="alignIcon" Data="M0,0 H14 M0,4 H9 M0,8 H14 M0,12 H9" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="AlignCenterToggle" Width="30" Padding="0" Tag="Center"
+                                      ToolTip.Tip="Centre" Click="OnTextAlignClick">
+                            <Path Classes="alignIcon" Data="M0,0 H14 M2.5,4 H11.5 M0,8 H14 M2.5,12 H11.5" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="AlignRightToggle" Width="30" Padding="0" Tag="Right"
+                                      ToolTip.Tip="Align right" Click="OnTextAlignClick">
+                            <Path Classes="alignIcon" Data="M0,0 H14 M5,4 H14 M0,8 H14 M5,12 H14" />
+                        </ToggleButton>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

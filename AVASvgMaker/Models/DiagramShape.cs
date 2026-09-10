@@ -38,6 +38,15 @@ public abstract class DiagramShape
     public StrokeStyle StrokeStyle { get; set; } = StrokeStyle.Solid;
     public double FontSize { get; set; } = 13;
 
+    /// <summary>The font a label is drawn in. Empty means whatever the application draws in.</summary>
+    public string FontName { get; set; } = string.Empty;
+
+    public bool Bold { get; set; }
+
+    public bool Italic { get; set; }
+
+    public TextAlign TextAlign { get; set; } = TextAlign.Center;
+
     public abstract ShapeKind Kind { get; }
 
     /// <summary>
@@ -152,11 +161,20 @@ public abstract class DiagramShape
 
     protected double LineHeight => FontSize * 1.3;
 
+    /// <summary>
+    /// The face a label is drawn with. A font that is not installed falls back to the default
+    /// rather than failing, which is also what the SVG font-family list does at the far end.
+    /// </summary>
+    protected Typeface Face => new(
+        string.IsNullOrEmpty(FontName) ? FontFamily.Default : new FontFamily(FontName),
+        Italic ? FontStyle.Italic : FontStyle.Normal,
+        Bold ? FontWeight.Bold : FontWeight.Normal);
+
     protected FormattedText Format(string line) => new(
         line,
         CultureInfo.CurrentCulture,
         FlowDirection.LeftToRight,
-        Typeface.Default,
+        Face,
         FontSize,
         new SolidColorBrush(TextColor));
 
@@ -200,6 +218,14 @@ public abstract class DiagramShape
 
     protected virtual Rect TextArea => Bounds;
 
+    /// <summary>Where a line of the given width starts, for the alignment in force.</summary>
+    private double LineLeft(Rect area, double width) => TextAlign switch
+    {
+        TextAlign.Left => area.X + TextPadding,
+        TextAlign.Right => area.Right - TextPadding - width,
+        _ => area.Center.X - width / 2
+    };
+
     protected void RenderText(DrawingContext context)
     {
         if (string.IsNullOrWhiteSpace(Text))
@@ -216,7 +242,7 @@ public abstract class DiagramShape
 
             var formatted = Format(lines[i]);
             context.DrawText(formatted, new Point(
-                area.Center.X - formatted.Width / 2,
+                LineLeft(area, formatted.Width),
                 top + i * LineHeight + (LineHeight - formatted.Height) / 2));
         }
     }
@@ -265,10 +291,22 @@ public abstract class DiagramShape
         var lines = WrapText(Math.Max(8, area.Width - TextPadding * 2));
         var top = area.Center.Y - lines.Count * LineHeight / 2;
 
+        // The anchor and the x it is measured from have to agree, or the text lands
+        // somewhere the editor never drew it.
+        var (anchor, x) = TextAlign switch
+        {
+            TextAlign.Left => ("start", area.X + TextPadding),
+            TextAlign.Right => ("end", area.Right - TextPadding),
+            _ => ("middle", area.Center.X)
+        };
+
         var sb = new StringBuilder();
         sb.AppendLine(
-            $"  <text font-family=\"sans-serif\" font-size=\"{Num(FontSize)}\" fill=\"{ToHex(TextColor)}\" " +
-            "text-anchor=\"middle\" dominant-baseline=\"central\">");
+            $"  <text font-family=\"{SvgFontFamily()}\" font-size=\"{Num(FontSize)}\" " +
+            $"fill=\"{ToHex(TextColor)}\"" +
+            (Bold ? " font-weight=\"bold\"" : string.Empty) +
+            (Italic ? " font-style=\"italic\"" : string.Empty) +
+            $" text-anchor=\"{anchor}\" dominant-baseline=\"central\">");
 
         for (var i = 0; i < lines.Count; i++)
         {
@@ -276,12 +314,21 @@ public abstract class DiagramShape
                 continue;
 
             var y = top + i * LineHeight + LineHeight / 2;
-            sb.AppendLine($"    <tspan x=\"{Num(area.Center.X)}\" y=\"{Num(y)}\">{Escape(lines[i])}</tspan>");
+            sb.AppendLine($"    <tspan x=\"{Num(x)}\" y=\"{Num(y)}\">{Escape(lines[i])}</tspan>");
         }
 
         sb.AppendLine("  </text>");
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The named font with a generic behind it, so the drawing still reads on a machine that
+    /// does not have the font - which, for a file being handed to someone else, is the
+    /// ordinary case.
+    /// </summary>
+    private string SvgFontFamily() => string.IsNullOrEmpty(FontName)
+        ? "sans-serif"
+        : $"{Escape(FontName)}, sans-serif";
 
     protected static string Num(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 

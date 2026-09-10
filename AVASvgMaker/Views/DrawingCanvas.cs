@@ -43,6 +43,12 @@ public class DrawingCanvas : Decorator
         Marquee
     }
 
+    /// <summary>
+    /// How near the line between its neighbours a bend has to be dropped to be taken out,
+    /// in screen pixels.
+    /// </summary>
+    private const double BendRemovalPixels = 6;
+
     private const double PageMargin = 24;
     private const double HandleSize = 8;
     private const double DefaultShapeWidth = 120;
@@ -75,6 +81,9 @@ public class DrawingCanvas : Decorator
     private static Color Wash(Color accent) => Color.FromArgb(0x20, accent.R, accent.G, accent.B);
     private static readonly IBrush MidpointHandleBrush = new SolidColorBrush(Color.FromArgb(0xC0, 0xFF, 0xE6, 0xC0));
 
+    /// <summary>A bend that letting go of would remove.</summary>
+    private static readonly IBrush DoomedHandleBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x5A, 0x4A));
+
     /// <summary>Handle order: NW, N, NE, E, SE, S, SW, W.</summary>
     private static readonly StandardCursorType[] HandleCursors =
     [
@@ -87,6 +96,9 @@ public class DrawingCanvas : Decorator
 
     /// <summary>Set once a drag actually alters a shape, so a bare click does not dirty the document.</summary>
     private bool _dragChanged;
+
+    /// <summary>Set while a bend is being dragged and has come back onto the line.</summary>
+    private bool _bendDoomed;
 
     private int _activeHandle = -1;
 
@@ -479,10 +491,20 @@ public class DrawingCanvas : Decorator
         {
             if (selection[0] is ConnectorShape connector)
             {
-                foreach (var handle in ConnectorHandles(connector))
+                var doomedHandle = _bendDoomed ? _activeHandle : -1;
+
+                for (var i = 0; i < ConnectorHandles(connector).Count; i++)
                 {
-                    // A solid handle moves what is there; a hollow one adds a new bend.
-                    var fill = handle.Kind == HandleKind.Midpoint ? MidpointHandleBrush : HandleBrush;
+                    var handle = ConnectorHandles(connector)[i];
+
+                    // A solid handle moves what is there; a hollow one adds a new bend; and a
+                    // bend that would go if it were let go now is marked as such.
+                    var fill = i == doomedHandle
+                        ? DoomedHandleBrush
+                        : handle.Kind == HandleKind.Midpoint
+                            ? MidpointHandleBrush
+                            : HandleBrush;
+
                     context.DrawRectangle(fill, outline, handle.Rect);
                 }
 
@@ -677,6 +699,18 @@ public class DrawingCanvas : Decorator
 
     public void SetFontSize(double value) =>
         ApplyFormat(shape => shape.FontSize = value, style => style with { FontSize = value });
+
+    public void SetFontName(string value) =>
+        ApplyFormat(shape => shape.FontName = value, style => style with { FontName = value });
+
+    public void SetBold(bool value) =>
+        ApplyFormat(shape => shape.Bold = value, style => style with { Bold = value });
+
+    public void SetItalic(bool value) =>
+        ApplyFormat(shape => shape.Italic = value, style => style with { Italic = value });
+
+    public void SetTextAlign(TextAlign value) =>
+        ApplyFormat(shape => shape.TextAlign = value, style => style with { TextAlign = value });
 
     #endregion
 
@@ -1274,9 +1308,52 @@ public class DrawingCanvas : Decorator
         connector.MoveBend(handle.Index, Grid.Snap(pagePoint),
             connector.Routing == ConnectorRouting.Orthogonal);
 
+        _bendDoomed = IsRedundantBend(connector);
         _dragChanged = true;
         InvalidateVisual();
         ReportStatus();
+    }
+
+    /// <summary>
+    /// True when the bend being dragged has come back onto the line between its neighbours,
+    /// where it is no longer bending anything. Letting go there takes it out - which is the
+    /// gesture for removing a bend, alongside double-clicking it.
+    /// </summary>
+    private bool IsRedundantBend(ConnectorShape connector)
+    {
+        if (ActiveConnectorHandle(connector) is not { Kind: HandleKind.Corner } handle)
+            return false;
+
+        var path = connector.Path;
+
+        // The ends are not bends; there is nothing either side of them to be in line with.
+        if (handle.Index <= 0 || handle.Index >= path.Count - 1)
+            return false;
+
+        return DistanceToSegment(path[handle.Index], path[handle.Index - 1], path[handle.Index + 1])
+               <= Screen(BendRemovalPixels);
+    }
+
+    /// <summary>How far a point lies off a line segment, in page units.</summary>
+    private static double DistanceToSegment(Point point, Point from, Point to)
+    {
+        var run = to - from;
+        var length = run.X * run.X + run.Y * run.Y;
+
+        if (length <= 0)
+            return Distance(point, from);
+
+        // Where along the segment the nearest point is, kept inside its ends.
+        var along = Math.Clamp(((point.X - from.X) * run.X + (point.Y - from.Y) * run.Y) / length, 0, 1);
+
+        return Distance(point, new Point(from.X + run.X * along, from.Y + run.Y * along));
+    }
+
+    private static double Distance(Point a, Point b)
+    {
+        var dx = a.X - b.X;
+        var dy = a.Y - b.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     /// <summary>
@@ -1314,6 +1391,17 @@ public class DrawingCanvas : Decorator
 
         if (_dragMode == DragMode.Marquee)
             FinishMarquee();
+
+        // A bend dropped back on the line between its neighbours is taken out.
+        if (_dragMode == DragMode.MovingBend && _bendDoomed &&
+            Document.Selection.Count == 1 && Document.Selected is ConnectorShape doomed &&
+            ActiveConnectorHandle(doomed) is { Kind: HandleKind.Corner } corner)
+        {
+            doomed.RemoveBend(corner.Index);
+            _dragChanged = true;
+        }
+
+        _bendDoomed = false;
 
         if (_dragMode == DragMode.None)
             return;
@@ -1968,6 +2056,12 @@ public class DrawingCanvas : Decorator
 
     public void ReportStatus()
     {
+        if (_bendDoomed)
+        {
+            StatusChanged?.Invoke("Let go to remove this bend");
+            return;
+        }
+
         if (Document.Selection.Count > 1)
         {
             var union = ShapeClipboard.Union(Document.Selection);
