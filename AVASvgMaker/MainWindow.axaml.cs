@@ -185,6 +185,10 @@ public partial class MainWindow : Window
 
         Canvas.CancelInteraction();
         Canvas.InvalidateVisual();
+
+        // The status line counts the shapes on the page in front of you, so it has to be
+        // asked again once that is a different page.
+        Canvas.ReportStatus();
     }
 
     #endregion

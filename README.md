@@ -36,7 +36,7 @@ Or [build it yourself](#building).
 
 - **96 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML and network, in categories that fold away, with a search box
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
-- **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, reorder and delete
+- **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder
 - **Drag and drop** - drag a stencil onto the page, or click a stencil and then click where you want it
 - **Grid snap** - positions and sizes snap to the grid, switchable between 5, 10, 20, 25 and 50 px
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
@@ -107,9 +107,14 @@ on-screen geometry and the exported SVG, so the two cannot drift apart.
 
 A document holds as many pages as you like. They appear as tabs along the bottom of the
 drawing area once there is more than one - a single page needs no tab bar, so it does not get
-one. Click a tab to turn to that page, double-click it to rename it, or right-click for the
-rest: duplicate, delete, move left, move right. The **Page** menu carries the same commands,
-with `Ctrl+PageUp` and `Ctrl+PageDown` to turn pages and `Ctrl+Shift+P` to add one.
+one. Click a tab to turn to that page, drag it to move it among the others, double-click it to
+rename it, or right-click for the rest: duplicate, delete, move left, move right. The **Page**
+menu carries the same commands, with `Ctrl+PageUp` and `Ctrl+PageDown` to turn pages and
+`Ctrl+Shift+P` to add one.
+
+A tab being dragged moves through its neighbours as you go, so the order you are about to get
+is the order you can see. However many tabs it crosses, the page moves once: the drag is a
+single step on the undo history, not one per neighbour passed.
 
 Pages are independent. A connector glues to shapes on its own page and a container holds
 shapes on its own page, so nothing on one page can point at anything on another - which is
@@ -624,6 +629,13 @@ Images/                  Screenshots used above
 - Because a restore rebuilds every shape, **no shape reference survives an undo**. Anything
   holding one - the selection, the inline editor's target, an in-flight drag - is restored by
   index or dropped in `DrawingCanvas.CancelInteraction`.
+- A tab is dragged by moving the control through the panel rather than by drawing an
+  insertion marker, so what you see during the drag is the arrangement you will get. Two
+  things fall out of that. The pointer is captured by the strip and not by the tab, because a
+  tab is taken out of the panel and put back at every swap and a control that leaves the
+  visual tree loses its capture. And the capture is taken when the drag starts rather than
+  when the button goes down, because capturing on the press would stop the second press of a
+  double-click from reaching the tab that wants it for renaming.
 - Pages are a list on the document, and `Shapes` is the current page's list rather than a
   field of its own. That is what keeps the canvas, the arranger, the clipboard and the
   exporters unaware that there is more than one page: they all go through `Shapes` and get the
@@ -689,7 +701,6 @@ Natural next steps, roughly in order of usefulness:
 - Resizing a multi-selection as a group, and grouping proper
 - Rulers, margins and smart guides
 - Lanes with individually adjustable heights
-- Dragging a page tab to reorder it, rather than the menu commands
 - Per-page paper sizes, so a document can mix portrait and landscape
 
 ## License
