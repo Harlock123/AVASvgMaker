@@ -17,6 +17,9 @@ that render themselves.
 self-contained executable per platform. Nothing to install: the .NET runtime and Avalonia's
 native libraries are inside the file.
 
+Every version, with what changed in each, is on the
+**[releases page](https://github.com/Harlock123/AVASvgMaker/releases)**.
+
 | Platform | Download |
 |---|---|
 | Windows, Intel and AMD | `AVASvgMaker-`*`version`*`-win-x64.zip` |
