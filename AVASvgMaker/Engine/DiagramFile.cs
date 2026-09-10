@@ -30,7 +30,7 @@ public static partial class DiagramFile
     /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand.
     /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 14;
+    public const int CurrentVersion = 15;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -134,6 +134,12 @@ public static partial class DiagramFile
         /// stencil's. Version 13 onwards, and written only for those - an imported path.
         /// </summary>
         public string? Outline { get; set; }
+
+        /// <summary>
+        /// Markings over that outline that are drawn but not filled. Version 15 onwards, and
+        /// written only for a path that has any.
+        /// </summary>
+        public string? Detail { get; set; }
 
         /// <summary>
         /// A lane's share of its pool. Version 8 onwards, and only written for a lane that
@@ -268,6 +274,7 @@ public static partial class DiagramFile
             GroupId = shape.GroupId == 0 ? null : shape.GroupId,
             Rotation = shape.IsRotated ? shape.Rotation : null,
             Outline = shape is PathShape outlined ? outlined.Outline : null,
+            Detail = shape is PathShape marked ? marked.Detail : null,
             LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
                         && Math.Abs(lane.LaneShare - 1) > 1e-9
                 ? lane.LaneShare
@@ -424,7 +431,8 @@ public static partial class DiagramFile
         {
             shape = new PathShape(bounds)
             {
-                Outline = string.IsNullOrWhiteSpace(record.Outline) ? PathShape.Fallback : record.Outline
+                Outline = string.IsNullOrWhiteSpace(record.Outline) ? PathShape.Fallback : record.Outline,
+                Detail = string.IsNullOrWhiteSpace(record.Detail) ? null : record.Detail
             };
         }
         else

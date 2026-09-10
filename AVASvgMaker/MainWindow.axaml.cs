@@ -1382,6 +1382,116 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnImportVisioClick(object? sender, RoutedEventArgs e) => _ = ImportVisioAsync();
+
+    /// <summary>
+    /// Reads a Visio drawing onto pages of its own, one for each page the file has, for the
+    /// same reason an SVG lands on a new page: an import is an interpretation, and it should
+    /// be possible to look at what arrived without it having landed on top of work already done.
+    /// </summary>
+    private async Task ImportVisioAsync()
+    {
+        Canvas.CommitEdit();
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import Visio drawing",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Visio drawing")
+                {
+                    Patterns = ["*.vsdx"],
+                    MimeTypes = ["application/vnd.ms-visio.drawing"]
+                },
+                FilePickerFileTypes.All
+            ]
+        });
+
+        if (files.Count == 0)
+            return;
+
+        try
+        {
+            // A .vsdx is a zip, and a zip is read from its end backwards, so it has to be in
+            // hand entire rather than arriving as it comes.
+            await using var picked = await files[0].OpenReadAsync();
+            using var whole = new MemoryStream();
+            await picked.CopyToAsync(whole);
+            whole.Position = 0;
+
+            var result = VisioImporter.Read(whole);
+            var document = Canvas.Document;
+
+            using (document.BeginBatch())
+            {
+                foreach (var page in result.Document.Pages)
+                {
+                    document.AddPage();
+                    document.RenamePage(document.PageIndex, page.Name);
+                    document.SetPageSize(page.Width, page.Height);
+
+                    foreach (var shape in page.Shapes)
+                        document.Shapes.Add(shape);
+
+                    document.NormaliseOrder();
+                }
+
+                document.MarkModified();
+            }
+
+            Canvas.SyncPageSize();
+            Canvas.InvalidateVisual();
+
+            StatusText.Text = result.Summary;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Import failed: {ex.Message}";
+        }
+    }
+
+    private void OnExportVisioClick(object? sender, RoutedEventArgs e) => _ = ExportVisioAsync();
+
+    /// <summary>
+    /// Writes the whole document as a Visio drawing. Every page goes, because a .vsdx holds
+    /// pages the way our own file does and there is nothing to choose between.
+    /// </summary>
+    private async Task ExportVisioAsync()
+    {
+        Canvas.CommitEdit();
+
+        var file = await AskWhereToPutAsync("Visio", "vsdx",
+            new FilePickerFileType("Visio drawing")
+            {
+                Patterns = ["*.vsdx"],
+                MimeTypes = ["application/vnd.ms-visio.drawing"]
+            });
+
+        if (file is null)
+            return;
+
+        try
+        {
+            await using var stream = await file.OpenWriteAsync();
+            VisioExporter.Write(Canvas.Document, stream, Path.GetFileNameWithoutExtension(file.Name));
+            await stream.FlushAsync();
+
+            if (stream.CanSeek)
+                stream.SetLength(stream.Position);
+
+            var pages = Canvas.Document.Pages.Count;
+
+            StatusText.Text = pages == 1
+                ? $"Exported {file.Name}"
+                : $"Exported {file.Name} - {pages} pages";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Export failed: {ex.Message}";
+        }
+    }
+
     private void OnExportSvgClick(object? sender, RoutedEventArgs e) => _ = ExportSvgAsync();
 
     private void OnExportPngClick(object? sender, RoutedEventArgs e) =>

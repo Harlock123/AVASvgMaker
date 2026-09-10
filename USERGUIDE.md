@@ -252,12 +252,13 @@ document and every time you open the app.
 the pages, the glue between connectors and shapes, the grouping, the drawing order and every
 colour and size you chose. Older files always open in newer versions.
 
-**File -> Export** writes your drawing in six other formats:
+**File -> Export** writes your drawing in seven other formats:
 
 | Format | When to use it |
 |---|---|
 | SVG | Vector, for handing to another drawing tool |
 | PDF | Vector, at the true physical page size, with the text still selectable. The one to print or attach. Offers all pages or just the one you are on |
+| Visio | A modern `.vsdx` drawing, every page of the document in the one file |
 | PNG | A picture, and the right answer nearly always. Choose 1x to 4x |
 | JPEG | For where nothing else is accepted. A diagram is the worst case for it, so the quality default is high |
 | WebP | Smaller than PNG at moderate quality |
@@ -270,8 +271,8 @@ selection handles and no workspace around it, whatever the screen happens to be 
 
 ![An SVG and the same file imported](Images/svg-import.png)
 
-**File -> Import SVG** reads a drawing in as editable shapes, onto a page of its own so it does
-not land on top of work you have already done.
+**File -> Import -> SVG...** reads a drawing in as editable shapes, onto a page of its own so it
+does not land on top of work you have already done.
 
 Reading SVG is an interpretation, not a copy. SVG can say far more than this editor can hold,
 so the importer takes what maps onto shapes with a fill, an outline and a label - shapes,
@@ -281,6 +282,39 @@ take**, rather than leaving you to notice.
 Gradients, patterns, filters, clipping and embedded images are the usual things it cannot bring
 in. A drawing that opens with a rectangle the size of itself is painting its background, which
 here is the page, so that is left behind too.
+
+## Visio drawings
+
+![The same drawing, before and after a trip out to .vsdx and back](Images/visio-roundtrip.png)
+
+**File -> Import -> Visio drawing...** opens a modern `.vsdx`. Each page of the drawing arrives
+as a page of its own here, so nothing lands on top of work you have already done.
+
+Most shapes in a real Visio drawing carry no picture of their own: they say which *master* they
+are a stamp of, and the master holds the geometry. The importer follows that all the way down,
+including the common case of a shape that redraws only part of what it inherits, so what you
+get is the drawing as Visio shows it rather than a page of empty boxes.
+
+It reads pages and their sizes, shape outlines - straight edges, arcs, ellipses and curves -
+fills, line colours, weights and dash patterns, text with its size, weight, slant, colour and
+alignment, groups, and connectors along with which shapes each end is stuck to.
+
+Two things it cannot bring in:
+
+- **Theme colours.** Visio can colour a shape by pointing at the current theme rather than by
+  naming a colour. Those come in with the app's defaults; colours the drawing states outright
+  come in as they are.
+- **Gradients, shadows, embedded pictures, layers and shape data.** Nothing here can hold them.
+
+As with SVG, it **tells you what it left out** rather than leaving you to notice.
+
+**File -> Export -> Visio...** writes one, every page of the document in the one file. Colours,
+line styles, rotation, text and connector glue all go with it. Everything Visio would normally
+look up in a stencil is written into the file itself, so it opens without needing one.
+
+One thing worth knowing: the exporter was built to the published file format and its output is
+read back and checked by this app, but it has not been opened in Visio itself - there is no
+copy of Visio to try it with. If you have one, the result either way is worth reporting.
 
 ## Keyboard
 

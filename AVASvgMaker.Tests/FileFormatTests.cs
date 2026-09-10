@@ -151,6 +151,43 @@ public class FileFormatTests
     }
 
     [AvaloniaFact]
+    public void APathKeepsTheMarkingsDrawnOverItsFace()
+    {
+        var document = Harness.Page(400, 300);
+
+        document.Add(new PathShape(new Rect(20, 20, 100, 80))
+        {
+            Outline = PathShape.Fallback,
+            Detail = "M 0,0.5 L 1,0.5"
+        });
+
+        var read = DiagramFile.FromJson(DiagramFile.ToJson(document));
+        var path = Assert.IsType<PathShape>(read.Pages[0].Shapes[0]);
+
+        Assert.Equal("M 0,0.5 L 1,0.5", path.Detail);
+    }
+
+    [AvaloniaFact]
+    public void AFileFromBeforePathsCouldHaveMarkingsStillOpens()
+    {
+        // Version 14 could say what a path's outline was but had no way to say that anything
+        // was drawn over it. Such a file is still a path, with nothing over its face.
+        var document = Harness.Page(400, 300);
+
+        document.Add(new PathShape(new Rect(20, 20, 100, 80))
+        {
+            Outline = PathShape.Fallback,
+            Detail = "M 0,0.5 L 1,0.5"
+        });
+
+        var json = Downgrade(DiagramFile.ToJson(document), 14);
+        var path = Assert.IsType<PathShape>(DiagramFile.FromJson(json).Pages[0].Shapes[0]);
+
+        Assert.Null(path.Detail);
+        Assert.Equal(PathShape.Fallback, path.Outline);
+    }
+
+    [AvaloniaFact]
     public void AFileFromTheFutureIsRefusedRatherThanMisread()
     {
         var json = DiagramFile.ToJson(Harness.Page())
@@ -229,6 +266,7 @@ public class FileFormatTests
         "laneShare" => version >= 8,
         "fontName" or "bold" or "italic" or "textAlign" => version >= 9,
         "groupId" => version >= 10,
+        "detail" => version >= 15,
         _ => true
     };
 }

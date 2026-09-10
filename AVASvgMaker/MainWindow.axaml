@@ -71,11 +71,15 @@
                 <Separator />
                 <MenuItem Header="Page set_up..." Click="OnPageSetupClick" />
                 <Separator />
-                <MenuItem Header="_Import SVG..." Click="OnImportSvgClick" />
+                <MenuItem Header="_Import">
+                    <MenuItem Header="_SVG..." Click="OnImportSvgClick" />
+                    <MenuItem Header="_Visio drawing..." Click="OnImportVisioClick" />
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="_Export">
                     <MenuItem Header="_SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
                     <MenuItem Header="P_DF..." Click="OnExportPdfClick" />
+                    <MenuItem Header="_Visio..." Click="OnExportVisioClick" />
                     <Separator />
                     <MenuItem Header="_PNG..." InputGesture="Ctrl+Shift+E" Click="OnExportPngClick" />
                     <MenuItem Header="_JPEG..." Click="OnExportJpegClick" />

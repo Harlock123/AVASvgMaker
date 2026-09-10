@@ -20,11 +20,22 @@ public class PathShape : DiagramShape
     /// <summary>The outline, every coordinate between 0 and 1.</summary>
     public string Outline { get; set; } = Fallback;
 
+    /// <summary>
+    /// Markings drawn over the outline and never filled, in the same unit square. A path
+    /// imported from a drawing that ruled a line across its own face keeps that line here
+    /// rather than letting the fill swallow it.
+    /// </summary>
+    public string? Detail { get; set; }
+
     public PathShape(Rect bounds) : base(bounds)
     {
     }
 
     public override Geometry CreateGeometry() => StencilPath.ToGeometry(Outline, Bounds);
+
+    public override string UnitOutline => Outline;
+
+    public override string? UnitDetail => Detail;
 
     protected override void Draw(DrawingContext context, bool withText)
     {
@@ -33,10 +44,21 @@ public class PathShape : DiagramShape
         // shape that happens to end without a Z is not thereby a line.
         context.DrawGeometry(new SolidColorBrush(Fill), CreatePen(), CreateGeometry());
 
+        if (Detail is { } detail)
+            context.DrawGeometry(null, CreatePen(), StencilPath.ToGeometry(detail, Bounds));
+
         if (withText)
             RenderText(context);
     }
 
-    protected override string SvgBody() =>
-        $"<path d=\"{StencilPath.ToSvgData(Outline, Bounds)}\" {SvgStyle()} />";
+    protected override string SvgBody()
+    {
+        var body = $"<path d=\"{StencilPath.ToSvgData(Outline, Bounds)}\" {SvgStyle()} />";
+
+        if (Detail is not { } detail)
+            return body;
+
+        return $"<g>{body}<path d=\"{StencilPath.ToSvgData(detail, Bounds)}\" fill=\"none\" " +
+               $"stroke=\"{SvgPaint(Stroke)}\" stroke-width=\"{Num(StrokeThickness)}\"{SvgDash()} /></g>";
+    }
 }

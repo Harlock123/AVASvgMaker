@@ -30,6 +30,8 @@ public abstract class PolygonShape : DiagramShape
         return geometry;
     }
 
+    public override string UnitOutline => UnitPolygon(GetPolygonPoints());
+
     protected override string SvgBody()
     {
         var points = string.Join(" ", GetPolygonPoints()

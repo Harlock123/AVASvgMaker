@@ -69,6 +69,23 @@ public class ContainerShape : DiagramShape
 
     public override Geometry CreateGeometry() => new RectangleGeometry(Bounds);
 
+    /// <summary>The line the title band is ruled off by.</summary>
+    public override string? UnitDetail
+    {
+        get
+        {
+            var band = HeaderBounds;
+
+            var rule = Header == HeaderEdge.Left
+                ? Bounds.Width <= 0 ? 0 : band.Width / Bounds.Width
+                : Bounds.Height <= 0 ? 0 : band.Height / Bounds.Height;
+
+            return Header == HeaderEdge.Left
+                ? $"M {Num(rule)},0 L {Num(rule)},1"
+                : $"M 0,{Num(rule)} L 1,{Num(rule)}";
+        }
+    }
+
     protected override void Draw(DrawingContext context, bool withText)
     {
         var pen = CreatePen();

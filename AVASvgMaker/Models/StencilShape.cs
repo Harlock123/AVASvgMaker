@@ -1,3 +1,4 @@
+using System.Linq;
 using Avalonia;
 using Avalonia.Media;
 
@@ -24,6 +25,10 @@ public class StencilShape : DiagramShape
     /// </summary>
     public override Geometry CreateGeometry() =>
         StencilPath.ToGeometry(_stencil.Outline ?? "M 0,0 L 1,0 L 1,1 L 0,1 Z", Bounds);
+
+    public override string UnitOutline => _stencil.Outline ?? base.UnitOutline;
+
+    public override string? UnitDetail => _stencil.Detail;
 
     protected override void Draw(DrawingContext context, bool withText)
     {

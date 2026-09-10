@@ -78,8 +78,9 @@ Or [build it yourself](#building).
 **Getting work in and out**
 
 - **Save and load** - a native `.avadiag` document that keeps what SVG export cannot: glue, ports, hand-placed bends, containment and z-order
-- **Six export formats** - SVG and PDF as vectors, PNG, JPEG, WebP and BMP as pictures
+- **Seven export formats** - SVG, PDF and Visio as vectors, PNG, JPEG, WebP and BMP as pictures
 - **SVG import** - reads a drawing back in as editable shapes, and says what it could not take
+- **Visio import and export** - reads and writes modern `.vsdx` drawings, masters and glue included
 - **Vector export** - SVG writes real SVG primitives, not a bitmap trace; PDF comes out the size the page says it is, with the text still selectable, and carries every page of a document in one file
 - **Picture export** - the page rendered at 1x to 4x, on white, with no grid or selection handles in the picture
 - **Six platforms** - Windows, macOS and Linux, on both x64 and ARM, each a single self-contained executable
@@ -201,8 +202,9 @@ past the edge stays put until you move it - at which point it is clamped back on
 
 ![The export menu](Images/export-menu.png)
 
-**File -> Export** holds all six formats, vectors first: **SVG** (`Ctrl+E`) and **PDF**,
-then **PNG** (`Ctrl+Shift+E`), **JPEG**, **WebP** and **BMP**.
+**File -> Export** holds all seven formats, vectors first: **SVG** (`Ctrl+E`), **PDF** and
+**Visio**, then **PNG** (`Ctrl+Shift+E`), **JPEG**, **WebP** and **BMP**. Visio has a section
+to itself [further down](#visio-drawings), since reading one is the harder half.
 
 Whichever you pick, what is exported is the page and only the page: white paper, no grid, no
 selection handles, no workspace around it, whatever the screen happens to be showing.
@@ -238,7 +240,7 @@ a quality setting, because they are the two that throw detail away.
 
 ![An SVG and the same file imported](Images/svg-import.png)
 
-**File -> Import SVG** reads a drawing onto a page of its own - a new page rather than the one
+**File -> Import -> SVG...** reads a drawing onto a page of its own - a new page rather than the one
 you are on, so what arrived can be looked at without landing on top of work already done.
 
 Writing SVG is a translation; reading it is an interpretation, and a lossy one. SVG can say far
@@ -274,6 +276,82 @@ so the importer invents a box that comfortably holds the words and can be resize
 The words, the size, the colour, the weight and the alignment all survive; the exact placement
 is an estimate.
 
+## Visio drawings
+
+![The same drawing, before and after a trip out to .vsdx and back](Images/visio-roundtrip.png)
+
+**File -> Import -> Visio drawing...** reads a modern `.vsdx`, one page of the drawing to one
+page here. **File -> Export -> Visio...** writes one, every page of the document in the one
+file.
+
+### What a .vsdx is, and why reading one is work
+
+A `.vsdx` is a zip of XML parts. A shape in it is not an element with attributes but a list of
+named cells - `PinX`, `Width`, `LineColor` - and almost none of a real drawing's shapes carry
+their own. A rounded rectangle on a Visio page usually says only *I am a stamp of master 9,
+here, this big*, and everything that makes it a rounded rectangle lives in the master.
+
+The inheritance goes further than that, and this is the part that decides whether an importer
+works on real files or only on made-up ones:
+
+- A shape with no geometry of its own draws its **master's**.
+- A shape **inside** a stamped group answers to one particular shape **within that master**, by
+  that shape's own ID - not to a master of that number, which is a different thing entirely and
+  the wrong shape when there happens to be one.
+- A shape that redraws **part** of what it inherits keeps the rest: sections merge by index,
+  rows merge by index within a section, and cells merge within a row. A file that says only
+  *the third corner moved to here* means every other corner still comes from the master - and
+  the opening `MoveTo` usually is not restated at all, so a section read on its own has no
+  beginning.
+- A master states its geometry in the master's own inches and leaves the instance to rescale it
+  by formula. The formulas are not evaluated here; instead each number is measured against the
+  sheet that wrote it, which comes to the same thing for any shape scaled evenly.
+
+Get any of that wrong and the file still opens - it just draws the wrong picture, quietly. This
+importer was written against genuine Visio-produced files, and the geometry it read from them -
+stick figures, use-case ellipses, a Classic border-and-title-block - came out matching what
+those files draw.
+
+### What is read
+
+| | |
+|---|---|
+| **Pages** | Each page at its own size, in inches converted at 96 to the inch, with Visio's y-up origin turned over to ours. Background pages are scenery for another page and are counted rather than imported |
+| **Geometry** | `MoveTo`, `LineTo`, `ArcTo`, `EllipticalArcTo`, `Ellipse`, `CubBezTo`, `QuadBezTo` and their relative forms. Arcs become beziers, solved through the three points the file gives; an elliptical arc is solved by squashing its ellipse into a circle and carrying the answer back. `NURBSTo` and `PolylineTo` are taken as straight runs to where they end |
+| **Masters** | Resolved for the shape, for the shapes inside it, and cell by cell, as above |
+| **Style** | Line colour, weight and pattern; fill colour. A section Visio will not fill is kept off the body, so a line ruled across a shape's face stays a line instead of being swallowed by the fill |
+| **Text** | The words, and the size, weight, slant, colour and alignment from the shape's `Character` and `Paragraph` sections |
+| **Connectors** | A shape with a begin and an end becomes a connector. The page's `Connects` list says which end is stuck to which shape, and whether it is stuck to the shape itself - free to leave from wherever suits - or held to one named connection point |
+| **Groups** | Read through, each child placed in its parent's frame |
+
+| Not read | |
+|---|---|
+| **Theme colours** | A colour cell is either a hex triplet or an index into a theme's palette. The palette lives in another part and depends on the theme, so an index falls back to the default rather than to a colour picked at random. A drawing themed in Visio comes in with its shapes' own colours where it states them and the default where it does not |
+| **Formulas** | Cells carry both a computed value and the formula behind it. Only the value is read |
+| **Gradients, shadows, images, OLE objects** | Nothing here can hold them |
+| **Layers, data, hyperlinks** | Not part of this model |
+
+As with SVG, the importer **says what it left out** - "Imported 39 shapes - left out 2 shapes
+with no outline" - rather than dropping it silently.
+
+### What is written
+
+Everything Visio would inherit from a master is stated outright instead, so the file stands on
+its own and needs no stencil to open. Positions and curves are written as fractions of the
+shape, which is how Visio's own files put them, so a shape resized in Visio keeps its
+proportions.
+
+Shapes, their outlines, fills, line colours, weights and dash patterns, rotation, text and how
+it is set, connectors with their arrowheads, and glue - both kinds - all go. The package holds
+the parts a Visio file is made of: content types, package and document relationships, a
+document part, a pages part, and a part per page.
+
+**One honest limit.** There is no copy of Visio here to open what this writes. The exporter is
+built to the file format and its output is read back by the importer - the round trip above is
+the test, and it is in the suite as thirty-odd assertions on shapes, colour, text, rotation,
+glue and page count - but *it has not been opened in Visio itself.* If you try it, the result
+either way is worth knowing.
+
 ## Rulers and guides
 
 ![Smart guides while dragging](Images/smart-guides.png)
@@ -302,6 +380,7 @@ a shape may go:
 | **`.webp`** | Export only. Lossy, quality adjustable. Smaller than PNG at moderate quality |
 | **`.bmp`** | Export only. The same render as the PNG, written as a 24-bit uncompressed Windows bitmap, for tools that will take nothing else. Much the larger file for exactly the same picture |
 | **`.pdf`** | Export only. Vector pages at their true physical size, each at its own, with the text left as text - the whole document in one file, or just the page you are on. The one to print or to attach |
+| **`.vsdx`** | Export, and import. Modern Visio, every page of the document in the one file. Lossy in both directions, and honestly so - see [Visio drawings](#visio-drawings) |
 
 A file records its format id and a version number, and the reader refuses both foreign JSON
 and files written by a future version rather than loading them incorrectly. Version 2 added
@@ -309,8 +388,8 @@ connection ports and routing, version 3 hand-placed bends, and version 4 the lin
 older files still load, and version 1 connectors keep their original straight routing. Version 5
 added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
 heights, version 9 the font a label is in, version 10 grouping, version 11 the margin guide,
-version 12 rotation, version 13 shapes carrying an outline of their own, and version 14 a
-connector label moved by hand. Older files still load: a version 5 file, which
+version 12 rotation, version 13 shapes carrying an outline of their own, version 14 a
+connector label moved by hand, and version 15 markings drawn over a path's face and not filled. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
@@ -319,7 +398,8 @@ which is how they were drawn; a file up to version 9 has no groups, because ther
 a file up to version 10 has no margins, so its pages come back without one; and a file up to
 version 11 has no angles, so its shapes come back upright; and a file up to version 12 has no
 outlines of its own, because nothing could make one; and a file up to version 13 has no moved
-labels, so they sit where the line puts them. The on-disk
+labels, so they sit where the line puts them; and a file up to version 14 has no markings over
+a path, because nothing could make those either. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -347,7 +427,7 @@ fields because its end points define it.
 
 | Group | What it does |
 |---|---|
-| **File menu** | New, Open, Save, Save As, Page set up, Import SVG, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
+| **File menu** | New, Open, Save, Save As, Page set up, Import (SVG, Visio), Export (SVG, PDF, Visio, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, and saving a selection as a shape of your own |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, rotating left, right or straight, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
@@ -766,7 +846,7 @@ passes anything else through as text rather than guessing.
 dotnet test AVASvgMaker.Tests
 ```
 
-Sixty-odd tests, a second to run. They live in a project of their own, which is not merely
+A hundred and sixty-odd tests, a few seconds to run. They live in a project of their own, which is not merely
 absent from the shipped binaries but invisible to the build that makes them: `build.sh` and the
 release workflow publish `AVASvgMaker/AVASvgMaker.csproj` by name and never see the test
 project at all. The release job will not run until they pass.
@@ -781,11 +861,12 @@ What they are there to hold on to:
 
 | | |
 |---|---|
-| **The file format** | Every version that has ever been written, 5 to 11, is loaded and checked. A format bug is the one thing a user cannot work around |
+| **The file format** | Every version that has ever been written is loaded and checked. A format bug is the one thing a user cannot work around |
 | **Things that fail silently** | A PDF page at the wrong physical size still looks right on screen and only misbehaves at the printer. A BMP is checked to be exactly the size it said it would be |
 | **Arithmetic with an anchor** | Stretching a selection keeps its anchored corner still and does not compound over a drag; lane shares divide a pool exactly, with the last lane landing on its edge |
 | **Every shape at once** | All ninety-odd kinds are asked for their connection points, and each is checked to be on that shape's outline - inside half a unit in, outside half a unit out |
 | **Routing settling** | The same page routed six times gives the same answer, and a reloaded file routes as it did when saved. Routes that never settle would be worse than routes that overlap |
+| **Other people's files** | The Visio tests build their own `.vsdx` by hand, so what each is about - a shape that restates one number of what it inherits, a child answering to a shape inside its parent's master - is on the page next to the assertion, and a drawing goes out to `.vsdx` and comes back checked shape by shape |
 
 The suite grew out of the scaffolding used to build each feature, which until now was written,
 run, and deleted. Keeping it is the difference between having tested something once and being
@@ -798,7 +879,7 @@ AVASvgMaker/
   Models/     Shape classes - each knows its own geometry and its SVG element
     DiagramShape.cs      Abstract base: bounds, fill/stroke, text wrapping, render, hit test, SVG
     PolygonShape.cs      Base for straight-edged shapes
-    PathShape.cs         A shape carrying an outline of its own, as imported SVG does
+    PathShape.cs         A shape carrying an outline of its own, as imported SVG and Visio do
     ConnectorShape.cs    Gluing, connection ports, end caps, and the routed path
     TextBoxShape.cs      Borderless text, with a dashed guide while empty
     EndCapStyle.cs       None, Arrow, OpenArrow, Dot, Diamond
@@ -829,6 +910,9 @@ AVASvgMaker/
     RasterExporter.cs    Document -> PNG, JPEG, WebP or BMP, at a chosen scale
     RasterFormat.cs      The four picture formats, and what each one is called
     PdfExporter.cs       Document -> a vector PDF page
+    VisioFormat.cs       The units, origin and namespaces a .vsdx is written in
+    VisioImporter.cs     .vsdx -> pages of shapes, masters and glue resolved
+    VisioExporter.cs     Document -> a .vsdx package, every page in the one file
   Views/      Controls that draw themselves
     DrawingCanvas.cs     The page: grid, shapes, tools, selection, connectors, label editing
     ToolboxPanel.cs      The stencil strip, and the drag source
@@ -1063,6 +1147,9 @@ Where it would go next, if it went anywhere:
 
 - Data behind a shape - fields, and a way to show them - which is what separates a diagram tool
   from a drawing one
+- Visio theme palettes, so a themed drawing comes in with the colours it is shown in rather than
+  the defaults
+- Confirmation that what the Visio exporter writes opens in Visio itself
 
 ## License
 

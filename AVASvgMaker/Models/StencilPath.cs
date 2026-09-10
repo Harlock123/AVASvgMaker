@@ -84,6 +84,13 @@ public static class StencilPath
         return sb.ToString();
     }
 
+    /// <summary>
+    /// The outline as its commands, each coordinate scaled out of the unit square into
+    /// <paramref name="bounds"/>. Pass the unit square itself to read the outline as written.
+    /// </summary>
+    public static IEnumerable<(char Command, Point[] Points)> Steps(string data, Rect bounds) =>
+        Parse(data, bounds);
+
     /// <summary>Reads the commands, scaling each coordinate out of the unit square.</summary>
     private static IEnumerable<(char Command, Point[] Points)> Parse(string data, Rect bounds)
     {

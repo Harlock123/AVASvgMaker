@@ -33,6 +33,54 @@ public class CylinderShape : DiagramShape
         return geometry;
     }
 
+    /// <summary>
+    /// The barrel, then the front edge of the lip as a second, open run - the same two parts
+    /// the shape is drawn in. Each end of the barrel is half an ellipse, and the lip is the
+    /// half of the top one that a real barrel would let you see.
+    /// </summary>
+    public override string UnitOutline
+    {
+        get
+        {
+            // How deep the ellipse at each end is, as a fraction of the shape.
+            var r = Bounds.Height <= 0 ? 0.25 : LipRadius / Bounds.Height;
+
+            // The handle that puts a cubic on a quarter ellipse, along each axis.
+            const double Pull = 0.5522847498307933;
+            var across = 0.5 * Pull;
+            var deep = r * Pull;
+
+            // Half an ellipse from one side of the shape to the other, by way of a point
+            // between them: the flat side of a barrel end.
+            string Half(double ends, double middle, double edge) =>
+                $"C 0,{Num(edge)} {Num(0.5 - across)},{Num(middle)} 0.5,{Num(middle)} " +
+                $"C {Num(0.5 + across)},{Num(middle)} 1,{Num(edge)} 1,{Num(ends)} ";
+
+            var top = $"M 0,{Num(r)} " + Half(r, 0, r - deep);
+            var side = $"L 1,{Num(1 - r)} ";
+
+            var bottom = $"C 1,{Num(1 - r + deep)} {Num(0.5 + across)},1 0.5,1 " +
+                         $"C {Num(0.5 - across)},1 0,{Num(1 - r + deep)} 0,{Num(1 - r)} ";
+
+            return (top + side + bottom + "Z").TrimEnd();
+        }
+    }
+
+    /// <summary>The half of the top ellipse a real barrel would let you see.</summary>
+    public override string? UnitDetail
+    {
+        get
+        {
+            var r = Bounds.Height <= 0 ? 0.25 : LipRadius / Bounds.Height;
+            const double Pull = 0.5522847498307933;
+            var across = 0.5 * Pull;
+            var deep = r * Pull;
+
+            return $"M 0,{Num(r)} C 0,{Num(r + deep)} {Num(0.5 - across)},{Num(2 * r)} 0.5,{Num(2 * r)} " +
+                   $"C {Num(0.5 + across)},{Num(2 * r)} 1,{Num(r + deep)} 1,{Num(r)}";
+        }
+    }
+
     /// <summary>The front edge of the top lip, drawn as an unfilled arc over the body.</summary>
     private Geometry CreateLipGeometry()
     {

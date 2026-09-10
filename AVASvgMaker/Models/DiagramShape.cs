@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Avalonia;
 using Avalonia.Media;
@@ -259,6 +260,35 @@ public abstract class DiagramShape
 
     /// <summary>Geometry for the shape, in page coordinates.</summary>
     public abstract Geometry CreateGeometry();
+
+    /// <summary>
+    /// The shape's outline in the unit square, in the same language stencils are written in.
+    /// <see cref="CreateGeometry"/> gives a picture to draw; this gives the drawing itself,
+    /// for an exporter that has to restate the shape in some other file's terms rather than
+    /// paint it. A shape is a box until it says otherwise.
+    /// </summary>
+    public virtual string UnitOutline => "M 0,0 L 1,0 L 1,1 L 0,1 Z";
+
+    /// <summary>
+    /// A second run of the outline that is drawn but never filled - a cylinder's front lip, a
+    /// container's title rule, the markings inside a stencil. Nothing, for a shape that is all
+    /// one piece.
+    /// </summary>
+    public virtual string? UnitDetail => null;
+
+    /// <summary>The unit-square outline of a run of page-space points.</summary>
+    protected string UnitPolygon(IEnumerable<Point> points)
+    {
+        var box = Bounds;
+        var width = box.Width <= 0 ? 1 : box.Width;
+        var height = box.Height <= 0 ? 1 : box.Height;
+
+        var steps = points.Select((point, index) =>
+            $"{(index == 0 ? 'M' : 'L')} " +
+            $"{Num((point.X - box.X) / width)},{Num((point.Y - box.Y) / height)}");
+
+        return string.Join(" ", steps) + " Z";
+    }
 
     public void Render(DrawingContext context) => Render(context, true);
 
