@@ -19,8 +19,25 @@ on:
         default: false
 
 jobs:
+  # Nothing is released that the suite has not agreed to. Headless, so the drag and export
+  # tests are the real controls doing the real thing, on a runner with no display.
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Run the suite
+        run: dotnet test AVASvgMaker.Tests --configuration Release --logger 'console;verbosity=normal'
+
   single-file:
     name: single file
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -43,6 +60,7 @@ jobs:
 
   native:
     name: native ${{ matrix.rid }}
+    needs: test
     if: inputs.native
     runs-on: ${{ matrix.os }}
 

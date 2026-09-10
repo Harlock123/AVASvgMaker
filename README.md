@@ -595,6 +595,37 @@ it puts each target on a runner of its own operating system.
 Both leave one archive per target in `dist/`. `zip` is used for Windows archives where it is
 installed, falling back to Python and then to `tar`.
 
+## Tests
+
+```bash
+dotnet test AVASvgMaker.Tests
+```
+
+Sixty-odd tests, a second to run. They live in a project of their own, which is not merely
+absent from the shipped binaries but invisible to the build that makes them: `build.sh` and the
+release workflow publish `AVASvgMaker/AVASvgMaker.csproj` by name and never see the test
+project at all. The release job will not run until they pass.
+
+They run **headless**, through `Avalonia.Headless`, which means they drive the real window, the
+real canvas and real pointer events with no display attached. A drag test presses, moves and
+releases; the code under test cannot tell the difference. Calling the method a drag would have
+called would prove considerably less - most of the bugs found while building this were in the
+wiring between the gesture and the method, not in the method.
+
+What they are there to hold on to:
+
+| | |
+|---|---|
+| **The file format** | Every version that has ever been written, 5 to 11, is loaded and checked. A format bug is the one thing a user cannot work around |
+| **Things that fail silently** | A PDF page at the wrong physical size still looks right on screen and only misbehaves at the printer. A BMP is checked to be exactly the size it said it would be |
+| **Arithmetic with an anchor** | Stretching a selection keeps its anchored corner still and does not compound over a drag; lane shares divide a pool exactly, with the last lane landing on its edge |
+| **Every shape at once** | All ninety-odd kinds are asked for their connection points, and each is checked to be on that shape's outline - inside half a unit in, outside half a unit out |
+| **Routing settling** | The same page routed six times gives the same answer, and a reloaded file routes as it did when saved. Routes that never settle would be worse than routes that overlap |
+
+The suite grew out of the scaffolding used to build each feature, which until now was written,
+run, and deleted. Keeping it is the difference between having tested something once and being
+able to tell whether it still works.
+
 ## Project layout
 
 ```
@@ -641,8 +672,9 @@ AVASvgMaker/
     PageSetupDialog.cs   Paper size, orientation, and fit-to-drawing
     RasterExportDialog.cs  Export scale and quality, and the pixel size it comes to
 
+AVASvgMaker.Tests/       The regression suite - headless, and no part of a release build
 build.sh                 Builds every target it can, and explains the rest
-.github/workflows/       Builds all six on a runner of each operating system
+.github/workflows/       Runs the tests, then builds all six on a runner of each operating system
 Images/                  Screenshots used above
     AppTheme.cs          The live chrome palette, held as brushes
   MainWindow.axaml       Toolbar, 1:3 toolbox/page split, status bar

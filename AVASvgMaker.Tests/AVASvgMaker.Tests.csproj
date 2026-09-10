@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The regression suite. Kept in a project of its own, so it is not merely absent from the
+    shipped binaries but invisible to the build that makes them: build.sh and the release
+    workflow publish AVASvgMaker/AVASvgMaker.csproj by name and never see this one.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+
+    <!-- Runs the real controls without a display, so the drag tests are real drags. -->
+    <PackageReference Include="Avalonia.Headless" Version="11.2.1" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AVASvgMaker\AVASvgMaker.csproj" />
+  </ItemGroup>
+
+</Project>
