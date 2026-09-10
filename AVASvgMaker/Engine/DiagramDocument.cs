@@ -305,10 +305,7 @@ public class DiagramDocument
 
     private static double Area(Rect rect) => rect.Width * rect.Height;
 
-    /// <summary>
-    /// Puts a shape in a container, or takes it out when given null. A shape is lifted above
-    /// its container in the drawing order, since a container is a backdrop for its contents.
-    /// </summary>
+    /// <summary>Puts a shape in a container, or takes it out when given null.</summary>
     public void Adopt(DiagramShape shape, DiagramShape? container)
     {
         if (ReferenceEquals(shape.Container, container))
@@ -316,13 +313,64 @@ public class DiagramDocument
 
         shape.Container = container;
 
-        if (container is not null && Shapes.IndexOf(shape) < Shapes.IndexOf(container))
+        NormaliseOrder();
+        MarkModified();
+    }
+
+    /// <summary>
+    /// Puts every container before the shapes it holds.
+    ///
+    /// A container is a backdrop, so it has to be drawn first. Any reordering can break that -
+    /// bringing a lane to the front puts it in front of its own contents - and a lane with an
+    /// opaque fill then hides everything in it. Rather than teaching each reordering operation
+    /// about containers, the rule is restored here afterwards.
+    /// </summary>
+    public void NormaliseOrder()
+    {
+        if (IsOrdered())
+            return;
+
+        var ordered = new List<DiagramShape>(Shapes.Count);
+        var placed = new HashSet<DiagramShape>();
+
+        foreach (var shape in Shapes)
+            Place(shape, ordered, placed, 0);
+
+        Shapes.Clear();
+        Shapes.AddRange(ordered);
+    }
+
+    /// <summary>Emits a shape's container before the shape, and so on up the chain.</summary>
+    private static void Place(DiagramShape shape, List<DiagramShape> ordered,
+        HashSet<DiagramShape> placed, int depth)
+    {
+        if (placed.Contains(shape))
+            return;
+
+        // The depth limit is for a malformed file; ContainerFor will not make a loop.
+        if (shape.Container is { } container && depth < 32)
+            Place(container, ordered, placed, depth + 1);
+
+        if (placed.Add(shape))
+            ordered.Add(shape);
+    }
+
+    private bool IsOrdered()
+    {
+        var index = new Dictionary<DiagramShape, int>(Shapes.Count);
+
+        for (var i = 0; i < Shapes.Count; i++)
+            index[Shapes[i]] = i;
+
+        foreach (var shape in Shapes)
         {
-            Shapes.Remove(shape);
-            Shapes.Add(shape);
+            if (shape.Container is { } container &&
+                index.TryGetValue(container, out var position) &&
+                position > index[shape])
+                return false;
         }
 
-        MarkModified();
+        return true;
     }
 
     /// <summary>

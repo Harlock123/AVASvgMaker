@@ -192,6 +192,12 @@ can be swept with the marquee and dropped into - clicking the middle of a pool t
 pool would make it nearly impossible to use. Containers are also hollow, so their contents
 read against the page rather than against a second wash of colour.
 
+A container is always drawn before the shapes it holds, and that rule is restored after any
+reordering rather than being left to each operation to respect - otherwise bringing a lane to
+the front puts it in front of its own contents, and a lane with an opaque fill then hides them
+completely. For the same reason, clicking a container does not raise it: a backdrop that
+jumped forward because it was clicked would bury whatever the click was aimed past.
+
 Containment is held on the child as a single reference rather than as a list on the parent, so
 a shape has exactly one container and the document stays one flat list in z-order. It is
 resolved on load in the same second pass as connector glue, and for the same reason: a shape

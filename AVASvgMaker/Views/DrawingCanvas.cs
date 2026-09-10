@@ -303,6 +303,7 @@ public class DrawingCanvas : Decorator
     public override void Render(DrawingContext context)
     {
         Document.LayoutContainers();
+        Document.NormaliseOrder();
         Document.RouteConnectors();
 
         context.DrawRectangle(WorkspaceBrush, null, new Rect(Bounds.Size));
@@ -905,7 +906,11 @@ public class DrawingCanvas : Decorator
         {
             // Clicking inside an existing multi-selection keeps it, so the group can be dragged.
             Document.SelectOnly(hit);
-            Document.BringToFront(hit);
+
+            // A container is a backdrop: raising one because it was clicked would bury the
+            // very contents the click was aimed past.
+            if (!hit.IsContainer)
+                Document.BringToFront(hit);
         }
 
         if (Document.IsSelected(hit))
