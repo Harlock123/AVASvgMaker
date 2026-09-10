@@ -53,6 +53,7 @@ Or [build it yourself](#building).
 - **Margin guide** - a dashed inset per page, to keep work clear of the edge
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
 - **Rotation** - drag the handle above a shape to turn it, or turn a selection in right angles from the menu
+- **Labels that leave their shape** - a label sits top, middle or bottom, and can carry a frame of its own that puts it beside or below the shape it belongs to
 
 **Connectors**
 
@@ -319,15 +320,19 @@ those files draw.
 | **Pages** | Each page at its own size, in inches converted at 96 to the inch, with Visio's y-up origin turned over to ours. Background pages are scenery for another page and are counted rather than imported |
 | **Geometry** | `MoveTo`, `LineTo`, `ArcTo`, `EllipticalArcTo`, `Ellipse`, `CubBezTo`, `QuadBezTo` and their relative forms. Arcs become beziers, solved through the three points the file gives; an elliptical arc is solved by squashing its ellipse into a circle and carrying the answer back. `NURBSTo` and `PolylineTo` are taken as straight runs to where they end |
 | **Masters** | Resolved for the shape, for the shapes inside it, and cell by cell, as above |
+| **Frames** | A group's own turn, flip and stretch reach everything it holds, rather than only shifting it sideways. Where the model has no room for a mirror the flip is folded into the outline, since every mirrored frame is some turn of a shape flipped once |
+| **Theme colours** | A colour cell may name a colour, number one in the drawing's table, say "Themed", or say nothing at all - which for a quick-styled shape also means the theme. The theme's variations are read from the theme part, and the shape's quick-style cells count along them |
+| **Splines** | A `PolylineTo` draws every corner its formula lists. A `NURBSTo` is evaluated as the curve it describes, weights included, and sampled into a smooth run |
 | **Style** | Line colour, weight and pattern; fill colour. A section Visio will not fill is kept off the body, so a line ruled across a shape's face stays a line instead of being swallowed by the fill |
-| **Text** | The words, and the size, weight, slant, colour and alignment from the shape's `Character` and `Paragraph` sections |
+| **Text** | The words, and the size, weight, slant, colour and alignment from the shape's `Character` and `Paragraph` sections. Also the block they sit in, which Visio sizes and pins separately and which need not be on the shape at all - the name under a stick figure hangs below it |
 | **Connectors** | A shape with a begin and an end becomes a connector. The page's `Connects` list says which end is stuck to which shape, and whether it is stuck to the shape itself - free to leave from wherever suits - or held to one named connection point |
 | **Groups** | Read through, each child placed in its parent's frame |
 
 | Not read | |
 |---|---|
-| **Theme colours** | A colour cell is either a hex triplet or an index into a theme's palette. The palette lives in another part and depends on the theme, so an index falls back to the default rather than to a colour picked at random. A drawing themed in Visio comes in with its shapes' own colours where it states them and the default where it does not |
-| **Formulas** | Cells carry both a computed value and the formula behind it. Only the value is read |
+| **Themed fills** | A themed *line* is resolved; a themed *fill* is not. Visio tints one through a quick-style matrix that is not read here, and a shape painted solid in its own line colour would be further from the truth than an empty one. A fill the drawing states outright is used |
+| **Formulas** | Cells carry both a computed value and the formula behind it. Only the value is read - except on the rows that draw a spline, where the run of control points is in the formula and nowhere else |
+| **Spline knots** | A `SplineStart` and its `SplineKnot` rows state one control point each, and how their knots run cannot be settled from the file alone, so the run of points itself is drawn. A `NURBSTo` states its own degree and knots, and its knot vector is taken to be clamped - the ordinary reading, which pins the curve's ends to the first and last control points |
 | **Gradients, shadows, images, OLE objects** | Nothing here can hold them |
 | **Layers, data, hyperlinks** | Not part of this model |
 
@@ -389,7 +394,8 @@ older files still load, and version 1 connectors keep their original straight ro
 added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
 heights, version 9 the font a label is in, version 10 grouping, version 11 the margin guide,
 version 12 rotation, version 13 shapes carrying an outline of their own, version 14 a
-connector label moved by hand, and version 15 markings drawn over a path's face and not filled. Older files still load: a version 5 file, which
+connector label moved by hand, version 15 markings drawn over a path's face and not filled, and
+version 16 where a label sits in its shape - or outside it. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
@@ -399,7 +405,8 @@ a file up to version 10 has no margins, so its pages come back without one; and 
 version 11 has no angles, so its shapes come back upright; and a file up to version 12 has no
 outlines of its own, because nothing could make one; and a file up to version 13 has no moved
 labels, so they sit where the line puts them; and a file up to version 14 has no markings over
-a path, because nothing could make those either. The on-disk
+a path, because nothing could make those either; and a file up to version 15 puts every label
+in the middle of the shape it belongs to, which was the only place there was. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -452,7 +459,7 @@ Down the right-hand side, applying to everything selected:
 |---|---|
 | **Fill** | Colour from a 24-swatch palette or a hex value, or None for a shape with no fill at all |
 | **Line** | Colour or None, style (solid, dashed, dotted), and weight |
-| **Text** | Colour, size, font, bold, italic, and whether the label sits left, centred or right in its shape |
+| **Text** | Colour, size, font, bold, italic, and where the label sits in its shape - left, centred or right, and top, middle or bottom |
 
 ![Label formatting](Images/text.png)
 
@@ -468,6 +475,15 @@ sets the formatting for the next shape drawn, so a colour can
 be chosen once and then used for several shapes. Formatting a selection also updates that
 default. A new text box keeps its transparent fill rather than taking the current one, but it
 can still be given a fill afterwards.
+
+![Labels down the shape, and one that has left it](Images/labels.png)
+
+A label sits in the middle of its shape unless told otherwise, and the second row of alignment
+buttons moves it to the top or the bottom. A shape can also carry a **frame** for its label -
+a box of its own, held as fractions of the shape so it moves and stretches with it, and free to
+sit outside the shape altogether. That is how a name hangs under a stick figure. Nothing in the
+editor draws one yet; it arrives with a Visio drawing that has one, survives saving and comes
+back, and is written out again on the way to `.vsdx`.
 
 ## Rotation
 
@@ -890,6 +906,7 @@ AVASvgMaker/
     StencilShape.cs      Draws a shape from a catalogue outline
     ShapeStyle.cs        Fill, line and text formatting, and the defaults for new shapes
     StrokeStyle.cs       Solid, Dashed, Dotted
+    TextVerticalAlign.cs Where a label sits down its shape
     ShapeFactory.cs      Kind -> shape, the stencil list, and display names
     PageSize.cs          The paper presets, and matching a size back to one
   Engine/     Document state, with no UI dependencies
@@ -1147,9 +1164,9 @@ Where it would go next, if it went anywhere:
 
 - Data behind a shape - fields, and a way to show them - which is what separates a diagram tool
   from a drawing one
-- Visio theme palettes, so a themed drawing comes in with the colours it is shown in rather than
-  the defaults
 - Confirmation that what the Visio exporter writes opens in Visio itself
+- A themed fill, which needs Visio's quick-style matrix rather than only its colours
+- Drawing a label's frame in the editor, rather than only carrying one that arrived with a file
 
 ## License
 

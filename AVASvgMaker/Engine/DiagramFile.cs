@@ -30,7 +30,7 @@ public static partial class DiagramFile
     /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand.
     /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 15;
+    public const int CurrentVersion = 16;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -140,6 +140,18 @@ public static partial class DiagramFile
         /// written only for a path that has any.
         /// </summary>
         public string? Detail { get; set; }
+
+        /// <summary>
+        /// Which edge the label hugs down the shape, when it is not the middle. Version 16
+        /// onwards, and written only when it is not.
+        /// </summary>
+        public string? TextVerticalAlign { get; set; }
+
+        /// <summary>
+        /// Where the label sits, as fractions of the shape - left, top, width, height. Version
+        /// 16 onwards, and written only for a shape whose label is not simply its own box.
+        /// </summary>
+        public double[]? TextFrame { get; set; }
 
         /// <summary>
         /// A lane's share of its pool. Version 8 onwards, and only written for a lane that
@@ -275,6 +287,12 @@ public static partial class DiagramFile
             Rotation = shape.IsRotated ? shape.Rotation : null,
             Outline = shape is PathShape outlined ? outlined.Outline : null,
             Detail = shape is PathShape marked ? marked.Detail : null,
+            TextVerticalAlign = shape.TextVerticalAlign == Models.TextVerticalAlign.Middle
+                ? null
+                : shape.TextVerticalAlign.ToString(),
+            TextFrame = shape.TextFrame is { } frame
+                ? [frame.X, frame.Y, frame.Width, frame.Height]
+                : null,
             LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
                         && Math.Abs(lane.LaneShare - 1) > 1e-9
                 ? lane.LaneShare
@@ -451,8 +469,13 @@ public static partial class DiagramFile
         shape.Bold = record.Bold ?? false;
         shape.Italic = record.Italic ?? false;
         shape.TextAlign = Parse(record.TextAlign, Models.TextAlign.Center);
+        shape.TextVerticalAlign = Parse(record.TextVerticalAlign, Models.TextVerticalAlign.Middle);
         shape.GroupId = record.GroupId ?? 0;
         shape.Rotation = record.Rotation ?? 0;
+
+        // Four numbers, or nothing at all for a label that simply fills its shape.
+        if (record.TextFrame is { Length: 4 } frame)
+            shape.TextFrame = new Rect(frame[0], frame[1], frame[2], frame[3]);
 
         // Absent before version 8, and absent since for any lane on the standard share.
         if (shape is ContainerShape { Kind: ShapeKind.Lane } lane && record.LaneShare is { } share && share > 0)

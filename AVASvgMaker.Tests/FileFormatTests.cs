@@ -188,6 +188,39 @@ public class FileFormatTests
     }
 
     [AvaloniaFact]
+    public void WhereALabelSitsInItsShapeSurvivesTheRoundTrip()
+    {
+        var document = Harness.Page(400, 300);
+        var box = Harness.Box(document, new Rect(20, 20, 100, 80), "under it");
+
+        box.TextVerticalAlign = TextVerticalAlign.Bottom;
+        box.TextFrame = new Rect(-0.2, 1.05, 1.4, 0.3);
+
+        var read = DiagramFile.FromJson(DiagramFile.ToJson(document));
+        var back = read.Pages[0].Shapes[0];
+
+        Assert.Equal(TextVerticalAlign.Bottom, back.TextVerticalAlign);
+        Assert.Equal(new Rect(-0.2, 1.05, 1.4, 0.3), Assert.NotNull(back.TextFrame));
+    }
+
+    [AvaloniaFact]
+    public void AFileFromBeforeALabelCouldLeaveItsShapeStillOpens()
+    {
+        // Version 15 had one place for a label: the middle of the shape it belonged to.
+        var document = Harness.Page(400, 300);
+        var box = Harness.Box(document, new Rect(20, 20, 100, 80), "in it");
+
+        box.TextVerticalAlign = TextVerticalAlign.Top;
+        box.TextFrame = new Rect(0, 1, 1, 0.3);
+
+        var json = Downgrade(DiagramFile.ToJson(document), 15);
+        var back = DiagramFile.FromJson(json).Pages[0].Shapes[0];
+
+        Assert.Equal(TextVerticalAlign.Middle, back.TextVerticalAlign);
+        Assert.Null(back.TextFrame);
+    }
+
+    [AvaloniaFact]
     public void AFileFromTheFutureIsRefusedRatherThanMisread()
     {
         var json = DiagramFile.ToJson(Harness.Page())
@@ -267,6 +300,7 @@ public class FileFormatTests
         "fontName" or "bold" or "italic" or "textAlign" => version >= 9,
         "groupId" => version >= 10,
         "detail" => version >= 15,
+        "textVerticalAlign" or "textFrame" => version >= 16,
         _ => true
     };
 }

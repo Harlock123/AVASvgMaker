@@ -16,7 +16,8 @@ public record ShapeStyle(
     string FontName,
     bool Bold,
     bool Italic,
-    TextAlign TextAlign)
+    TextAlign TextAlign,
+    TextVerticalAlign TextVerticalAlign)
 {
     public static readonly ShapeStyle Default = new(
         DiagramShape.DefaultFill,
@@ -28,7 +29,8 @@ public record ShapeStyle(
         string.Empty,
         false,
         false,
-        TextAlign.Center);
+        TextAlign.Center,
+        TextVerticalAlign.Middle);
 
     public static ShapeStyle From(DiagramShape shape) => new(
         shape.Fill,
@@ -40,7 +42,8 @@ public record ShapeStyle(
         shape.FontName,
         shape.Bold,
         shape.Italic,
-        shape.TextAlign);
+        shape.TextAlign,
+        shape.TextVerticalAlign);
 
     public void ApplyTo(DiagramShape shape)
     {
@@ -61,5 +64,6 @@ public record ShapeStyle(
         shape.Bold = Bold;
         shape.Italic = Italic;
         shape.TextAlign = TextAlign;
+        shape.TextVerticalAlign = TextVerticalAlign;
     }
 }

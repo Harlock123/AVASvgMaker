@@ -164,5 +164,5 @@ public class ContainerShape : DiagramShape
     }
 
     /// <summary>The title is drawn in the band, so the base class's centred label is not used.</summary>
-    protected override Rect TextArea => HeaderBounds;
+    protected override Rect TextArea => Framed(HeaderBounds);
 }

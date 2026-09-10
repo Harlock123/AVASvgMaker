@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -44,14 +45,32 @@ public static class VisioImporter
     /// </summary>
     private sealed record Master(Sheet Stamp, IReadOnlyDictionary<string, XElement> Parts);
 
+    /// <summary>
+    /// Everything that stays the same while one page is read: what to look things up in, what
+    /// is being filled in, and what has been left out along the way. Gathered here so that
+    /// reading a shape takes the shape and its frame, rather than eight things and a shape.
+    /// </summary>
+    private sealed record Reading(
+        IReadOnlyDictionary<string, Master> Masters,
+        Palette Palette,
+        DiagramPage Page,
+        double PageHeight,
+        Dictionary<string, DiagramShape> ById,
+        List<(ConnectorShape Line, string Id)> Connectors,
+        Dictionary<Tally, int> Skipped);
+
     /// <summary>Something left out, counted, and able to say itself for any number of it.</summary>
     private sealed record Tally(string One, string Many)
     {
         public string Say(int count) => count == 1 ? $"1 {One}" : $"{count} {Many}";
     }
 
-    /// <summary>One number in a geometry row, and the sheet whose inches it is stated in.</summary>
-    private sealed record Slot(double Value, Sheet Owner);
+    /// <summary>
+    /// One number in a geometry row, and the sheet whose inches it is stated in. A cell also
+    /// keeps the formula behind its value, because the rows that draw a spline put the whole
+    /// run of control points in there and leave the value to name only where it ends.
+    /// </summary>
+    private sealed record Slot(double Value, Sheet Owner, string? Formula = null);
 
     /// <summary>A geometry row once it has inherited what it did not restate.</summary>
     private sealed record Step(string? Index, string Kind, IReadOnlyDictionary<string, Slot> Cells);
@@ -166,7 +185,10 @@ public static class VisioImporter
 
                 foreach (var cell in row.Elements(V + "Cell"))
                     if ((string?)cell.Attribute("N") is { } name)
-                        cells[name] = new Slot(VisioFormat.Number((string?)cell.Attribute("V")), this);
+                        cells[name] = new Slot(
+                            VisioFormat.Number((string?)cell.Attribute("V")),
+                            this,
+                            (string?)cell.Attribute("F"));
 
                 var step = new Step(ix, (string?)row.Attribute("T") ?? basis?.Kind ?? string.Empty, cells);
 
@@ -188,6 +210,7 @@ public static class VisioImporter
                         ?? throw new InvalidDataException("That is not a Visio drawing.");
 
         var masters = ReadMasters(package);
+        var palette = Palette.Read(package);
         var document = new DiagramDocument();
         var pages = new List<DiagramPage>();
         var skipped = new Dictionary<Tally, int>();
@@ -221,7 +244,7 @@ public static class VisioImporter
             if (relationship is not null && links.TryGetValue(relationship, out var path) &&
                 Part(package, "visio/pages/" + path) is { Root: not null } contents)
             {
-                total += ReadPage(contents.Root, page, height, masters, skipped);
+                total += ReadPage(contents.Root, page, height, masters, palette, skipped);
             }
 
             pages.Add(page);
@@ -245,14 +268,15 @@ public static class VisioImporter
 
     private static int ReadPage(
         XElement root, DiagramPage page, double pageHeight,
-        IReadOnlyDictionary<string, Master> masters, Dictionary<Tally, int> skipped)
+        IReadOnlyDictionary<string, Master> masters, Palette palette, Dictionary<Tally, int> skipped)
     {
-        var byId = new Dictionary<string, DiagramShape>();
-        var connectors = new List<(ConnectorShape Line, string Id)>();
+        var reading = new Reading(masters, palette, page, pageHeight,
+            new Dictionary<string, DiagramShape>(), [], skipped);
+
         var count = 0;
 
         foreach (var element in root.Element(V + "Shapes")?.Elements(V + "Shape") ?? [])
-            count += ReadShape(element, page, pageHeight, masters, null, Matrix.Identity, byId, connectors, skipped);
+            count += ReadShape(element, reading, null, Matrix.Identity);
 
         // Glue is a page-level list of which end of which connector meets which shape.
         foreach (var connect in root.Element(V + "Connects")?.Elements(V + "Connect") ?? [])
@@ -262,8 +286,8 @@ public static class VisioImporter
             var cell = (string?)connect.Attribute("FromCell") ?? string.Empty;
 
             if (from is null || to is null ||
-                connectors.FirstOrDefault(entry => entry.Id == from).Line is not { } line ||
-                !byId.TryGetValue(to, out var target))
+                reading.Connectors.FirstOrDefault(entry => entry.Id == from).Line is not { } line ||
+                !reading.ById.TryGetValue(to, out var target))
                 continue;
 
             // Visio says which part of the shape the line is stuck to: 3 means the shape
@@ -294,16 +318,12 @@ public static class VisioImporter
 
     #region Shapes
 
-    private static int ReadShape(
-        XElement element, DiagramPage page, double pageHeight,
-        IReadOnlyDictionary<string, Master> masters, Master? inherited, Matrix parent,
-        Dictionary<string, DiagramShape> byId,
-        List<(ConnectorShape Line, string Id)> connectors,
-        Dictionary<Tally, int> skipped)
+    private static int ReadShape(XElement element, Reading reading, Master? inherited, Matrix parent)
     {
         // A shape either stamps a whole master, or - inside a stamped group - answers to one
         // particular shape within the master its parent stamped, by that shape's own ID.
-        if ((string?)element.Attribute("Master") is { } stamped && masters.TryGetValue(stamped, out var master))
+        if ((string?)element.Attribute("Master") is { } stamped &&
+            reading.Masters.TryGetValue(stamped, out var master))
             inherited = master;
 
         var stencil = (string?)element.Attribute("Master") is not null
@@ -322,9 +342,10 @@ public static class VisioImporter
         var pin = new Point(sheet.Number("PinX"), sheet.Number("PinY"));
         var local = new Point(sheet.Number("LocPinX", width / 2), sheet.Number("LocPinY", height / 2));
 
-        // Where the shape's own bottom-left corner sits on the page, before any group above it.
-        var origin = new Point(pin.X - local.X, pin.Y - local.Y);
-        var placed = origin.Transform(parent);
+        // Where this shape's own coordinates land in the page's. A group hands the very same
+        // frame to everything inside it, which is why a group that has been turned turns what
+        // it holds rather than sliding it sideways.
+        var mine = Placement(sheet, pin, local) * parent;
 
         // A connector is a shape with two ends rather than a box, and it stands for the whole
         // of itself: what a dynamic connector holds inside is its own label and arrowhead.
@@ -334,17 +355,17 @@ public static class VisioImporter
             var to = new Point(sheet.Number("EndX"), sheet.Number("EndY")).Transform(parent);
 
             var line = new ConnectorShape(
-                VisioFormat.ToPage(from.X, from.Y, pageHeight),
-                VisioFormat.ToPage(to.X, to.Y, pageHeight))
+                VisioFormat.ToPage(from.X, from.Y, reading.PageHeight),
+                VisioFormat.ToPage(to.X, to.Y, reading.PageHeight))
             {
                 Routing = ConnectorRouting.Straight,
                 EndCap = EndCapStyle.Arrow,
                 Text = Words(element)
             };
 
-            Paint(line, sheet, stroke: true);
-            page.Shapes.Add(line);
-            connectors.Add((line, id));
+            Paint(line, sheet, reading.Palette, stroke: true);
+            reading.Page.Shapes.Add(line);
+            reading.Connectors.Add((line, id));
 
             return 1;
         }
@@ -356,17 +377,18 @@ public static class VisioImporter
         var children = element.Element(V + "Shapes");
 
         if (children is not null)
-        {
-            var inside = Matrix.CreateTranslation(placed.X, placed.Y);
-
             foreach (var child in children.Elements(V + "Shape"))
-                count += ReadShape(child, page, pageHeight, masters, inherited, inside, byId, connectors, skipped);
-        }
+                count += ReadShape(child, reading, inherited, mine);
 
         if (width <= 0 || height <= 0)
             return count;
 
-        var outline = Outline(sheet, width, height);
+        // The box the shape ends up occupying, and how it ends up sitting in it. Anything
+        // above the shape may have turned it, flipped it or stretched it, so the answer comes
+        // from the frame itself rather than from the shape's own cells.
+        var (bounds, turn, mirrored) = Sits(mine, width, height, reading.PageHeight);
+
+        var outline = Outline(sheet, width, height, mirrored);
 
         if (outline is not { } drawing)
         {
@@ -374,30 +396,85 @@ public static class VisioImporter
             if (children is null)
             {
                 var tally = new Tally("shape with no outline", "shapes with no outline");
-                skipped[tally] = skipped.GetValueOrDefault(tally) + 1;
+                reading.Skipped[tally] = reading.Skipped.GetValueOrDefault(tally) + 1;
             }
 
             return count;
         }
 
-        var bounds = new Rect(
-            VisioFormat.ToPixels(placed.X),
-            VisioFormat.ToPixels(pageHeight - placed.Y - height),
-            VisioFormat.ToPixels(width),
-            VisioFormat.ToPixels(height));
-
         var shape = Build(drawing.Body, drawing.Detail, bounds);
 
         shape.Text = Words(element);
-        shape.Rotation = VisioFormat.ToDegrees(sheet.Number("Angle"));
-        Lettering(shape, sheet);
+        shape.Rotation = turn;
 
-        Paint(shape, sheet, stroke: false);
+        Lettering(shape, sheet, reading.Palette);
+        Block(shape, sheet, width, height, mirrored);
+        Paint(shape, sheet, reading.Palette, stroke: false);
 
-        page.Shapes.Add(shape);
-        byId[id] = shape;
+        reading.Page.Shapes.Add(shape);
+        reading.ById[id] = shape;
 
         return count + 1;
+    }
+
+    /// <summary>
+    /// A shape's own coordinates as its parent sees them. Visio turns and flips a shape about
+    /// its local pin, and then puts that pin where PinX and PinY say. A group hands the result
+    /// on to everything inside it unchanged, so this is also the frame a group's contents are
+    /// drawn in.
+    /// </summary>
+    private static Matrix Placement(Sheet sheet, Point pin, Point local)
+    {
+        var flipX = Math.Abs(sheet.Number("FlipX")) > 0.5;
+        var flipY = Math.Abs(sheet.Number("FlipY")) > 0.5;
+        var angle = sheet.Number("Angle");
+
+        var turn = Matrix.Identity;
+
+        if (flipX || flipY)
+            turn *= Matrix.CreateScale(flipX ? -1 : 1, flipY ? -1 : 1);
+
+        if (Math.Abs(angle) > 1e-9)
+            turn *= Matrix.CreateRotation(angle);
+
+        // Both happen about the local pin, so the shape is carried to the origin and back.
+        return Matrix.CreateTranslation(-local.X, -local.Y) *
+               turn *
+               Matrix.CreateTranslation(pin.X, pin.Y);
+    }
+
+    /// <summary>
+    /// Where a shape of the given size ends up once its frame is applied: the box it occupies,
+    /// the angle it sits at, and whether it has been turned over.
+    ///
+    /// The model here holds an upright box and an angle, and has no room for a mirror - but
+    /// every mirrored frame is some turn of a shape flipped once, so the flip is handed back
+    /// to be folded into the outline and what is left is an angle like any other.
+    /// </summary>
+    private static (Rect Bounds, double Turn, bool Mirrored) Sits(
+        Matrix frame, double width, double height, double pageHeight)
+    {
+        Point At(double x, double y) => new Point(x, y).Transform(frame);
+
+        var centre = At(width / 2, height / 2);
+        var across = At(width, height / 2) - At(0, height / 2);
+        var down = At(width / 2, height) - At(width / 2, 0);
+
+        var wide = Math.Sqrt(across.X * across.X + across.Y * across.Y);
+        var tall = Math.Sqrt(down.X * down.X + down.Y * down.Y);
+
+        // A frame that has been turned over reverses which way round its two axes go.
+        var mirrored = across.X * down.Y - across.Y * down.X < 0;
+
+        var middle = VisioFormat.ToPage(centre.X, centre.Y, pageHeight);
+
+        var bounds = new Rect(
+            middle.X - VisioFormat.ToPixels(wide) / 2,
+            middle.Y - VisioFormat.ToPixels(tall) / 2,
+            VisioFormat.ToPixels(wide),
+            VisioFormat.ToPixels(tall));
+
+        return (bounds, VisioFormat.ToDegrees(Math.Atan2(across.Y, across.X)), mirrored);
     }
 
     /// <summary>A rectangle stays a rectangle, so it can be resized and recognised.</summary>
@@ -416,7 +493,7 @@ public static class VisioImporter
     }
 
     /// <summary>How the shape's words are set: size, weight, colour, and which edge they hug.</summary>
-    private static void Lettering(DiagramShape shape, Sheet sheet)
+    private static void Lettering(DiagramShape shape, Sheet sheet, Palette palette)
     {
         var size = VisioFormat.Number(sheet.Cell("Character", "Size"), 0.16667);
         shape.FontSize = Math.Max(6, VisioFormat.ToPixels(size));
@@ -426,7 +503,7 @@ public static class VisioImporter
         shape.Bold = (style & 1) != 0;
         shape.Italic = (style & 2) != 0;
 
-        if (Colour(sheet.Cell("Character", "Color")) is { } ink)
+        if (Colour(sheet.Cell("Character", "Color"), sheet, palette, "QuickStyleFontColor") is { } ink)
             shape.TextColor = ink;
 
         if (sheet.Cell("Character", "Font") is { Length: > 0 } face)
@@ -440,12 +517,63 @@ public static class VisioImporter
         };
     }
 
-    private static void Paint(DiagramShape shape, Sheet sheet, bool stroke)
+    /// <summary>
+    /// The block the shape's words go in. Visio gives it a size and a pin of its own, in the
+    /// shape's coordinates, and it need not sit on the shape at all - the name under a stick
+    /// figure hangs below it. Where the block is the shape, nothing is recorded, which keeps
+    /// it out of the way of every shape that does not need it.
+    /// </summary>
+    private static void Block(DiagramShape shape, Sheet sheet, double width, double height, bool mirrored)
     {
-        shape.Stroke = Colour(sheet.Cell("LineColor")) ?? DiagramShape.DefaultStroke;
+        shape.TextVerticalAlign = sheet.Number("VerticalAlign", 1) switch
+        {
+            0 => TextVerticalAlign.Top,
+            2 => TextVerticalAlign.Bottom,
+            _ => TextVerticalAlign.Middle
+        };
+
+        if (width <= 0 || height <= 0)
+            return;
+
+        var blockWidth = sheet.Number("TxtWidth", width);
+        var blockHeight = sheet.Number("TxtHeight", height);
+
+        var pin = new Point(sheet.Number("TxtPinX", width / 2), sheet.Number("TxtPinY", height / 2));
+        var local = new Point(
+            sheet.Number("TxtLocPinX", blockWidth / 2),
+            sheet.Number("TxtLocPinY", blockHeight / 2));
+
+        // Visio measures up from the bottom of the shape and we measure down from its top.
+        var left = (pin.X - local.X) / width;
+        var top = 1 - (pin.Y - local.Y + blockHeight) / height;
+
+        var frame = new Rect(left, mirrored ? 1 - top - blockHeight / height : top,
+            blockWidth / width, blockHeight / height);
+
+        // A block that is simply the shape is not worth recording.
+        if (Math.Abs(frame.X) > 1e-6 || Math.Abs(frame.Y) > 1e-6 ||
+            Math.Abs(frame.Width - 1) > 1e-6 || Math.Abs(frame.Height - 1) > 1e-6)
+            shape.TextFrame = frame;
+    }
+
+    private static void Paint(DiagramShape shape, Sheet sheet, Palette palette, bool stroke)
+    {
+        shape.Stroke = Colour(sheet.Cell("LineColor"), sheet, palette, "QuickStyleLineColor")
+                       ?? DiagramShape.DefaultStroke;
 
         if (!stroke)
-            shape.Fill = Colour(sheet.Cell("FillForegnd")) ?? Colors.Transparent;
+        {
+            // A fill pattern of 0 means the shape is not filled at all, whatever colour it
+            // may name. Anything else is taken as solid: the hatchings and gradients Visio
+            // can fill with have nothing here to become.
+            var filled = Math.Abs(VisioFormat.Number(sheet.Cell("FillPattern"), 1)) >= 0.5;
+
+            // Only a colour the shape states outright is used to fill it. A themed fill is
+            // tinted through a quick-style matrix that is not read here, and a shape painted
+            // solid in its own line colour would be further from the truth than an empty one.
+            shape.Fill = filled ? Stated(sheet.Cell("FillForegnd"), palette) ?? Colors.Transparent
+                                : Colors.Transparent;
+        }
 
         // A line pattern of 0 is no line at all; anything past 1 is some sort of dash.
         var pattern = sheet.Number("LinePattern", 1);
@@ -460,18 +588,153 @@ public static class VisioImporter
     }
 
     /// <summary>
-    /// A colour cell is either a hex triplet or an index into a theme's palette. The palette
-    /// is not read - it lives in another part and depends on the theme - so an index falls
-    /// back to nothing rather than to a colour picked at random.
+    /// A colour cell, in whichever of its forms it is written: a hex triplet, a number into
+    /// the drawing's table of colours, or the word "Themed".
+    ///
+    /// A shape that has been given a quick style very often states no colour at all - the cell
+    /// is simply absent, and the colour it is drawn in comes from the theme by way of the
+    /// shape's quick-style cells. So saying nothing and saying "Themed" mean the same thing
+    /// here, and both end up asking the theme.
     /// </summary>
-    private static Color? Colour(string? value)
+    private static Color? Colour(string? value, Sheet sheet, Palette palette, string quickStyle) =>
+        Stated(value, palette)
+        ?? palette.Themed(sheet.Number("QuickStyleVariation"), sheet.Number(quickStyle, -1));
+
+    /// <summary>
+    /// A colour the cell states for itself - a hex triplet, or a number into the drawing's
+    /// table of colours. Nothing, when the cell is absent or defers to the theme.
+    /// </summary>
+    private static Color? Stated(string? value, Palette palette)
     {
-        if (string.IsNullOrWhiteSpace(value))
+        value = value?.Trim();
+
+        if (string.IsNullOrEmpty(value) ||
+            string.Equals(value, "Themed", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        value = value.Trim();
+        if (value.StartsWith('#'))
+            return Color.TryParse(value, out var written) ? written : null;
 
-        return value.StartsWith('#') && Color.TryParse(value, out var colour) ? colour : null;
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var index)
+            ? palette.Numbered((int)index)
+            : null;
+    }
+
+
+    #endregion
+
+    #region Colour
+
+    /// <summary>
+    /// The colours a drawing points at rather than states.
+    ///
+    /// A colour cell holds one of three things: a hex triplet, a number into a table of
+    /// colours, or the word "Themed" - which means the shape takes its colour from the theme,
+    /// and says which one it wants through its quick-style cells. All three are here.
+    /// </summary>
+    private sealed record Palette(
+        IReadOnlyDictionary<int, Color> Table,
+        IReadOnlyList<IReadOnlyList<Color>> Variations)
+    {
+        /// <summary>
+        /// Visio's own two dozen colours, which a drawing numbers without writing down. A
+        /// document may add its own past the end of these, and does when it has resolved a
+        /// theme colour and wants to name it again.
+        /// </summary>
+        private static readonly string[] Standard =
+        [
+            "#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF", "#FFFF00",
+            "#FF00FF", "#00FFFF", "#800000", "#008000", "#000080", "#808000",
+            "#800080", "#008080", "#C0C0C0", "#808080", "#9999FF", "#993366",
+            "#FFFFCC", "#CCFFFF", "#660066", "#FF8080", "#0066CC", "#CCCCFF"
+        ];
+
+        public static readonly Palette Empty = new(new Dictionary<int, Color>(), []);
+
+        public static Palette Read(ZipArchive package)
+        {
+            var table = new Dictionary<int, Color>();
+
+            for (var i = 0; i < Standard.Length; i++)
+                if (Color.TryParse(Standard[i], out var colour))
+                    table[i] = colour;
+
+            var document = Part(package, "visio/document.xml");
+
+            foreach (var entry in document?.Root?.Element(V + "Colors")?.Elements(V + "ColorEntry") ?? [])
+                if (int.TryParse((string?)entry.Attribute("IX"), out var index) &&
+                    Color.TryParse((string?)entry.Attribute("RGB") ?? string.Empty, out var colour))
+                    table[index] = colour;
+
+            return new Palette(table, Theme(package));
+        }
+
+        /// <summary>
+        /// The theme's variations. Visio keeps them in the theme part beside the Office colour
+        /// scheme, in an extension of its own: a list of variations, each seven colours, which
+        /// is what a shape's quick-style cells count along.
+        /// </summary>
+        private static IReadOnlyList<IReadOnlyList<Color>> Theme(ZipArchive package)
+        {
+            XNamespace drawing = "http://schemas.openxmlformats.org/drawingml/2006/main";
+            XNamespace themed = "http://schemas.microsoft.com/office/visio/2012/theme";
+
+            // A relationship's target is relative to the folder its own part sits in.
+            var part = Part(package, "visio/" + (Target(package, "visio/_rels/document.xml.rels", "theme")
+                                                 ?? "theme/theme1.xml"));
+
+            var variations = new List<IReadOnlyList<Color>>();
+
+            foreach (var scheme in part?.Root?.Descendants(themed + "variationClrScheme") ?? [])
+            {
+                var colours = new List<Color>();
+
+                // The seven are named rather than listed, so they are asked for by name.
+                for (var i = 1; i <= 7; i++)
+                {
+                    var value = (string?)scheme.Element(themed + $"varColor{i}")
+                        ?.Element(drawing + "srgbClr")?.Attribute("val");
+
+                    if (value is not null && Color.TryParse("#" + value.TrimStart('#'), out var colour))
+                        colours.Add(colour);
+                }
+
+                if (colours.Count > 0)
+                    variations.Add(colours);
+            }
+
+            return variations;
+        }
+
+        /// <summary>A numbered colour. 255 is Visio's way of saying it has none.</summary>
+        public Color? Numbered(int index) =>
+            index != 255 && Table.TryGetValue(index, out var colour) ? colour : null;
+
+        /// <summary>
+        /// The colour a quick-style cell asks for. Values from 100 up count along the chosen
+        /// variation's seven; below that they name a slot in a matrix this does not read, and
+        /// so are left to the default rather than guessed at.
+        /// </summary>
+        public Color? Themed(double variation, double wanted)
+        {
+            if (wanted < 100 || Variations.Count == 0)
+                return null;
+
+            var scheme = Variations[Math.Clamp((int)variation, 0, Variations.Count - 1)];
+            var slot = (int)wanted - 100;
+
+            return slot >= 0 && slot < scheme.Count ? scheme[slot] : null;
+        }
+    }
+
+    /// <summary>The first relationship of a kind, by the tail of its type.</summary>
+    private static string? Target(ZipArchive package, string rels, string kind)
+    {
+        var part = Part(package, rels);
+
+        return part?.Root?.Elements()
+            .FirstOrDefault(link => ((string?)link.Attribute("Type"))?.EndsWith("/" + kind) == true)
+            ?.Attribute("Target")?.Value;
     }
 
     #endregion
@@ -489,15 +752,14 @@ public static class VisioImporter
     /// and angles honest while the rows are being read; the y axis is put back on the shape's
     /// own proportions only as each point is written out.
     /// </summary>
-    private static (string Body, string? Detail)? Outline(Sheet sheet, double width, double height)
+    private static (string Body, string? Detail)? Outline(
+        Sheet sheet, double width, double height, bool mirrored)
     {
         var figures = sheet.Geometry;
 
         if (figures.Count == 0 || width <= 0 || height <= 0)
             return null;
 
-        var flipX = Math.Abs(sheet.Number("FlipX")) > 0.5;
-        var flipY = Math.Abs(sheet.Number("FlipY")) > 0.5;
         var aspect = width / height;
 
         // A run Visio will not fill is kept apart, so the fill cannot swallow a line ruled
@@ -512,7 +774,7 @@ public static class VisioImporter
             var u = point.X;
             var v = 1 - point.Y * aspect;
 
-            return $"{VisioFormat.Number(flipX ? 1 - u : u)},{VisioFormat.Number(flipY ? 1 - v : v)}";
+            return $"{VisioFormat.Number(u)},{VisioFormat.Number(mirrored ? 1 - v : v)}";
         }
 
         void Curve(char command, params Point[] points) =>
@@ -560,6 +822,12 @@ public static class VisioImporter
                 // An angle or a ratio is a number in its own right and is not a measurement.
                 double Plain(string name, double fallback = 0) =>
                     step.Cells.TryGetValue(name, out var slot) ? slot.Value : fallback;
+
+                // Numbers written into a formula are in the inches of the sheet that wrote the
+                // row they sit in, the same as the row's own cells.
+                var frame = step.Cells.Values
+                    .Select(slot => slot.Owner.Number("Width", width))
+                    .FirstOrDefault(width);
 
                 Point At(string x, string y) => new(Across(x), Up(y));
 
@@ -639,10 +907,60 @@ public static class VisioImporter
                         break;
                     }
 
-                    case "NURBSTo" or "PolylineTo" or "SplineStart" or "SplineKnot":
+                    case "PolylineTo":
                     {
-                        // Not read as curves; taken as a straight run to where they end up, so
-                        // the outline still closes and the shape still has a body.
+                        // A run of straight edges kept in a formula, with the row's own cells
+                        // naming only the last of them.
+                        var to = At("X", "Y");
+
+                        foreach (var corner in Corners(step, "A", "POLYLINE", 2, frame, aspect))
+                            Curve('L', corner);
+
+                        Curve('L', to);
+                        cursor = to;
+                        break;
+                    }
+
+                    case "NURBSTo":
+                    {
+                        // A curve through control points kept in a formula: four numbers each,
+                        // being the point, its knot and its weight, after a leading knot,
+                        // degree and the pair of flags the coordinates are measured by.
+                        var to = At("X", "Y");
+                        var numbers = Arguments(step.Cells.GetValueOrDefault("E")?.Formula, "NURBS");
+
+                        if (numbers is null || numbers.Count < 8)
+                        {
+                            Curve('L', to);
+                            cursor = to;
+                            break;
+                        }
+
+                        var degree = (int)numbers[1];
+                        var control = new List<Point> { cursor };
+                        var weights = new List<double> { 1 };
+
+                        for (var i = 4; i + 3 < numbers.Count; i += 4)
+                        {
+                            control.Add(Measured(numbers[i], numbers[i + 1], numbers[2], numbers[3], frame, aspect));
+                            weights.Add(numbers[i + 3]);
+                        }
+
+                        control.Add(to);
+                        weights.Add(Plain("B", 1));
+
+                        foreach (var along in Spline(control, weights, degree))
+                            Curve('L', along);
+
+                        cursor = to;
+                        break;
+                    }
+
+                    case "SplineStart" or "SplineKnot":
+                    {
+                        // A spline states one control point per row, and how its knots run
+                        // cannot be settled from the file alone - so the run of points itself
+                        // is drawn, which is the shape the curve is pulled towards.
                         cursor = At("X", "Y");
                         Curve('L', cursor);
                         break;
@@ -663,6 +981,154 @@ public static class VisioImporter
         return path.Length > 0
             ? (path.ToString().Trim(), marks.Length > 0 ? marks.ToString().Trim() : null)
             : (marks.ToString().Trim(), null);
+    }
+
+    /// <summary>
+    /// A point from a formula's own pair of numbers, measured the way its flags say: a flag of
+    /// 0 means a fraction of the shape, anything else means the sheet's own inches.
+    /// </summary>
+    private static Point Measured(double x, double y, double xKind, double yKind, double frame, double aspect) =>
+        new(Math.Abs(xKind) < 0.5 ? x : x / frame,
+            Math.Abs(yKind) < 0.5 ? y / aspect : y / frame);
+
+    /// <summary>The corners a POLYLINE formula lists, in the same measure as everything else.</summary>
+    private static IEnumerable<Point> Corners(
+        Step step, string cell, string function, int lead, double frame, double aspect)
+    {
+        var numbers = Arguments(step.Cells.GetValueOrDefault(cell)?.Formula, function);
+
+        if (numbers is null || numbers.Count < lead + 2)
+            yield break;
+
+        for (var i = lead; i + 1 < numbers.Count; i += 2)
+            yield return Measured(numbers[i], numbers[i + 1], numbers[0], numbers[1], frame, aspect);
+    }
+
+    /// <summary>
+    /// The numbers inside a function written in a formula - POLYLINE(...) or NURBS(...) - or
+    /// nothing when the formula is not that function. Visio keeps the whole run of points a
+    /// spline is drawn through in there, leaving the row's own cells to name only where it
+    /// ends up.
+    /// </summary>
+    private static IReadOnlyList<double>? Arguments(string? formula, string function)
+    {
+        if (formula is null)
+            return null;
+
+        var start = formula.IndexOf(function + "(", StringComparison.OrdinalIgnoreCase);
+
+        if (start < 0)
+            return null;
+
+        start += function.Length + 1;
+        var end = formula.LastIndexOf(')');
+
+        if (end <= start)
+            return null;
+
+        var numbers = new List<double>();
+
+        foreach (var part in formula[start..end].Split(','))
+        {
+            if (!double.TryParse(part.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                return null;
+
+            numbers.Add(value);
+        }
+
+        return numbers;
+    }
+
+    /// <summary>
+    /// Points along a B-spline of the given degree through its control points, at a handful of
+    /// samples per span.
+    ///
+    /// The knots are taken to be clamped and evenly spaced. Visio states one knot per control
+    /// point rather than the whole vector, and what it leaves out cannot be settled from the
+    /// file alone - so the reading here is the ordinary one, which pins the curve's two ends to
+    /// the first and last control points. Should the drawing have meant something else, the
+    /// curve still begins and ends where it should and still lies inside the run of points that
+    /// shapes it, which is a bounded sort of wrong.
+    /// </summary>
+    private static IEnumerable<Point> Spline(IReadOnlyList<Point> control, IReadOnlyList<double> weights, int degree)
+    {
+        degree = Math.Clamp(degree, 1, Math.Max(1, control.Count - 1));
+
+        if (control.Count <= degree)
+        {
+            // Too few points to curve through; the run of them is the best there is.
+            foreach (var point in control.Skip(1))
+                yield return point;
+
+            yield break;
+        }
+
+        var count = control.Count;
+        var knots = new double[count + degree + 1];
+
+        for (var i = 0; i < knots.Length; i++)
+            knots[i] = Math.Clamp(i - degree, 0, count - degree) / (double)(count - degree);
+
+        // Enough samples that a span reads as a curve rather than as a run of corners.
+        var steps = Math.Max(16, 12 * (count - degree));
+
+        for (var step = 1; step <= steps; step++)
+        {
+            var t = step / (double)steps;
+
+            // The last sample sits exactly on the final control point rather than a hair short.
+            yield return t >= 1 ? control[^1] : DeBoor(control, weights, knots, degree, t);
+        }
+    }
+
+    /// <summary>
+    /// One point on the curve, by de Boor's algorithm. The control points are carried with
+    /// their weights and divided back out at the end, which is what makes it rational - Visio
+    /// weights a control point to pull the curve towards it, and a circle drawn as a spline
+    /// is not a circle without that.
+    /// </summary>
+    private static Point DeBoor(
+        IReadOnlyList<Point> control, IReadOnlyList<double> weights, double[] knots, int degree, double t)
+    {
+        // The span t falls in.
+        var span = degree;
+
+        while (span < control.Count - 1 && t >= knots[span + 1])
+            span++;
+
+        var x = new double[degree + 1];
+        var y = new double[degree + 1];
+        var w = new double[degree + 1];
+
+        for (var i = 0; i <= degree; i++)
+        {
+            var at = span - degree + i;
+            var weight = at < weights.Count ? weights[at] : 1;
+
+            if (Math.Abs(weight) < 1e-9)
+                weight = 1;
+
+            x[i] = control[at].X * weight;
+            y[i] = control[at].Y * weight;
+            w[i] = weight;
+        }
+
+        for (var round = 1; round <= degree; round++)
+            for (var i = degree; i >= round; i--)
+            {
+                var at = span - degree + i;
+                var low = knots[at];
+                var high = knots[at + degree - round + 1];
+                var share = high - low < 1e-12 ? 0 : (t - low) / (high - low);
+
+                x[i] = (1 - share) * x[i - 1] + share * x[i];
+                y[i] = (1 - share) * y[i - 1] + share * y[i];
+                w[i] = (1 - share) * w[i - 1] + share * w[i];
+            }
+
+        return Math.Abs(w[degree]) < 1e-12
+            ? new Point(x[degree], y[degree])
+            : new Point(x[degree] / w[degree], y[degree] / w[degree]);
     }
 
     /// <summary>The point an arc passes through, from its bow height.</summary>

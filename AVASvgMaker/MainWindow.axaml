@@ -396,6 +396,21 @@
                             <Path Classes="alignIcon" Data="M0,0 H14 M5,4 H14 M0,8 H14 M5,12 H14" />
                         </ToggleButton>
                     </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,6,0,0">
+                        <ToggleButton x:Name="AlignTopToggle" Width="30" Padding="0" Tag="Top"
+                                      ToolTip.Tip="Align to the top" Click="OnTextVerticalAlignClick">
+                            <Path Classes="alignIcon" Data="M0,0 H14 M2,4 H12 M2,7 H12" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="AlignMiddleToggle" Width="30" Padding="0" Tag="Middle"
+                                      ToolTip.Tip="Centre down the shape" Click="OnTextVerticalAlignClick">
+                            <Path Classes="alignIcon" Data="M0,0 H14 M2,5 H12 M2,8 H12 M0,13 H14" />
+                        </ToggleButton>
+                        <ToggleButton x:Name="AlignBottomToggle" Width="30" Padding="0" Tag="Bottom"
+                                      ToolTip.Tip="Align to the bottom" Click="OnTextVerticalAlignClick">
+                            <Path Classes="alignIcon" Data="M2,6 H12 M2,9 H12 M0,13 H14" />
+                        </ToggleButton>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Border>

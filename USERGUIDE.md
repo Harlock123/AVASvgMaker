@@ -149,6 +149,15 @@ The properties panel down the right formats everything selected at once.
 | LINE | The outline colour or None, the style - solid, dashed or dotted - and the weight |
 | TEXT | The colour, size, font, bold, italic and alignment of the label |
 
+There are two rows of alignment buttons: the first puts the label to the left, the centre or
+the right of its shape, the second puts it at the top, the middle or the bottom.
+
+![Labels down the shape, and one that has left it](Images/labels.png)
+
+A label can also sit *outside* the shape it belongs to - the name under a stick figure is the
+usual case. Nothing in the editor draws one that way yet, but a label that arrives like that in
+a Visio drawing keeps its place, is saved with your work, and goes back out to Visio as it came.
+
 Where the selected shapes disagree, a control shows a dash rather than pretending they match;
 choosing something then applies it to all of them. With nothing selected the panel sets the
 formatting for the next shape you draw.
@@ -295,15 +304,21 @@ are a stamp of, and the master holds the geometry. The importer follows that all
 including the common case of a shape that redraws only part of what it inherits, so what you
 get is the drawing as Visio shows it rather than a page of empty boxes.
 
-It reads pages and their sizes, shape outlines - straight edges, arcs, ellipses and curves -
-fills, line colours, weights and dash patterns, text with its size, weight, slant, colour and
-alignment, groups, and connectors along with which shapes each end is stuck to.
+It reads pages and their sizes, shape outlines - straight edges, arcs, ellipses, curves and
+splines - fills, line colours, weights and dash patterns, groups along with any turn or flip
+the group itself has, connectors and which shapes each end is stuck to, and text with its size,
+weight, slant, colour and alignment. It also reads the block the text sits in, which Visio
+places separately and which need not be on the shape at all - so the name under a stick figure
+arrives under the figure.
+
+Colours come through even when the drawing does not name them: a shape may point at the current
+theme instead, and the theme is read.
 
 Two things it cannot bring in:
 
-- **Theme colours.** Visio can colour a shape by pointing at the current theme rather than by
-  naming a colour. Those come in with the app's defaults; colours the drawing states outright
-  come in as they are.
+- **A themed fill.** A themed *line* comes through. A themed *fill* is tinted by Visio in a way
+  this does not read, so rather than paint the shape solid in its line colour it is left
+  unfilled. A fill the drawing states outright comes in as it is.
 - **Gradients, shadows, embedded pictures, layers and shape data.** Nothing here can hold them.
 
 As with SVG, it **tells you what it left out** rather than leaving you to notice.

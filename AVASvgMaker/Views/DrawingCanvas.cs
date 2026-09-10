@@ -870,6 +870,10 @@ public class DrawingCanvas : Decorator
     public void SetTextAlign(TextAlign value) =>
         ApplyFormat(shape => shape.TextAlign = value, style => style with { TextAlign = value });
 
+    public void SetTextVerticalAlign(TextVerticalAlign value) =>
+        ApplyFormat(shape => shape.TextVerticalAlign = value,
+            style => style with { TextVerticalAlign = value });
+
     #endregion
 
     private Rect DefaultBoundsAt(ShapeKind kind, Point pageCentre)

@@ -48,6 +48,18 @@ public abstract class DiagramShape
 
     public TextAlign TextAlign { get; set; } = TextAlign.Center;
 
+    public TextVerticalAlign TextVerticalAlign { get; set; } = TextVerticalAlign.Middle;
+
+    /// <summary>
+    /// Where the words sit, as fractions of the shape's box - so the label moves and stretches
+    /// with the shape exactly as its outline does. Nothing, for a shape whose words simply
+    /// fill it, which is nearly all of them.
+    ///
+    /// A drawing can put a label outside the shape it belongs to - the name under a stick
+    /// figure is the usual case - and then the fractions run past 0 and 1.
+    /// </summary>
+    public Rect? TextFrame { get; set; }
+
     public abstract ShapeKind Kind { get; }
 
     /// <summary>
@@ -413,7 +425,29 @@ public abstract class DiagramShape
         return lines;
     }
 
-    protected virtual Rect TextArea => Bounds;
+    protected virtual Rect TextArea => Framed(Bounds);
+
+    /// <summary>The given box, moved and sized to the text frame when the shape has one.</summary>
+    protected Rect Framed(Rect box) => TextFrame is not { } frame
+        ? box
+        : new Rect(
+            box.X + frame.X * box.Width,
+            box.Y + frame.Y * box.Height,
+            frame.Width * box.Width,
+            frame.Height * box.Height);
+
+    /// <summary>Where the first line's box starts, for the vertical alignment in force.</summary>
+    private double LineTop(Rect area, int lines)
+    {
+        var height = lines * LineHeight;
+
+        return TextVerticalAlign switch
+        {
+            TextVerticalAlign.Top => area.Y + TextPadding,
+            TextVerticalAlign.Bottom => area.Bottom - TextPadding - height,
+            _ => area.Center.Y - height / 2
+        };
+    }
 
     /// <summary>
     /// Where the label is drawn, which for most shapes is the shape. A connector's is a small
@@ -437,7 +471,7 @@ public abstract class DiagramShape
 
         var area = TextArea;
         var lines = WrapText(Math.Max(8, area.Width - TextPadding * 2));
-        var top = area.Center.Y - lines.Count * LineHeight / 2;
+        var top = LineTop(area, lines.Count);
 
         for (var i = 0; i < lines.Count; i++)
         {
@@ -502,7 +536,7 @@ public abstract class DiagramShape
     {
         var area = TextArea;
         var lines = WrapText(Math.Max(8, area.Width - TextPadding * 2));
-        var top = area.Center.Y - lines.Count * LineHeight / 2;
+        var top = LineTop(area, lines.Count);
 
         // The anchor and the x it is measured from have to agree, or the text lands
         // somewhere the editor never drew it.

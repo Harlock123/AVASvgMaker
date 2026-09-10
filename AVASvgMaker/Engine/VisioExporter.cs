@@ -345,7 +345,14 @@ public static class VisioExporter
 
         var style = (shape.Bold ? 1 : 0) + (shape.Italic ? 2 : 0);
 
-        return Cell("VerticalAlign", 1) + Cell("TextBkgnd", 0) +
+        var down = shape.TextVerticalAlign switch
+        {
+            TextVerticalAlign.Top => 0,
+            TextVerticalAlign.Bottom => 2,
+            _ => 1
+        };
+
+        return Cell("VerticalAlign", down) + Cell("TextBkgnd", 0) + Block(shape) +
                "<Section N=\"Character\"><Row IX=\"0\">" +
                Cell("Size", VisioFormat.ToInches(shape.FontSize), "PT") +
                Cell("Style", style) +
@@ -355,6 +362,28 @@ public static class VisioExporter
                    : Cell("Font", Escape(shape.FontName))) +
                "</Row></Section>" +
                $"<Section N=\"Paragraph\"><Row IX=\"0\">{Cell("HorzAlign", align)}</Row></Section>";
+    }
+
+    /// <summary>
+    /// Where the words go, when that is not simply the shape. Visio states the block's size
+    /// and pins it in the shape's own coordinates, measuring up from the bottom.
+    /// </summary>
+    private static string Block(DiagramShape shape)
+    {
+        if (shape.TextFrame is not { } frame)
+            return string.Empty;
+
+        var width = VisioFormat.ToInches(shape.Bounds.Width);
+        var height = VisioFormat.ToInches(shape.Bounds.Height);
+
+        var blockWidth = frame.Width * width;
+        var blockHeight = frame.Height * height;
+
+        return Cell("TxtWidth", blockWidth) + Cell("TxtHeight", blockHeight) +
+               Cell("TxtLocPinX", blockWidth / 2) + Cell("TxtLocPinY", blockHeight / 2) +
+               Cell("TxtPinX", frame.X * width + blockWidth / 2) +
+               Cell("TxtPinY", height - frame.Y * height - blockHeight / 2) +
+               Cell("TxtAngle", 0);
     }
 
     #endregion

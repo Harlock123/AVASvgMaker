@@ -541,6 +541,19 @@ public partial class MainWindow : Window
         SyncProperties();
     }
 
+    /// <summary>The three buttons behave as one group, as the ones above them do.</summary>
+    private void OnTextVerticalAlignClick(object? sender, RoutedEventArgs e)
+    {
+        if (_syncing || sender is not ToggleButton { Tag: string tag })
+            return;
+
+        Canvas.SetTextVerticalAlign(Enum.TryParse<TextVerticalAlign>(tag, out var value)
+            ? value
+            : TextVerticalAlign.Middle);
+
+        SyncProperties();
+    }
+
     /// <summary>
     /// Shows the formatting of the selection, or of the defaults when nothing is selected.
     /// Where the selected shapes disagree the control shows a mixed state rather than the
@@ -597,6 +610,13 @@ public partial class MainWindow : Window
         AlignLeftToggle.IsChecked = !alignMixed && style.TextAlign == TextAlign.Left;
         AlignCenterToggle.IsChecked = !alignMixed && style.TextAlign == TextAlign.Center;
         AlignRightToggle.IsChecked = !alignMixed && style.TextAlign == TextAlign.Right;
+
+        var downMixed = Differs(selection, s => s.TextVerticalAlign);
+        var down = style.TextVerticalAlign;
+
+        AlignTopToggle.IsChecked = !downMixed && down == TextVerticalAlign.Top;
+        AlignMiddleToggle.IsChecked = !downMixed && down == TextVerticalAlign.Middle;
+        AlignBottomToggle.IsChecked = !downMixed && down == TextVerticalAlign.Bottom;
 
         _syncing = wasSyncing;
     }

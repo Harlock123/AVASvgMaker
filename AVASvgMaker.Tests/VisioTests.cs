@@ -38,7 +38,9 @@ public class VisioTests
         string connects = "",
         double width = 8,
         double height = 6,
-        bool background = false)
+        bool background = false,
+        string colours = "",
+        string theme = "")
     {
         var stream = new MemoryStream();
 
@@ -59,7 +61,25 @@ public class VisioTests
                 $"<Relationship Id='rId1' Type='{Visio}/document' Target='visio/document.xml'/>" +
                 "</Relationships>");
 
-            Put("visio/document.xml", $"<VisioDocument xmlns='{Main}'/>");
+            Put("visio/document.xml",
+                $"<VisioDocument xmlns='{Main}'>" +
+                (colours.Length > 0 ? $"<Colors>{colours}</Colors>" : string.Empty) +
+                "</VisioDocument>");
+
+            if (theme.Length > 0)
+            {
+                Put("visio/_rels/document.xml.rels",
+                    $"<Relationships xmlns='{Package}'>" +
+                    $"<Relationship Id='rId1' Type='{Office}/theme' Target='theme/theme1.xml'/>" +
+                    "</Relationships>");
+
+                Put("visio/theme/theme1.xml",
+                    "<a:theme xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main'>" +
+                    "<a:themeElements><a:extLst><a:ext uri='{x}'>" +
+                    "<vt:variationClrSchemeLst xmlns:vt='http://schemas.microsoft.com/office/visio/2012/theme'>" +
+                    theme +
+                    "</vt:variationClrSchemeLst></a:ext></a:extLst></a:themeElements></a:theme>");
+            }
 
             var paper = $"<PageSheet><Cell N='PageWidth' V='{width}'/>" +
                         $"<Cell N='PageHeight' V='{height}'/></PageSheet>";
@@ -215,6 +235,87 @@ public class VisioTests
         Assert.Empty(read.Skipped);
     }
 
+    /// <summary>
+    /// A group four inches square at the middle of the page, holding one two-inch shape at its
+    /// centre. The shape is filled over its own left half only, so which half of it ends up
+    /// filled says whether the group's frame reached it.
+    /// </summary>
+    private static string Held(string groupCells)
+    {
+        const string LeftHalf =
+            "<Section N='Geometry' IX='0'>" +
+            "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+            "<Row T='LineTo' IX='2'><Cell N='X' V='1'/><Cell N='Y' V='0'/></Row>" +
+            "<Row T='LineTo' IX='3'><Cell N='X' V='1'/><Cell N='Y' V='2'/></Row>" +
+            "<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='2'/></Row>" +
+            "<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+            "</Section>";
+
+        return "<Shape ID='1' Type='Group'>" +
+               "<Cell N='PinX' V='4'/><Cell N='PinY' V='3'/>" +
+               "<Cell N='Width' V='4'/><Cell N='Height' V='4'/>" +
+               "<Cell N='LocPinX' V='2'/><Cell N='LocPinY' V='2'/>" +
+               groupCells +
+               "<Shapes><Shape ID='2' Type='Shape'>" +
+               "<Cell N='PinX' V='2'/><Cell N='PinY' V='2'/>" +
+               "<Cell N='Width' V='2'/><Cell N='Height' V='2'/>" +
+               "<Cell N='LocPinX' V='1'/><Cell N='LocPinY' V='1'/>" +
+               LeftHalf + "</Shape></Shapes></Shape>";
+    }
+
+    /// <summary>A point in Visio inches on an 8 by 6 page, in ours.</summary>
+    private static Point On(double x, double y) => new(x * 96, (6 - y) * 96);
+
+    [AvaloniaFact]
+    public void AShapeInsideAPlainGroupSitsWhereTheGroupPutsIt()
+    {
+        var read = VisioImporter.Read(Drawing(Held(string.Empty)));
+        var shape = Assert.Single(read.Document.Pages[0].Shapes);
+
+        // The group's frame only shifts here, so the filled half stays the left one.
+        Assert.True(shape.HitTest(On(3.5, 3)), "the left half should be filled");
+        Assert.False(shape.HitTest(On(4.5, 3)), "the right half should not be");
+    }
+
+    [AvaloniaFact]
+    public void AGroupThatHasBeenTurnedTurnsWhatItHolds()
+    {
+        // A quarter turn anticlockwise about the group's middle. Carried down as a shift only -
+        // which is what it used to be - the held shape would not move at all, because it sits
+        // at the very centre the group turns about.
+        var read = VisioImporter.Read(Drawing(
+            Held("<Cell N='Angle' V='1.5707963267948966'/>")));
+
+        var shape = Assert.Single(read.Document.Pages[0].Shapes);
+
+        // The left half swings round to the bottom.
+        Assert.True(shape.HitTest(On(4, 2.5)), "the filled half should have swung to the bottom");
+        Assert.False(shape.HitTest(On(4, 3.5)), "and should have left the top");
+    }
+
+    [AvaloniaFact]
+    public void AGroupThatHasBeenTurnedOverTurnsOverWhatItHolds()
+    {
+        var read = VisioImporter.Read(Drawing(Held("<Cell N='FlipX' V='1'/>")));
+        var shape = Assert.Single(read.Document.Pages[0].Shapes);
+
+        // Mirrored, so the half that was filled is now the other one.
+        Assert.True(shape.HitTest(On(4.5, 3)), "the right half should be filled");
+        Assert.False(shape.HitTest(On(3.5, 3)), "the left half should not be");
+    }
+
+    [AvaloniaFact]
+    public void AGroupThatHasBeenStretchedStretchesWhatItHolds()
+    {
+        // The frame is read from the group itself, so a group scaled by its own cells carries
+        // that to its contents rather than leaving them their original size.
+        var read = VisioImporter.Read(Drawing(Held(string.Empty)));
+        var plain = Assert.Single(read.Document.Pages[0].Shapes);
+
+        Assert.Equal(192, plain.Bounds.Width, 1);
+        Assert.Equal(192, plain.Bounds.Height, 1);
+    }
+
     [AvaloniaFact]
     public void AnEllipseRowIsAWholeEllipse()
     {
@@ -254,6 +355,114 @@ public class VisioTests
         var far = Corners(shape.Outline).Max(point => point.X + point.Y);
 
         Assert.True(far > 1.4, $"the arc bows inward: furthest corner reaches {far:0.###}");
+    }
+
+    [AvaloniaFact]
+    public void APolylineDrawsEveryCornerItLists()
+    {
+        // The row's cells name only where the run ends; the corners along the way are in the
+        // formula, and jumping straight to the end loses all of them.
+        var run =
+            "<Section N='Geometry' IX='0'>" +
+            "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+            "<Row T='PolylineTo' IX='2'><Cell N='X' V='1'/><Cell N='Y' V='1'/>" +
+            "<Cell N='A' V='0' F='POLYLINE(0,0,0.25,0.5,0.5,0,0.75,0.5)'/></Row>" +
+            "</Section>";
+
+        var read = VisioImporter.Read(Drawing(Square(geometry: run)));
+        var shape = Assert.IsType<PathShape>(read.Document.Pages[0].Shapes[0]);
+
+        // One move and five straight edges: three corners, then the end.
+        Assert.Equal(4, shape.Outline.Count(character => character == 'L'));
+        Assert.Contains("0.25,0.5", shape.Outline);
+        Assert.Contains("0.5,1", shape.Outline);
+    }
+
+    /// <summary>A NURBS row whose control points are the ones given, in fractions of the shape.</summary>
+    private static string Nurbs(string end, params string[] control) =>
+        "<Section N='Geometry' IX='0'>" +
+        "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+        $"<Row T='NURBSTo' IX='2'>{end}<Cell N='B' V='1'/>" +
+        $"<Cell N='E' V='0' F='NURBS(1,3,0,0,{string.Join(",", control)})'/></Row>" +
+        "</Section>";
+
+    [AvaloniaFact]
+    public void ACurveThroughPointsInALineStaysOnThatLine()
+    {
+        // Control points strung along the diagonal. Whatever is assumed about the knots, a
+        // curve shaped by points on a line cannot leave it - so this holds the arithmetic
+        // without holding an opinion about the convention.
+        var read = VisioImporter.Read(Drawing(Square(geometry: Nurbs(
+            "<Cell N='X' V='1'/><Cell N='Y' V='1'/>",
+            "0.25,0.25,0.25,1", "0.5,0.5,0.5,1", "0.75,0.75,0.75,1"))));
+
+        var shape = Assert.IsType<PathShape>(read.Document.Pages[0].Shapes[0]);
+
+        foreach (var point in Corners(shape.Outline))
+            Assert.Equal(1 - point.X, point.Y, 3);
+    }
+
+    [AvaloniaFact]
+    public void ACurveBeginsAndEndsWhereTheRowsSayItDoes()
+    {
+        var read = VisioImporter.Read(Drawing(Square(geometry: Nurbs(
+            "<Cell N='X' V='1'/><Cell N='Y' V='0'/>",
+            "0,1,0.25,1", "1,1,0.5,1", "1,0.5,0.75,1"))));
+
+        var shape = Assert.IsType<PathShape>(read.Document.Pages[0].Shapes[0]);
+        var points = Corners(shape.Outline).ToList();
+
+        // The move starts at the shape's bottom left, and the run ends at its bottom right.
+        Assert.Equal(0, points[0].X, 3);
+        Assert.Equal(1, points[0].Y, 3);
+        Assert.Equal(1, points[^1].X, 3);
+        Assert.Equal(1, points[^1].Y, 3);
+    }
+
+    [AvaloniaFact]
+    public void ACurveStaysInsideTheRunOfPointsThatShapesIt()
+    {
+        // A B-spline never leaves the hull of its control points, so this holds however the
+        // knots are read - and it is what makes a wrong reading a bounded sort of wrong.
+        var read = VisioImporter.Read(Drawing(Square(geometry: Nurbs(
+            "<Cell N='X' V='1'/><Cell N='Y' V='0'/>",
+            "0,1,0.25,1", "1,1,0.5,1", "1,0.5,0.75,1"))));
+
+        var shape = Assert.IsType<PathShape>(read.Document.Pages[0].Shapes[0]);
+
+        foreach (var point in Corners(shape.Outline))
+        {
+            Assert.InRange(point.X, -0.001, 1.001);
+            Assert.InRange(point.Y, -0.001, 1.001);
+        }
+    }
+
+    [AvaloniaFact]
+    public void ACurveIsDrawnAsACurveRatherThanAsOneStraightJump()
+    {
+        var read = VisioImporter.Read(Drawing(Square(geometry: Nurbs(
+            "<Cell N='X' V='1'/><Cell N='Y' V='0'/>",
+            "0,1,0.25,1", "1,1,0.5,1", "1,0.5,0.75,1"))));
+
+        var shape = Assert.IsType<PathShape>(read.Document.Pages[0].Shapes[0]);
+
+        Assert.True(shape.Outline.Count(character => character == 'L') > 8,
+            $"the curve came out as {shape.Outline.Count(character => character == 'L')} edges");
+    }
+
+    [AvaloniaFact]
+    public void ANurbsRowWithNoFormulaToReadStillReachesItsEnd()
+    {
+        var bare =
+            "<Section N='Geometry' IX='0'>" +
+            "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+            "<Row T='NURBSTo' IX='2'><Cell N='X' V='1'/><Cell N='Y' V='1'/></Row>" +
+            "</Section>";
+
+        var read = VisioImporter.Read(Drawing(Square(geometry: bare)));
+        var shape = Assert.IsType<PathShape>(read.Document.Pages[0].Shapes[0]);
+
+        Assert.Equal(1, shape.Outline.Count(character => character == 'L'));
     }
 
     [AvaloniaFact]
@@ -308,6 +517,137 @@ public class VisioTests
         Assert.True(shape.Italic);
         Assert.Equal(Colors.Red, shape.TextColor);
         Assert.Equal(TextAlign.Left, shape.TextAlign);
+    }
+
+    /// <summary>One of the theme's variations: seven colours, named rather than listed.</summary>
+    private static string Variation(params string[] colours) =>
+        "<vt:variationClrScheme>" + string.Concat(colours.Select((colour, i) =>
+            $"<vt:varColor{i + 1}><a:srgbClr val='{colour}'/></vt:varColor{i + 1}>")) +
+        "</vt:variationClrScheme>";
+
+    [AvaloniaFact]
+    public void AColourGivenAsANumberComesFromVisiosOwnTwoDozen()
+    {
+        // 2 is red in the table every Visio drawing has without writing it down.
+        var read = VisioImporter.Read(Drawing(Square(extra: "<Cell N='LineColor' V='2'/>")));
+
+        Assert.Equal(Colors.Red, read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void ADrawingCanNameColoursOfItsOwnPastTheEndOfThose()
+    {
+        var read = VisioImporter.Read(Drawing(
+            Square(extra: "<Cell N='LineColor' V='30'/>"),
+            colours: "<ColorEntry IX='30' RGB='#5B9BD5'/>"));
+
+        Assert.Equal(Color.Parse("#5B9BD5"), read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void TwoFiftyFiveIsVisiosWayOfSayingNoColourAtAll()
+    {
+        var read = VisioImporter.Read(Drawing(Square(extra: "<Cell N='LineColor' V='255'/>")));
+
+        Assert.Equal(DiagramShape.DefaultStroke, read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void AShapeThatDefersToTheThemeIsDrawnInTheThemesColours()
+    {
+        // The shape states no line colour at all - only which of the theme's colours it wants,
+        // and which variation of the theme to count along. This is how most shapes in a real
+        // drawing are coloured, and reading it as "no colour" leaves the drawing all defaults.
+        var read = VisioImporter.Read(Drawing(
+            Square(extra: "<Cell N='QuickStyleLineColor' V='102'/><Cell N='QuickStyleVariation' V='1'/>"),
+            theme: Variation("111111", "222222", "333333") +
+                   Variation("AA0000", "00BB00", "0000CC")));
+
+        // Variation 1, third colour along.
+        Assert.Equal(Color.Parse("#0000CC"), read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void AThemedShapeInADrawingWithNoThemeKeepsTheDefault()
+    {
+        var read = VisioImporter.Read(Drawing(
+            Square(extra: "<Cell N='LineColor' V='Themed'/><Cell N='QuickStyleLineColor' V='100'/>")));
+
+        Assert.Equal(DiagramShape.DefaultStroke, read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void AShapeThatSaysItIsNotFilledIsNotFilled()
+    {
+        var read = VisioImporter.Read(Drawing(Square(
+            extra: "<Cell N='FillForegnd' V='2'/><Cell N='FillPattern' V='0'/>")));
+
+        Assert.Equal(Colors.Transparent, read.Document.Pages[0].Shapes[0].Fill);
+    }
+
+    [AvaloniaFact]
+    public void AFillTheShapeStatesOutrightIsUsed()
+    {
+        var read = VisioImporter.Read(Drawing(Square(
+            extra: "<Cell N='FillForegnd' V='#abcdef'/><Cell N='FillPattern' V='1'/>")));
+
+        Assert.Equal(Color.Parse("#abcdef"), read.Document.Pages[0].Shapes[0].Fill);
+    }
+
+    [AvaloniaFact]
+    public void WordsGoWhereTheShapeSaysItsTextBlockIs()
+    {
+        // A block half the width, in the top left quarter of a one-inch square.
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            "<Cell N='TxtWidth' V='0.5'/><Cell N='TxtHeight' V='0.5'/>" +
+            "<Cell N='TxtLocPinX' V='0.25'/><Cell N='TxtLocPinY' V='0.25'/>" +
+            "<Cell N='TxtPinX' V='0.25'/><Cell N='TxtPinY' V='0.75'/>")));
+
+        var frame = Assert.NotNull(read.Document.Pages[0].Shapes[0].TextFrame);
+
+        Assert.Equal(0, frame.X, 3);
+        Assert.Equal(0, frame.Y, 3);
+        Assert.Equal(0.5, frame.Width, 3);
+        Assert.Equal(0.5, frame.Height, 3);
+    }
+
+    [AvaloniaFact]
+    public void ALabelCanHangBelowTheShapeItBelongsTo()
+    {
+        // How the name under a stick figure is written: the block is pinned below the shape's
+        // own bottom edge, so its fractions run past the end of the shape.
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            "<Cell N='TxtWidth' V='2'/><Cell N='TxtHeight' V='0.4'/>" +
+            "<Cell N='TxtLocPinX' V='1'/><Cell N='TxtLocPinY' V='0.2'/>" +
+            "<Cell N='TxtPinX' V='0.5'/><Cell N='TxtPinY' V='-0.2'/>")));
+
+        var frame = Assert.NotNull(read.Document.Pages[0].Shapes[0].TextFrame);
+
+        // It begins exactly at the shape's bottom edge and hangs below it, and is wider than
+        // the shape so that the name does not wrap to the figure's width.
+        Assert.Equal(1, frame.Y, 3);
+        Assert.Equal(1.4, frame.Bottom, 3);
+        Assert.Equal(-0.5, frame.X, 3);
+        Assert.Equal(2, frame.Width, 3);
+    }
+
+    [AvaloniaFact]
+    public void AShapeWhoseWordsFillItRecordsNoBlockAtAll()
+    {
+        var read = VisioImporter.Read(Drawing(Square()));
+
+        Assert.Null(read.Document.Pages[0].Shapes[0].TextFrame);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("0", TextVerticalAlign.Top)]
+    [InlineData("1", TextVerticalAlign.Middle)]
+    [InlineData("2", TextVerticalAlign.Bottom)]
+    public void WordsHugTheEdgeTheShapeSaysTheyDo(string stated, TextVerticalAlign expected)
+    {
+        var read = VisioImporter.Read(Drawing(Square(extra: $"<Cell N='VerticalAlign' V='{stated}'/>")));
+
+        Assert.Equal(expected, read.Document.Pages[0].Shapes[0].TextVerticalAlign);
     }
 
     [AvaloniaFact]
@@ -528,6 +868,24 @@ public class VisioTests
         Assert.False(back.Italic);
         Assert.Equal(TextAlign.Right, back.TextAlign);
         Assert.Equal(Colors.DarkGreen, back.TextColor);
+    }
+
+    [AvaloniaFact]
+    public void WhereTheWordsSitSurvivesTheTrip()
+    {
+        var box = ShapeFactory.Create(ShapeKind.Rectangle, new Rect(100, 100, 200, 100));
+        box.Text = "under the shape";
+        box.TextVerticalAlign = TextVerticalAlign.Top;
+        box.TextFrame = new Rect(-0.25, 1.1, 1.5, 0.4);
+
+        var back = RoundTrip(OnePage(box)).Pages[0].Shapes[0];
+        var frame = Assert.NotNull(back.TextFrame);
+
+        Assert.Equal(TextVerticalAlign.Top, back.TextVerticalAlign);
+        Assert.Equal(-0.25, frame.X, 3);
+        Assert.Equal(1.1, frame.Y, 3);
+        Assert.Equal(1.5, frame.Width, 3);
+        Assert.Equal(0.4, frame.Height, 3);
     }
 
     [AvaloniaFact]
