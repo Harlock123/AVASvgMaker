@@ -71,6 +71,7 @@ Or [build it yourself](#building).
 
 - **Save and load** - a native `.avadiag` document that keeps what SVG export cannot: glue, ports, hand-placed bends, containment and z-order
 - **Six export formats** - SVG and PDF as vectors, PNG, JPEG, WebP and BMP as pictures
+- **SVG import** - reads a drawing back in as editable shapes, and says what it could not take
 - **Vector export** - SVG writes real SVG primitives, not a bitmap trace; PDF comes out the size the page says it is, with the text still selectable, and carries every page of a document in one file
 - **Picture export** - the page rendered at 1x to 4x, on white, with no grid or selection handles in the picture
 - **Six platforms** - Windows, macOS and Linux, on both x64 and ARM, each a single self-contained executable
@@ -225,6 +226,45 @@ a quality setting, because they are the two that throw detail away.
 | **WebP** | Smaller than PNG at moderate quality, larger than PNG at maximum. Worth it only if the thing receiving it asks for WebP |
 | **BMP** | For the tools that will take nothing else: some older Windows software, a few embedded and print workflows. 24-bit uncompressed, the variant everything that reads BMP can open. Its exact file size is worked out and shown before you commit to it, because it is a large one |
 
+## Importing SVG
+
+![An SVG and the same file imported](Images/svg-import.png)
+
+**File -> Import SVG** reads a drawing onto a page of its own - a new page rather than the one
+you are on, so what arrived can be looked at without landing on top of work already done.
+
+Writing SVG is a translation; reading it is an interpretation, and a lossy one. SVG can say far
+more than this editor can hold, so the importer reads the part of the language that maps onto
+shapes with a fill, an outline and a label, **and says plainly what it could not take** -
+"Imported 8 shapes - left out 1 image". What comes out is a drawing you can edit, not a
+facsimile of the file.
+
+| Read | |
+|---|---|
+| **Elements** | `svg`, `g`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `path`, `text` |
+| **Paths** | Every command, relative and absolute, including the `S` and `T` shorthands. Arcs become beziers, since the stencil language has none |
+| **Transforms** | `translate`, `scale`, `rotate`, `matrix`, `skewX`, `skewY`, nested and composed |
+| **Styling** | Fill, stroke, width, dash pattern, font family, size, weight, slant and anchor - as attributes or in a `style`, and inherited down the tree |
+| **The page** | `width`, `height` and `viewBox`, which becomes the transform onto the page |
+
+| Not read | |
+|---|---|
+| **Gradients, patterns, filters, masks, clip paths** | Nothing in this editor can hold them |
+| **`image`, `use`, `symbol`, stylesheets** | Counted and reported rather than silently dropped |
+| **Units other than the absolute ones** | `px`, `pt`, `pc`, `mm`, `cm` and `in` convert; percentages need a context the importer does not carry |
+
+Anything the model has a shape for becomes that shape - a `rect` is a rectangle you can resize,
+a `circle` an ellipse. Anything else becomes a **path shape**, which carries its own outline in
+the same unit-square language a stencil uses, and so needs no drawing or exporting of its own:
+it scales when resized exactly as a stencil does. A turn in a transform becomes the shape's own
+angle, which it now has; stroke widths and font sizes are scaled by the transform, so a drawing
+whose `viewBox` does the scaling comes in at the weights it was drawn at.
+
+Text is the weakest part, and knowingly so. SVG places text by a baseline and gives no extent,
+so the importer invents a box that comfortably holds the words and can be resized afterwards.
+The words, the size, the colour, the weight and the alignment all survive; the exact placement
+is an estimate.
+
 ## Rulers and guides
 
 ![Smart guides while dragging](Images/smart-guides.png)
@@ -247,7 +287,7 @@ a shape may go:
 | | |
 |---|---|
 | **`.avadiag`** | The native format - JSON, human-readable and diffable. Round-trips everything: pages with their names and paper sizes, shapes, labels, colours, z-order, and the glue, ports and routing of connectors. This is the one to save your work in |
-| **`.svg`** | Export only. Standards-compliant SVG for handing to another tool. Lossy as a working format: glue and tool state are not representable, so exports cannot be reopened for editing |
+| **`.svg`** | Export, and import. Standards-compliant SVG for handing to another tool. Lossy as a working format either way: glue, grouping and tool state are not representable, so a drawing that goes out and comes back is shapes rather than the document it was |
 | **`.png`** | Export only. The page rendered at 1x, 2x, 3x or 4x, for pasting into a document or a chat where SVG is not welcome |
 | **`.jpg`** | Export only. Lossy, no transparency, quality adjustable. There when something insists on JPEG |
 | **`.webp`** | Export only. Lossy, quality adjustable. Smaller than PNG at moderate quality |
@@ -260,14 +300,15 @@ connection ports and routing, version 3 hand-placed bends, and version 4 the lin
 older files still load, and version 1 connectors keep their original straight routing. Version 5
 added containers, version 6 multiple pages, version 7 a paper size per page, version 8 lane
 heights, version 9 the font a label is in, version 10 grouping, version 11 the margin guide,
-and version 12 rotation. Older files still load: a version 5 file, which
+version 12 rotation, and version 13 shapes carrying an outline of their own. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
 drawn; a file up to version 8 has no font settings, so its labels come back plain and centred,
 which is how they were drawn; a file up to version 9 has no groups, because there were none to have; and
 a file up to version 10 has no margins, so its pages come back without one; and a file up to
-version 11 has no angles, so its shapes come back upright. The on-disk
+version 11 has no angles, so its shapes come back upright; and a file up to version 12 has no
+outlines of its own, because nothing could make one. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -295,7 +336,7 @@ fields because its end points define it.
 
 | Group | What it does |
 |---|---|
-| **File menu** | New, Open, Save, Save As, Page set up, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
+| **File menu** | New, Open, Save, Save As, Page set up, Import SVG, Export (SVG, PDF, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, and saving a selection as a shape of your own |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, rotating left, right or straight, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
@@ -695,6 +736,7 @@ AVASvgMaker/
   Models/     Shape classes - each knows its own geometry and its SVG element
     DiagramShape.cs      Abstract base: bounds, fill/stroke, text wrapping, render, hit test, SVG
     PolygonShape.cs      Base for straight-edged shapes
+    PathShape.cs         A shape carrying an outline of its own, as imported SVG does
     ConnectorShape.cs    Gluing, connection ports, end caps, and the routed path
     TextBoxShape.cs      Borderless text, with a dashed guide while empty
     EndCapStyle.cs       None, Arrow, OpenArrow, Dot, Diamond
@@ -720,6 +762,8 @@ AVASvgMaker/
     GridSettings.cs      Grid visibility, size and snapping maths
     StencilLibrary.cs    The shapes you saved yourself, and the file they live in
     SvgExporter.cs       Document -> SVG document
+    SvgImporter.cs       SVG document -> a page of shapes, and what it could not take
+    SvgPathData.cs       An SVG path made absolute, arcs and all, in the stencil language
     RasterExporter.cs    Document -> PNG, JPEG, WebP or BMP, at a chosen scale
     RasterFormat.cs      The four picture formats, and what each one is called
     PdfExporter.cs       Document -> a vector PDF page
@@ -952,7 +996,6 @@ been worked through.
 
 Where it would go next, if it went anywhere:
 
-- Reading an SVG back in, which is a different and much larger problem than writing one
 - Data behind a shape - fields, and a way to show them - which is what separates a diagram tool
   from a drawing one
 

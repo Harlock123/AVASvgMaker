@@ -71,6 +71,8 @@
                 <Separator />
                 <MenuItem Header="Page set_up..." Click="OnPageSetupClick" />
                 <Separator />
+                <MenuItem Header="_Import SVG..." Click="OnImportSvgClick" />
+                <Separator />
                 <MenuItem Header="_Export">
                     <MenuItem Header="_SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
                     <MenuItem Header="P_DF..." Click="OnExportPdfClick" />

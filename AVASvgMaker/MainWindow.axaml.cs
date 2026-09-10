@@ -1301,6 +1301,71 @@ public partial class MainWindow : Window
         StatusText.Text = $"{what} is now {setup.Size.Width:0} x {setup.Size.Height:0}";
     }
 
+    private void OnImportSvgClick(object? sender, RoutedEventArgs e) => _ = ImportSvgAsync();
+
+    /// <summary>
+    /// Reads an SVG onto a page of its own. A new page rather than the current one, because an
+    /// import is an interpretation and it should be possible to look at what arrived without it
+    /// having landed on top of work already done.
+    /// </summary>
+    private async Task ImportSvgAsync()
+    {
+        Canvas.CommitEdit();
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import SVG",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("SVG drawing") { Patterns = ["*.svg"], MimeTypes = ["image/svg+xml"] },
+                FilePickerFileTypes.All
+            ]
+        });
+
+        if (files.Count == 0)
+            return;
+
+        try
+        {
+            await using var stream = await files[0].OpenReadAsync();
+            var result = SvgImporter.Read(stream);
+
+            if (result.Shapes == 0)
+            {
+                StatusText.Text = result.Summary;
+                return;
+            }
+
+            var document = Canvas.Document;
+
+            using (document.BeginBatch())
+            {
+                document.AddPage();
+
+                document.RenamePage(document.PageIndex,
+                    Path.GetFileNameWithoutExtension(files[0].Name));
+
+                document.SetPageSize(result.Document.PageWidth, result.Document.PageHeight);
+
+                foreach (var shape in result.Document.Shapes)
+                    document.Shapes.Add(shape);
+
+                document.NormaliseOrder();
+                document.MarkModified();
+            }
+
+            Canvas.SyncPageSize();
+            Canvas.InvalidateVisual();
+
+            StatusText.Text = result.Summary;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Import failed: {ex.Message}";
+        }
+    }
+
     private void OnExportSvgClick(object? sender, RoutedEventArgs e) => _ = ExportSvgAsync();
 
     private void OnExportPngClick(object? sender, RoutedEventArgs e) =>

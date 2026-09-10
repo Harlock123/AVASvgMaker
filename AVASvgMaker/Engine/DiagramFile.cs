@@ -26,10 +26,10 @@ public static partial class DiagramFile
     /// <summary>
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
     /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights,
-    /// 9 the font a label is in, 10 grouping, 11 the margin guide, 12 rotation.
-    /// Older files still load.
+    /// 9 the font a label is in, 10 grouping, 11 the margin guide, 12 rotation,
+    /// 13 shapes carrying an outline of their own. Older files still load.
     /// </summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -127,6 +127,12 @@ public static partial class DiagramFile
 
         /// <summary>Degrees clockwise. Version 12 onwards, and absent for a shape sitting upright.</summary>
         public double? Rotation { get; set; }
+
+        /// <summary>
+        /// A unit-square outline, for a shape that carries one of its own rather than taking a
+        /// stencil's. Version 13 onwards, and written only for those - an imported path.
+        /// </summary>
+        public string? Outline { get; set; }
 
         /// <summary>
         /// A lane's share of its pool. Version 8 onwards, and only written for a lane that
@@ -254,6 +260,7 @@ public static partial class DiagramFile
             ContainerId = IdOf(shape.Container, ids),
             GroupId = shape.GroupId == 0 ? null : shape.GroupId,
             Rotation = shape.IsRotated ? shape.Rotation : null,
+            Outline = shape is PathShape outlined ? outlined.Outline : null,
             LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
                         && Math.Abs(lane.LaneShare - 1) > 1e-9
                 ? lane.LaneShare
@@ -398,6 +405,13 @@ public static partial class DiagramFile
                 EndPort = connectorRecord.EndPort,
                 Routing = Parse(connectorRecord.Routing, ConnectorRouting.Straight),
                 Waypoints = ToPoints(connectorRecord.Waypoints)
+            };
+        }
+        else if (kind == ShapeKind.Path)
+        {
+            shape = new PathShape(bounds)
+            {
+                Outline = string.IsNullOrWhiteSpace(record.Outline) ? PathShape.Fallback : record.Outline
             };
         }
         else

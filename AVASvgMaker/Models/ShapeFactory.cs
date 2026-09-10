@@ -21,6 +21,7 @@ public static class ShapeFactory
         ShapeKind.Parallelogram => new ParallelogramShape(bounds),
         ShapeKind.Cylinder => new CylinderShape(bounds),
         ShapeKind.TextBox => new TextBoxShape(bounds),
+        ShapeKind.Path => new PathShape(bounds),
         ShapeKind.Pool => new ContainerShape(kind, bounds, HeaderEdge.Left),
         ShapeKind.Lane => new ContainerShape(kind, bounds, HeaderEdge.Left),
         ShapeKind.ContainerBox => new ContainerShape(kind, bounds, HeaderEdge.Top),
@@ -34,6 +35,7 @@ public static class ShapeFactory
     public static string DisplayName(ShapeKind kind) => kind switch
     {
         // The flowchart names these differently from their plain geometry.
+        ShapeKind.Path => "Path",
         ShapeKind.Rectangle => "Process",
         ShapeKind.RoundedRectangle => "Terminator",
         ShapeKind.Diamond => "Decision",

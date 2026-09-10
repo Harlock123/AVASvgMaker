@@ -115,5 +115,9 @@ public enum ShapeKind
     Printer,
     MobileDevice,
     StorageArray,
-    WirelessAccessPoint
+    WirelessAccessPoint,
+
+    /// <summary>An outline of its own, rather than one from the catalogue. Imported SVG
+    /// arrives as these where nothing simpler fits.</summary>
+    Path
 }
