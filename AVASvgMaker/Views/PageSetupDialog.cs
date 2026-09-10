@@ -26,7 +26,8 @@ public class PageSetupDialog : Window
     private readonly NumericUpDown _width = new() { Width = 150, Minimum = 100, Maximum = 20000, Increment = 10 };
     private readonly NumericUpDown _height = new() { Width = 150, Minimum = 100, Maximum = 20000, Increment = 10 };
     private readonly NumericUpDown _margin = new() { Width = 150, Minimum = 0, Maximum = 500, Increment = 8 };
-    private readonly TextBlock _summary = new() { FontSize = 11, Opacity = 0.7 };
+    private readonly TextBlock _summary = new()
+        { FontSize = 11, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
     private readonly Rect? _drawing;
 
     /// <summary>Guards the boxes against reacting while they are being filled in.</summary>
@@ -55,6 +56,7 @@ public class PageSetupDialog : Window
         _orientation.SelectionChanged += (_, _) => OnOrientationChanged();
         _width.ValueChanged += (_, _) => OnSizeTyped();
         _height.ValueChanged += (_, _) => OnSizeTyped();
+        _margin.ValueChanged += (_, _) => Describe();
 
         var layout = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
         layout.Children.Add(Row("Size", _preset));

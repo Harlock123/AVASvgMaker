@@ -2,7 +2,9 @@
 
 A Visio-style diagram editor built with **Avalonia UI** and **.NET 9**. Drag shapes from a
 stencil toolbox onto a page-like canvas, label them, wire them together with connectors that
-route themselves around whatever is in the way, and save or export the result.
+route themselves around whatever is in the way - and around each other - and spread the work
+over as many pages as it needs. Export it as SVG or PDF for a printer, or as a picture for
+anything else.
 
 ![AVASvgMaker](Images/overview.png)
 
@@ -109,6 +111,8 @@ on-screen geometry and the exported SVG, so the two cannot drift apart.
 
 ## Pages
 
+![Page tabs](Images/page-tabs.png)
+
 A document holds as many pages as you like. They appear as tabs along the bottom of the
 drawing area once there is more than one - a single page needs no tab bar, so it does not get
 one. Click a tab to turn to that page, drag it to move it among the others, double-click it to
@@ -140,6 +144,8 @@ it stood. Adding, deleting, renaming and reordering pages *are* edits, and undo 
 
 ## Page setup and image export
 
+![Page setup](Images/page-setup.png)
+
 **File -> Page set up** sets the paper the current page sits on - or, with **Apply to every
 page**, all of them at once. Pick one of the six presets -
 Letter, Legal, Tabloid, A3, A4 or A5 - or type a width and height; picking a preset or
@@ -151,6 +157,8 @@ and nothing more - nothing is stopped from being put outside it, and nothing is 
 Set it to 0 for none. The page size and margin are part of the document, saved with it and
 undoable like any other edit. Shrinking the page leaves the shapes where they are, as Visio does, so anything now
 past the edge stays put until you move it - at which point it is clamped back onto the page.
+
+![The export menu](Images/export-menu.png)
 
 **File -> Export** holds all six formats, vectors first: **SVG** (`Ctrl+E`) and **PDF**,
 then **PNG** (`Ctrl+Shift+E`), **JPEG**, **WebP** and **BMP**.
@@ -176,12 +184,31 @@ The four **picture** formats share one dialog: 1x, 2x, 3x or 4x, with the pixel 
 scale produces shown against it, and anything over 100 megapixels refused. JPEG and WebP add
 a quality setting, because they are the two that throw detail away.
 
+![Exporting a picture](Images/export-image.png)
+
 | | |
 |---|---|
 | **PNG** | The default, and the right answer nearly always. Lossless, transparent where the page is not, and small for flat diagram colours |
 | **JPEG** | For where nothing else is accepted. A diagram is the worst case for it - flat colour and hard edges are exactly what its ringing shows up on - so the quality default is high and the dialog says so |
 | **WebP** | Smaller than PNG at moderate quality, larger than PNG at maximum. Worth it only if the thing receiving it asks for WebP |
 | **BMP** | For the tools that will take nothing else: some older Windows software, a few embedded and print workflows. 24-bit uncompressed, the variant everything that reads BMP can open. Its exact file size is worked out and shown before you commit to it, because it is a large one |
+
+## Rulers and guides
+
+![Smart guides while dragging](Images/smart-guides.png)
+
+Three things help work line up, and all three are only guides - none of them constrains where
+a shape may go:
+
+- **Rulers** run along the top and down the side, marked in page units, with a marker on each
+  following the pointer. `View -> Rulers` folds them away.
+- **Smart guides** line a dragged shape up with the edges and middles of the others when it
+  comes within a few pixels, and draw the line it caught on so it is clear what happened. They
+  beat the grid, and the grid still catches whichever axis nothing lined up on. `View -> Smart
+  guides` turns them off, leaving the grid alone in charge.
+- **The margin** is a dashed inset drawn on the page, set per page in Page setup and off by
+  default. Nothing is stopped from being put outside it and nothing is clipped by it; it is
+  there to be lined up against, which is why it is drawn under the drawing rather than over it.
 
 ## Files
 
@@ -261,6 +288,8 @@ Down the right-hand side, applying to everything selected:
 | **Fill** | Colour from a 24-swatch palette or a hex value, or None for a shape with no fill at all |
 | **Line** | Colour or None, style (solid, dashed, dotted), and weight |
 | **Text** | Colour, size, font, bold, italic, and whether the label sits left, centred or right in its shape |
+
+![Label formatting](Images/text.png)
 
 The font list is what is actually installed on the machine, with the application's own font
 at the top; offering fonts that are not there would only produce labels that draw in something
@@ -353,6 +382,8 @@ and entity-relationship diagrams need:
 | Hollow arrow | UML generalisation - a closed, unfilled triangle |
 | One, Many, Zero or one, One or many, Zero or many | The entity-relationship crow's foot family |
 
+![Connection points on the outline](Images/connection-points.png)
+
 **Connection points sit on the shape, not on the box around it.** A line meets a triangle on
 its sloping side, a hexagon on its corner and a cylinder on the curve of its cap, rather than
 stopping short in the empty corner of a bounding box. For a rectangle nothing moves, and nor
@@ -362,6 +393,8 @@ each side - so drawings made before this look exactly as they did.
 A handful of stencils are hollow where their middle would be - a bowtie, a stick figure, a
 curved arrow - and there is no outline to walk out to along the way. Those keep the four
 points of the box, which is what every shape had before.
+
+![Two connectors taking different ways round](Images/routing.png)
 
 **Routed connectors keep out of each other's way as well as out of the shapes'.** Where two
 lines would take the same detour round the same obstacle and be drawn one on top of the other,
