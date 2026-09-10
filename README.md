@@ -20,6 +20,9 @@ native libraries are inside the file.
 Every version, with what changed in each, is on the
 **[releases page](https://github.com/Harlock123/AVASvgMaker/releases)**.
 
+**[USERGUIDE.pdf](USERGUIDE.pdf)** is the guide to using the thing - the window, the tools and
+what each does - without any of the how-it-works below.
+
 | Platform | Download |
 |---|---|
 | Windows, Intel and AMD | `AVASvgMaker-`*`version`*`-win-x64.zip` |
@@ -707,6 +710,30 @@ it puts each target on a runner of its own operating system.
 Both leave one archive per target in `dist/`. `zip` is used for Windows archives where it is
 installed, falling back to Python and then to `tar`.
 
+## The user guide
+
+`USERGUIDE.md` is the guide for someone using the app rather than reading about it: what the
+window holds, how to draw, connect, format, arrange and export, and a keyboard reference. It
+repeats what this README says about the interface and leaves out everything it says about the
+insides.
+
+`USERGUIDE.pdf` is generated from it and kept in the repository, so anyone wanting the guide
+has it without building anything:
+
+```bash
+./make-guide.sh
+```
+
+Edit the Markdown; never the PDF. **A change to the app wants a line in `USERGUIDE.md` and the
+script run again** - which is the whole reason the guide is a file in the repository rather
+than a document somewhere else.
+
+It renders with Skia, in a small tool of its own under `Tools/`, rather than by way of a
+browser or a TeX distribution: the guide has to be rebuildable by anyone with the .NET SDK and
+nothing else. The tool understands only as much Markdown as the guide uses - headings,
+paragraphs, bullets, tables, pictures, code blocks, and bold, italic and code spans - and
+passes anything else through as text rather than guessing.
+
 ## Tests
 
 ```bash
@@ -790,6 +817,9 @@ AVASvgMaker/
     RasterExportDialog.cs  Export scale and quality, and the pixel size it comes to
 
 AVASvgMaker.Tests/       The regression suite - headless, and no part of a release build
+Tools/GuideBuilder/      Turns USERGUIDE.md into USERGUIDE.pdf
+USERGUIDE.md             The guide for using the app; the PDF is generated from it
+make-guide.sh            Rebuilds USERGUIDE.pdf
 build.sh                 Builds every target it can, and explains the rest
 .github/workflows/       Runs the tests, then builds all six on a runner of each operating system
 Images/                  Screenshots used above
