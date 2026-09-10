@@ -9,6 +9,27 @@ route themselves around whatever is in the way, and save or export the result.
 Built in the same style as AVALander - no MVVM framework, just custom `Control` subclasses
 that render themselves.
 
+## Download
+
+**[Latest release](https://github.com/Harlock123/AVASvgMaker/releases/latest)** - one
+self-contained executable per platform. Nothing to install: the .NET runtime and Avalonia's
+native libraries are inside the file.
+
+| Platform | Download |
+|---|---|
+| Windows, Intel and AMD | `AVASvgMaker-`*`version`*`-win-x64.zip` |
+| Windows on ARM | `AVASvgMaker-`*`version`*`-win-arm64.zip` |
+| macOS, Apple silicon | `AVASvgMaker-`*`version`*`-osx-arm64.tar.gz` |
+| macOS, Intel | `AVASvgMaker-`*`version`*`-osx-x64.tar.gz` |
+| Linux, Intel and AMD | `AVASvgMaker-`*`version`*`-linux-x64.tar.gz` |
+| Linux on ARM | `AVASvgMaker-`*`version`*`-linux-arm64.tar.gz` |
+
+The tarballs keep the executable bit; if it goes missing on the way, `chmod +x AVASvgMaker`.
+macOS will also want the binary cleared from quarantine before it will open something
+downloaded from the web.
+
+Or [build it yourself](#building).
+
 ## Features
 
 **Drawing**
@@ -273,6 +294,10 @@ dotnet run --project AVASvgMaker/AVASvgMaker.csproj
 Requires the .NET 9 SDK.
 
 ### Releases
+
+Releases are published to the
+[releases page](https://github.com/Harlock123/AVASvgMaker/releases) by pushing a tag; the
+same script builds them locally.
 
 `build.sh` builds every supported target and packs each into one archive:
 
