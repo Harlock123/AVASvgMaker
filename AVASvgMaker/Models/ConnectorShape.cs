@@ -217,7 +217,9 @@ public class ConnectorShape : DiagramShape
     /// Recomputes the route if anything it depends on has moved. The key covers both ends and
     /// every obstacle, so a drag only pays for the search when the geometry actually changed.
     /// </summary>
-    public void UpdateRoute(IReadOnlyList<DiagramShape> obstacles, double clearance)
+    public void UpdateRoute(
+        IReadOnlyList<DiagramShape> obstacles, double clearance,
+        IReadOnlyList<(Point A, Point B)>? taken = null)
     {
         if (HasManualRoute)
             return;
@@ -241,6 +243,17 @@ public class ConnectorShape : DiagramShape
         foreach (var obstacle in obstacles)
             key.Add(obstacle.Bounds);
 
+        // The routes already laid down are part of what this one depends on, so they belong in
+        // the key: move the connector above and this one has to think again.
+        if (taken is not null)
+        {
+            foreach (var (a, b) in taken)
+            {
+                key.Add(a);
+                key.Add(b);
+            }
+        }
+
         var hash = key.ToHashCode();
 
         if (hash == _routeKey && _route.Count >= 2)
@@ -253,7 +266,8 @@ public class ConnectorShape : DiagramShape
             .Select(shape => shape.Bounds)
             .ToList();
 
-        _route = ConnectorRouter.Route(start, StartDirection, end, EndDirection, rects, clearance);
+        _route = ConnectorRouter.Route(
+            start, StartDirection, end, EndDirection, rects, clearance, taken);
     }
 
     public ConnectorShape(Point start, Point end) : base(new Rect(start, end))

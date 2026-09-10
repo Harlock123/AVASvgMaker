@@ -21,6 +21,16 @@ public static class ConnectorRouter
     /// <summary>What a corner costs, in page units, relative to distance travelled.</summary>
     private const double BendPenalty = 40;
 
+    /// <summary>
+    /// What running alongside a connector that is already there costs, per page unit of
+    /// company kept. A penalty rather than a prohibition: a corridor with no room for two
+    /// lines is still better used than not reached at all.
+    /// </summary>
+    private const double CrowdingPenalty = 3;
+
+    /// <summary>Beyond this many segments already on the page, crowding is not weighed at all.</summary>
+    private const int CrowdedEnough = 400;
+
     /// <summary>Beyond this many obstacles the lattice is thinned to keep routing interactive.</summary>
     private const int DenseObstacleCount = 24;
 
@@ -35,7 +45,8 @@ public static class ConnectorRouter
         Point end,
         Vector endDirection,
         IReadOnlyList<Rect> obstacles,
-        double clearance)
+        double clearance,
+        IReadOnlyList<(Point A, Point B)>? taken = null)
     {
         var stub = Math.Max(clearance, 1);
         var from = Step(start, startDirection, stub);
@@ -46,7 +57,9 @@ public static class ConnectorRouter
             .Where(rect => rect.Width > 0 && rect.Height > 0)
             .ToList();
 
-        var middle = Search(from, startDirection, to, blocked) ?? Elbow(from, to, startDirection);
+        var lanes = taken is { Count: > 0 and <= CrowdedEnough } ? taken : null;
+        var middle = Search(from, startDirection, to, blocked, lanes, clearance)
+                     ?? Elbow(from, to, startDirection);
 
         var path = new List<Point> { start };
 
@@ -125,7 +138,9 @@ public static class ConnectorRouter
 
     #region Search
 
-    private static List<Point>? Search(Point from, Vector startDirection, Point to, List<Rect> blocked)
+    private static List<Point>? Search(
+        Point from, Vector startDirection, Point to, List<Rect> blocked,
+        IReadOnlyList<(Point A, Point B)>? taken, double spacing)
     {
         var xs = Axis(from.X, to.X, blocked, horizontal: true);
         var ys = Axis(from.Y, to.Y, blocked, horizontal: false);
@@ -198,7 +213,8 @@ public static class ConnectorRouter
                         continue;
 
                     var length = Math.Abs(b.X - a.X) + Math.Abs(b.Y - a.Y);
-                    var next = cost + length + (axis == axisOf ? 0 : BendPenalty);
+                    var next = cost + length + (axis == axisOf ? 0 : BendPenalty)
+                               + Shared(a, b, taken, spacing) * CrowdingPenalty;
                     var key = Key(nx, ny, axis);
 
                     if (best.TryGetValue(key, out var known) && known <= next + Epsilon)
@@ -309,6 +325,44 @@ public static class ConnectorRouter
     }
 
     private static bool Clear(Point a, Point b, List<Rect> blocked) => !Crosses(a, b, blocked);
+
+    /// <summary>
+    /// How far a candidate run keeps company with the connectors already on the page: the
+    /// length it spends beside one of them, near enough and parallel enough to read as the
+    /// same line. Crossings are not counted - two lines at right angles are only a crossing,
+    /// and unavoidable - so only lines along the same axis are measured.
+    /// </summary>
+    private static double Shared(Point a, Point b, IReadOnlyList<(Point A, Point B)>? taken, double spacing)
+    {
+        if (taken is null)
+            return 0;
+
+        var horizontal = Math.Abs(a.Y - b.Y) < Epsilon;
+        var total = 0.0;
+
+        foreach (var (c, d) in taken)
+        {
+            if (horizontal)
+            {
+                if (Math.Abs(c.Y - d.Y) >= Epsilon || Math.Abs(c.Y - a.Y) > spacing)
+                    continue;
+
+                total += Overlap(a.X, b.X, c.X, d.X);
+            }
+            else
+            {
+                if (Math.Abs(c.X - d.X) >= Epsilon || Math.Abs(c.X - a.X) > spacing)
+                    continue;
+
+                total += Overlap(a.Y, b.Y, c.Y, d.Y);
+            }
+        }
+
+        return total;
+    }
+
+    private static double Overlap(double a1, double a2, double b1, double b2) => Math.Max(0,
+        Math.Min(Math.Max(a1, a2), Math.Max(b1, b2)) - Math.Max(Math.Min(a1, a2), Math.Min(b1, b2)));
 
     #endregion
 

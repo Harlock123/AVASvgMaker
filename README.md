@@ -45,7 +45,7 @@ Or [build it yourself](#building).
 
 - **Connection points** - every shape offers four attachment points, sitting on the shape's own outline rather than the box around it; they light up while a connector is being drawn and the end snaps to the nearest one
 - **Glue** - an end dropped on a shape sticks to it and tracks the shape as it moves and resizes
-- **Right-angle routing** - routed connectors keep clear of the shapes in their way, put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved or resized
+- **Right-angle routing** - routed connectors keep clear of the shapes in their way and of each other, put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved or resized
 - **Adjustable bends** - a selected connector offers a grab point on each end, on every bend, and on the middle of every segment; dragging a middle point adds bends, and dropping one back on the line takes it away again
 - **Twelve line ends** - including the hollow arrow and diamond that UML needs, and the entity-relationship crow's foot family
 
@@ -356,6 +356,19 @@ each side - so drawings made before this look exactly as they did.
 A handful of stencils are hollow where their middle would be - a bowtie, a stick figure, a
 curved arrow - and there is no outline to walk out to along the way. Those keep the four
 points of the box, which is what every shape had before.
+
+**Routed connectors keep out of each other's way as well as out of the shapes'.** Where two
+lines would take the same detour round the same obstacle and be drawn one on top of the other,
+the second takes another way round. It is a preference and not a rule: a corridor with room for
+only one line is still better used than not reached at all, so lines share one where they must.
+Crossings are left alone - two lines meeting at right angles are only a crossing, and often
+unavoidable.
+
+Each connector keeps clear of the ones routed before it and only of those. Letting them all
+avoid each other would let two chase one another round the page for ever, each moving aside
+from where the other has just been; an order that only looks backwards cannot come round on
+itself. Drawing order is the order used, so the same page always routes the same way, and a
+file reopened routes exactly as it did when it was saved.
 
 A connection point that ends up facing away from the other end is used from the opposite side
 instead. Pin a connector to the bottom of one shape and the top of another, then swap the two
@@ -728,6 +741,10 @@ Images/                  Screenshots used above
 - Handles are offered for a selection of one, and for a selection of several as one box round
   the lot. A connector is the exception: selected on its own it shows its ends, bends and
   segment midpoints instead of a resize box.
+- Connectors avoid each other by paying a penalty per unit of company kept, not by treating
+  one another as obstacles. An obstacle can make a route impossible, and a connector with
+  nowhere to go is worse than one drawn alongside its neighbour; a penalty degrades instead,
+  taking the crowded corridor only when there is no other.
 - Stretching a selection maps every shape out of the box the shapes started in, and the
   starting bounds are captured once when the drag begins rather than read off the shapes each
   time. Read them each time and every pointer move would scale what the last move already
@@ -788,7 +805,6 @@ Images/                  Screenshots used above
 Natural next steps, roughly in order of usefulness:
 
 - Custom stencils saved from a drawing
-- Letting routed connectors avoid each other, not only the shapes
 - Rulers, margins and smart guides
 
 ## License

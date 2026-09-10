@@ -486,9 +486,22 @@ public class DiagramDocument
     public void RouteConnectors()
     {
         var obstacles = Shapes.Where(shape => shape is not ConnectorShape).ToList();
+        var taken = new List<(Point A, Point B)>();
 
+        // Each connector keeps clear of the ones routed before it, and only of those. Letting
+        // them all avoid each other would let two chase one another round the page for ever -
+        // A moves aside for B, which then has to move aside for A - whereas an order that only
+        // looks backwards cannot come round on itself. Drawing order is the order used, so the
+        // same page always routes the same way.
         foreach (var connector in Shapes.OfType<ConnectorShape>())
-            connector.UpdateRoute(obstacles, RouteClearance);
+        {
+            connector.UpdateRoute(obstacles, RouteClearance, taken);
+
+            var path = connector.Path;
+
+            for (var i = 0; i + 1 < path.Count; i++)
+                taken.Add((path[i], path[i + 1]));
+        }
     }
 
     #region Groups
