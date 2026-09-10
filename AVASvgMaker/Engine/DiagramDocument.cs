@@ -373,18 +373,25 @@ public class DiagramDocument
         return true;
     }
 
+    /// <summary>The lanes of a pool, in the order they are drawn from top to bottom.</summary>
+    public List<ContainerShape> LanesOf(DiagramShape pool) => ChildrenOf(pool)
+        .OfType<ContainerShape>()
+        .Where(lane => lane.Kind == ShapeKind.Lane)
+        .ToList();
+
     /// <summary>
     /// Lays a pool's lanes out across its body. Lanes are positioned by the pool rather than by
     /// their own handles, which is what makes them follow when the pool is moved or resized.
+    ///
+    /// Whatever a lane holds travels with it. Without that, a lane that is reordered or a pool
+    /// that is resized leaves its contents behind, sitting over whichever lane has taken the
+    /// space - the shapes stay put while the band beneath them slides away.
     /// </summary>
     public void LayoutContainers()
     {
         foreach (var pool in Shapes.OfType<ContainerShape>().Where(c => c.Kind == ShapeKind.Pool))
         {
-            var lanes = ChildrenOf(pool)
-                .OfType<ContainerShape>()
-                .Where(lane => lane.Kind == ShapeKind.Lane)
-                .ToList();
+            var lanes = LanesOf(pool);
 
             if (lanes.Count == 0)
                 continue;
@@ -394,12 +401,72 @@ public class DiagramDocument
 
             for (var i = 0; i < lanes.Count; i++)
             {
+                var lane = lanes[i];
                 var wanted = new Rect(body.X, body.Y + i * height, body.Width, height);
 
-                if (lanes[i].Bounds != wanted)
-                    lanes[i].Bounds = wanted;
+                if (lane.Bounds == wanted)
+                    continue;
+
+                var delta = new Vector(wanted.X - lane.Bounds.X, wanted.Y - lane.Bounds.Y);
+                lane.Bounds = wanted;
+
+                if (delta.X == 0 && delta.Y == 0)
+                    continue;
+
+                foreach (var child in DescendantsOf(lane).ToList())
+                    child.Translate(delta);
             }
         }
+    }
+
+    /// <summary>
+    /// Moves a lane to a new place among its siblings, contents and all.
+    ///
+    /// A lane cannot be dragged around freely - the pool decides where it sits - so dragging
+    /// one reorders it instead. The lane and everything inside it move through the drawing
+    /// order as one block, or the contents would be left pointing at a container that now sits
+    /// after them.
+    /// </summary>
+    public bool MoveLaneTo(ContainerShape lane, int position)
+    {
+        if (lane.Container is not { } pool)
+            return false;
+
+        var lanes = LanesOf(pool);
+        var current = lanes.IndexOf(lane);
+
+        if (current < 0)
+            return false;
+
+        position = Math.Clamp(position, 0, lanes.Count - 1);
+
+        if (position == current)
+            return false;
+
+        var block = new HashSet<DiagramShape>(DescendantsOf(lane)) { lane };
+        var moving = Shapes.Where(block.Contains).ToList();
+
+        Shapes.RemoveAll(block.Contains);
+
+        var remaining = LanesOf(pool);
+
+        int insertAt;
+
+        if (position >= remaining.Count)
+        {
+            // Past the last lane: after everything that lane holds.
+            var last = remaining[^1];
+            var lastBlock = new HashSet<DiagramShape>(DescendantsOf(last)) { last };
+            insertAt = Shapes.FindLastIndex(lastBlock.Contains) + 1;
+        }
+        else
+        {
+            insertAt = Shapes.IndexOf(remaining[position]);
+        }
+
+        Shapes.InsertRange(insertAt, moving);
+        MarkModified();
+        return true;
     }
 
     #endregion

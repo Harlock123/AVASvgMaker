@@ -37,6 +37,7 @@ public class DrawingCanvas : Decorator
         MovingEndpoint,
         MovingBend,
         MovingSegment,
+        ReorderingLane,
         DrawingConnector,
         Marquee
     }
@@ -90,6 +91,9 @@ public class DrawingCanvas : Decorator
 
     /// <summary>The segment a slide started on; the handle list shifts underneath it.</summary>
     private int _activeSegment = -1;
+
+    /// <summary>The lane being dragged through its pool's running order.</summary>
+    private ContainerShape? _dragLane;
     private Point _dragOrigin;
     private Rect _dragStartBounds;
     private Rect? _ghost;
@@ -914,11 +918,49 @@ public class DrawingCanvas : Decorator
         }
 
         if (Document.IsSelected(hit))
-            BeginMove(pagePoint, e);
+        {
+            // A lane has no position of its own to drag - the pool gives it one - so
+            // dragging one moves it through the running order instead.
+            if (Document.Selection.Count == 1 && hit is ContainerShape { Kind: ShapeKind.Lane } lane)
+                BeginLaneReorder(lane, e);
+            else
+                BeginMove(pagePoint, e);
+        }
 
         InvalidateVisual();
         ReportStatus();
         e.Handled = true;
+    }
+
+    private void BeginLaneReorder(ContainerShape lane, PointerPressedEventArgs e)
+    {
+        _dragLane = lane;
+        _dragMode = DragMode.ReorderingLane;
+
+        e.Pointer.Capture(this);
+    }
+
+    /// <summary>Drops the lane into whichever band the pointer is over.</summary>
+    private void ReorderLane(ContainerShape lane, Point pagePoint)
+    {
+        if (lane.Container is not ContainerShape pool)
+            return;
+
+        var lanes = Document.LanesOf(pool);
+        var body = pool.Body;
+
+        if (lanes.Count < 2 || body.Height <= 0)
+            return;
+
+        var band = body.Height / lanes.Count;
+        var position = (int)Math.Floor((pagePoint.Y - body.Top) / band);
+
+        if (!Document.MoveLaneTo(lane, Math.Clamp(position, 0, lanes.Count - 1)))
+            return;
+
+        _dragChanged = true;
+        InvalidateVisual();
+        ReportStatus();
     }
 
     /// <summary>Remembers where everything sat, so a drag moves the whole selection together.</summary>
@@ -1036,6 +1078,10 @@ public class DrawingCanvas : Decorator
             case DragMode.MovingSegment when Document.Selected is ConnectorShape sliding
                                              && Document.Selection.Count == 1:
                 DragSegment(sliding, pagePoint);
+                return;
+
+            case DragMode.ReorderingLane when _dragLane is { } lane:
+                ReorderLane(lane, pagePoint);
                 return;
 
             case DragMode.DrawingConnector when _pendingConnector is { } pending:
@@ -1215,6 +1261,7 @@ public class DrawingCanvas : Decorator
         _dragMode = DragMode.None;
         _activeHandle = -1;
         _activeSegment = -1;
+        _dragLane = null;
         _glueTarget = null;
         _portShape = null;
         _portIndex = -1;
@@ -1319,9 +1366,12 @@ public class DrawingCanvas : Decorator
         }
         else
         {
-            cursor = Document.HitTest(pagePoint, Screen(LineHitPixels)) is not null
-                ? StandardCursorType.SizeAll
-                : StandardCursorType.Arrow;
+            cursor = Document.HitTest(pagePoint, Screen(LineHitPixels)) switch
+            {
+                ContainerShape { Kind: ShapeKind.Lane } => StandardCursorType.SizeNorthSouth,
+                not null => StandardCursorType.SizeAll,
+                _ => StandardCursorType.Arrow
+            };
         }
 
         Cursor = new Cursor(cursor);
@@ -1666,6 +1716,7 @@ public class DrawingCanvas : Decorator
 
         _editing = null;
         _pendingConnector = null;
+        _dragLane = null;
         _glueTarget = null;
         _portShape = null;
         _portIndex = -1;

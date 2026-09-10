@@ -182,8 +182,12 @@ A pool, lane or grouping box holds what is put into it:
 - **Moving a container carries its contents**, without moving anything twice when both the
   container and something inside it are selected.
 - **Lanes belong to their pool** and are positioned by it, so they follow when the pool is
-  moved or resized. A lane has no resize handles of its own - its size comes from the pool,
-  and letting it be dragged as well would only contradict that.
+  moved or resized. A lane has no resize handles of its own, and cannot be dragged around
+  freely - the pool decides where it sits. **Dragging a lane reorders it** among its siblings
+  instead, which is the only move a lane meaningfully has.
+- **A lane's contents travel with it.** Whenever a lane's band changes - because it was
+  reordered, or because the pool was resized - what it holds moves by the same amount.
+  Otherwise the shapes stay put while the band slides out from under them.
 - **Deleting a container asks** whether to take the contents with it. Keeping them drops them
   onto the page rather than leaving them pointing at something that no longer exists.
 
