@@ -842,6 +842,10 @@ public partial class MainWindow : Window
                 _ = SaveAsync();
                 break;
 
+            case Key.E when shift:
+                _ = ExportPngAsync();
+                break;
+
             case Key.E:
                 _ = ExportSvgAsync();
                 break;
@@ -907,7 +911,73 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private async void OnPageSetupClick(object? sender, RoutedEventArgs e)
+    {
+        Canvas.CommitEdit();
+
+        var document = Canvas.Document;
+        var size = await PageSetupDialog.ShowAsync(
+            this, document.PageWidth, document.PageHeight, document.DrawingBounds);
+
+        if (size is not { } chosen)
+            return;
+
+        document.SetPageSize(chosen.Width, chosen.Height);
+        Canvas.SyncPageSize();
+
+        StatusText.Text = $"Page is now {chosen.Width:0} x {chosen.Height:0}";
+    }
+
     private void OnExportSvgClick(object? sender, RoutedEventArgs e) => _ = ExportSvgAsync();
+
+    private void OnExportPngClick(object? sender, RoutedEventArgs e) => _ = ExportPngAsync();
+
+    private async Task ExportPngAsync()
+    {
+        Canvas.CommitEdit();
+
+        var scale = await PngExportDialog.ShowAsync(this, Canvas.Document);
+
+        if (scale is not { } chosen)
+            return;
+
+        var suggested = Path.GetFileNameWithoutExtension(_currentFile?.Name ?? "diagram");
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export PNG",
+            SuggestedFileName = $"{suggested}.png",
+            DefaultExtension = "png",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("PNG image")
+                {
+                    Patterns = ["*.png"],
+                    MimeTypes = ["image/png"]
+                }
+            ]
+        });
+
+        if (file is null)
+            return;
+
+        try
+        {
+            await using var stream = await file.OpenWriteAsync();
+            PngExporter.Export(Canvas.Document, stream, chosen);
+            await stream.FlushAsync();
+
+            if (stream.CanSeek)
+                stream.SetLength(stream.Position);
+
+            var size = PngExporter.SizeAt(Canvas.Document, chosen);
+            StatusText.Text = $"Exported {file.Name} at {size.Width} x {size.Height}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Export failed: {ex.Message}";
+        }
+    }
 
     private async Task ExportSvgAsync()
     {

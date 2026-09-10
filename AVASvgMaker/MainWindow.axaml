@@ -62,7 +62,10 @@
                 <MenuItem Header="_Save" InputGesture="Ctrl+S" Click="OnSaveClick" />
                 <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Click="OnSaveAsClick" />
                 <Separator />
+                <MenuItem Header="Page set_up..." Click="OnPageSetupClick" />
+                <Separator />
                 <MenuItem Header="_Export SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
+                <MenuItem Header="Export _PNG..." InputGesture="Ctrl+Shift+E" Click="OnExportPngClick" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>

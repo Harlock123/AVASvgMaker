@@ -471,6 +471,34 @@ public class DiagramDocument
 
     #endregion
 
+    /// <summary>Resizes the page, as an edit that can be undone.</summary>
+    public void SetPageSize(double width, double height)
+    {
+        if (Math.Abs(PageWidth - width) < 0.01 && Math.Abs(PageHeight - height) < 0.01)
+            return;
+
+        PageWidth = width;
+        PageHeight = height;
+        MarkModified();
+    }
+
+    /// <summary>The box around everything on the page, or nothing when it is empty.</summary>
+    public Rect? DrawingBounds
+    {
+        get
+        {
+            if (Shapes.Count == 0)
+                return null;
+
+            var bounds = Shapes[0].Bounds;
+
+            foreach (var shape in Shapes.Skip(1))
+                bounds = bounds.Union(shape.Bounds);
+
+            return bounds;
+        }
+    }
+
     /// <summary>Keeps a shape inside the page after a move.</summary>
     public Rect ClampToPage(Rect bounds)
     {
