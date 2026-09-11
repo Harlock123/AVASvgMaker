@@ -8,6 +8,8 @@ namespace AVASvgMaker.Models;
 /// </summary>
 public record ShapeStyle(
     Color Fill,
+    Color? FillTo,
+    double FillAngle,
     Color Stroke,
     Color TextColor,
     double StrokeThickness,
@@ -21,6 +23,8 @@ public record ShapeStyle(
 {
     public static readonly ShapeStyle Default = new(
         DiagramShape.DefaultFill,
+        null,
+        90,
         DiagramShape.DefaultStroke,
         DiagramShape.DefaultTextColor,
         2,
@@ -34,6 +38,8 @@ public record ShapeStyle(
 
     public static ShapeStyle From(DiagramShape shape) => new(
         shape.Fill,
+        shape.FillTo,
+        shape.FillAngle,
         shape.Stroke,
         shape.TextColor,
         shape.StrokeThickness,
@@ -48,6 +54,8 @@ public record ShapeStyle(
     public void ApplyTo(DiagramShape shape)
     {
         shape.Fill = Fill;
+        shape.FillTo = FillTo;
+        shape.FillAngle = FillAngle;
         shape.Stroke = Stroke;
         shape.StrokeThickness = StrokeThickness;
         shape.StrokeStyle = StrokeStyle;

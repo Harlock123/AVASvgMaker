@@ -392,7 +392,12 @@ public class DrawingCanvas : Decorator
         {
             var page = PageRect;
             context.DrawRectangle(ShadowBrush, null, page.Translate(new Vector(Screen(3), Screen(3))));
-            context.DrawRectangle(PageBrush, null, page);
+            context.DrawRectangle(Document.CurrentPage.Paper(), null, page);
+
+            // The page's own furniture, under the drawing, and clipped to the paper so a
+            // watermark that overruns does not spill onto the workspace round it.
+            using (context.PushClip(page))
+                PageFurniture.DrawWatermark(context, Document, Document.CurrentPage);
 
             if (Grid.ShowGrid)
                 RenderGrid(context);
@@ -1029,6 +1034,13 @@ public class DrawingCanvas : Decorator
 
     public void SetFill(Color value) =>
         ApplyFormat(shape => shape.Fill = value, style => style with { Fill = value });
+
+    /// <summary>The far end of a fade, or nothing at all to fill flat again.</summary>
+    public void SetFillTo(Color? value) =>
+        ApplyFormat(shape => shape.FillTo = value, style => style with { FillTo = value });
+
+    public void SetFillAngle(double value) =>
+        ApplyFormat(shape => shape.FillAngle = value, style => style with { FillAngle = value });
 
     public void SetStroke(Color value) =>
         ApplyFormat(shape => shape.Stroke = value, style => style with { Stroke = value });

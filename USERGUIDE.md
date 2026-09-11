@@ -145,7 +145,7 @@ The properties panel down the right formats everything selected at once.
 
 | Section | What it sets |
 |---|---|
-| FILL | The colour inside a shape, from a palette or a hex value, or None for no fill at all |
+| FILL | The colour inside a shape, from a palette or a hex value, or None for no fill at all - and a fade to a second colour |
 | LINE | The outline colour or None, the style - solid, dashed or dotted - and the weight |
 | TEXT | The colour, size, font, bold, italic and alignment of the label |
 
@@ -209,6 +209,47 @@ in the dialog.
 
 The data belongs to the shape. It is saved with your drawing, and it travels to Visio and back:
 a Visio drawing whose stencil defines fields arrives with those fields ready to fill in.
+
+## Fades
+
+![Fades on shapes and on the paper](Images/fades.png)
+
+A shape can be filled with a **fade** that runs from one colour to another. Tick **Fade to** in
+the properties panel, pick the second colour, and choose which way it runs: down, up, across,
+back or diagonally. The fill colour you already had stays the near end, so turning the fade off
+again leaves the shape as it was.
+
+It works on pools, lanes and containers too, which is where it is most useful - a band of
+colour at a lane's heading that thins out across the rest of it.
+
+The **paper** can fade the same way, in **File -> Page setup**.
+
+## Watermarks, headers and footers
+
+![A page with a watermark, a header and a footer](Images/page-furniture.png)
+
+**File -> Page furniture...** puts words across the page and a line of text along the top and
+the bottom.
+
+None of it is a shape: you cannot click it, drag it or glue a connector to it. It belongs to the
+page, so it stays where it is put.
+
+A header or footer can be written with these in braces, and they are filled in as the page is
+drawn:
+
+| | |
+|---|---|
+| `{page}` | Which page this is |
+| `{pages}` | How many pages there are |
+| `{name}` | The page's name, as shown on its tab |
+| `{date}` `{time}` | When it was drawn |
+
+A footer of `Page {page} of {pages}` is therefore right on every page, and stays right when you
+add, delete or reorder pages.
+
+The watermark is drawn under your diagram so the diagram stays readable, and it is sized to
+cross the page rather than set in points. Either the watermark or the header and footer can be
+set on this page alone or on every page at once.
 
 ## Arranging
 

@@ -42,7 +42,7 @@ public class PathShape : DiagramShape
         // Filled or not is the fill colour's business, not the outline's. An SVG path is
         // filled whether or not it closes - the fill shuts each subpath for itself - so a
         // shape that happens to end without a Z is not thereby a line.
-        context.DrawGeometry(new SolidColorBrush(Fill), CreatePen(), CreateGeometry());
+        context.DrawGeometry(FillBrush(), CreatePen(), CreateGeometry());
 
         if (Detail is { } detail)
             context.DrawGeometry(null, CreatePen(), StencilPath.ToGeometry(detail, Bounds));

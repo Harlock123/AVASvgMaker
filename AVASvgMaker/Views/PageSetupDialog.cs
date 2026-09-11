@@ -10,7 +10,8 @@ using AVASvgMaker.Models;
 namespace AVASvgMaker.Views;
 
 /// <summary>The paper chosen, and whether every page is to be put on it.</summary>
-public record PageSetup(Size Size, double Margin, bool AllPages);
+public record PageSetup(
+    Size Size, double Margin, bool AllPages, Color Background, Color? BackgroundTo, double BackgroundAngle);
 
 /// <summary>Chooses the size of a page. Returns the choice, or null if it was cancelled.</summary>
 public class PageSetupDialog : Window
@@ -28,12 +29,24 @@ public class PageSetupDialog : Window
     private readonly NumericUpDown _margin = new() { Width = 150, Minimum = 0, Maximum = 500, Increment = 8 };
     private readonly TextBlock _summary = new()
         { FontSize = 11, Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
+    private readonly ColorSwatchPicker _paper = new();
+    private readonly ColorSwatchPicker _paperTo = new();
+
+    private readonly CheckBox _fade = new()
+    {
+        Content = "Fade to",
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    private readonly ComboBox _fadeAngle = new() { Width = 104 };
     private readonly Rect? _drawing;
 
     /// <summary>Guards the boxes against reacting while they are being filled in.</summary>
     private bool _syncing;
 
-    private PageSetupDialog(double width, double height, double margin, Rect? drawing, int pageCount)
+    private PageSetupDialog(
+        double width, double height, double margin, Rect? drawing, int pageCount,
+        Color background, Color? backgroundTo, double backgroundAngle)
     {
         _drawing = drawing;
 
@@ -64,6 +77,36 @@ public class PageSetupDialog : Window
         layout.Children.Add(Row("Width", _width));
         layout.Children.Add(Row("Height", _height));
         layout.Children.Add(Row("Margin", _margin));
+
+        _paper.Color = background;
+        _paperTo.Color = backgroundTo ?? background;
+        _fade.IsChecked = backgroundTo is not null;
+        _fade.IsCheckedChanged += (_, _) => ShowFade();
+
+        foreach (var (caption, angle) in new[]
+                 { ("Down", 90), ("Up", 270), ("Across", 0), ("Back", 180), ("Diagonal", 45) })
+            _fadeAngle.Items.Add(new ComboBoxItem { Content = caption, Tag = angle });
+
+        _fadeAngle.SelectedItem = _fadeAngle.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (int)item.Tag! == (int)backgroundAngle)
+            ?? _fadeAngle.Items.OfType<ComboBoxItem>().First();
+
+        layout.Children.Add(Row("Paper", new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { _paper, _fade }
+        }));
+
+        _fadeRow = Row("Fades to", new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { _paperTo, _fadeAngle }
+        });
+
+        layout.Children.Add(_fadeRow);
+        ShowFade();
         layout.Children.Add(_summary);
 
         // Only worth asking when there is more than one page to ask about.
@@ -87,7 +130,10 @@ public class PageSetupDialog : Window
 
         var ok = new Button { Content = "OK", MinWidth = 88, IsDefault = true };
         ok.Click += (_, _) => Close(new PageSetup(
-            new Size(Value(_width), Value(_height)), Value(_margin), _allPages.IsChecked == true));
+            new Size(Value(_width), Value(_height)), Value(_margin), _allPages.IsChecked == true,
+            _paper.Color,
+            _fade.IsChecked == true ? _paperTo.Color : null,
+            _fadeAngle.SelectedItem is ComboBoxItem { Tag: int angle } ? angle : 90));
 
         var cancel = new Button { Content = "Cancel", MinWidth = 88, IsCancel = true };
         cancel.Click += (_, _) => Close(null);
@@ -210,10 +256,21 @@ public class PageSetupDialog : Window
                         $"{width / 96 * 25.4:0} x {height / 96 * 25.4:0} mm";
     }
 
-    public static async Task<PageSetup?> ShowAsync(
-        Window owner, double width, double height, double margin, Rect? drawing, int pageCount)
+    private Control? _fadeRow;
+
+    private void ShowFade()
     {
-        var dialog = new PageSetupDialog(width, height, margin, drawing, pageCount);
+        if (_fadeRow is not null)
+            _fadeRow.IsVisible = _fade.IsChecked == true;
+    }
+
+    public static async Task<PageSetup?> ShowAsync(
+        Window owner, double width, double height, double margin, Rect? drawing, int pageCount,
+        Color background, Color? backgroundTo, double backgroundAngle)
+    {
+        var dialog = new PageSetupDialog(
+            width, height, margin, drawing, pageCount, background, backgroundTo, backgroundAngle);
+
         return await dialog.ShowDialog<PageSetup?>(owner);
     }
 }

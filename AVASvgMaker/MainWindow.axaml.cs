@@ -68,6 +68,7 @@ public partial class MainWindow : Window
         Canvas.Document.Changed += SyncProperties;
 
         FillPicker.ColorPicked += OnFillPicked;
+        FillToPicker.ColorPicked += OnFillToPicked;
         LinePicker.ColorPicked += OnLinePicked;
         TextPicker.ColorPicked += OnTextPicked;
         Canvas.StatusChanged += text => StatusText.Text = text;
@@ -438,6 +439,49 @@ public partial class MainWindow : Window
         Canvas.SetFill(FillNoneCheck.IsChecked == true ? Colors.Transparent : FillPicker.Color);
     }
 
+    /// <summary>
+    /// Turning a fade on gives it a far end to run to. Something visibly different from the
+    /// near one, so that switching it on shows something rather than appearing to do nothing.
+    /// </summary>
+    private void OnFadeChanged(object? sender, RoutedEventArgs e)
+    {
+        if (Canvas is null || _syncing || FadeCheck.IsChecked is null)
+            return;
+
+        Canvas.SetFillTo(FadeCheck.IsChecked == true ? Softer(FillPicker.Color) : null);
+        SyncProperties();
+    }
+
+    private void OnFillToPicked(Color colour)
+    {
+        _syncing = true;
+        FadeCheck.IsChecked = true;
+        _syncing = false;
+
+        Canvas.SetFillTo(colour);
+        SyncProperties();
+    }
+
+    private void OnFadeAngleChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (Canvas is null || _syncing ||
+            FadeAngleBox.SelectedItem is not ComboBoxItem { Tag: string tag } ||
+            !double.TryParse(tag, NumberStyles.Float, CultureInfo.InvariantCulture, out var angle))
+            return;
+
+        Canvas.SetFillAngle(angle);
+    }
+
+    /// <summary>A paler version of a colour, for the far end of a fade to start out as.</summary>
+    private static Color Softer(Color colour)
+    {
+        byte Lift(byte channel) => (byte)(channel + (255 - channel) * 0.55);
+
+        return colour.A == 0
+            ? Color.FromArgb(255, 0xF2, 0xF5, 0xFA)
+            : Color.FromArgb(colour.A, Lift(colour.R), Lift(colour.G), Lift(colour.B));
+    }
+
     private void OnLinePicked(Color colour)
     {
         _syncing = true;
@@ -582,6 +626,17 @@ public partial class MainWindow : Window
 
         if (!fillMixed && style.Fill.A != 0)
             FillPicker.Color = style.Fill;
+
+        var fadeMixed = Differs(selection, s => s.FillTo);
+
+        FadeCheck.IsChecked = fadeMixed ? null : style.FillTo is not null;
+        FadeRow.IsVisible = !fadeMixed && style.FillTo is not null;
+        FillToPicker.IsMixed = fadeMixed;
+
+        if (style.FillTo is { } far)
+            FillToPicker.Color = far;
+
+        Choose(FadeAngleBox, Whole(style.FillAngle), Differs(selection, s => s.FillAngle));
 
         var lineMixed = Differs(selection, s => s.Stroke);
         LinePicker.IsMixed = lineMixed;
@@ -1377,20 +1432,56 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnPageFurnitureClick(object? sender, RoutedEventArgs e) => _ = PageFurnitureAsync();
+
+    /// <summary>What the page carries besides its shapes: a watermark, a header, a footer.</summary>
+    private async Task PageFurnitureAsync()
+    {
+        Canvas.CommitEdit();
+
+        var document = Canvas.Document;
+        var page = document.CurrentPage;
+
+        var chosen = await PageFurnitureDialog.ShowAsync(
+            this, page.Watermark, page.WatermarkColor, page.WatermarkAngle,
+            page.Header, page.Footer, page.HeadFootSize, page.HeadFootColor,
+            document.Pages.Count);
+
+        if (chosen is null)
+            return;
+
+        document.SetFurniture(
+            chosen.Watermark, chosen.WatermarkColor, chosen.WatermarkAngle,
+            chosen.Header, chosen.Footer, chosen.HeadFootSize, chosen.HeadFootColor,
+            chosen.AllPages);
+
+        Canvas.InvalidateVisual();
+
+        var what = chosen.AllPages && document.Pages.Count > 1 ? "Every page" : "This page";
+
+        StatusText.Text = chosen.Watermark.Length + chosen.Header.Length + chosen.Footer.Length == 0
+            ? $"{what} is bare"
+            : $"{what} now carries its own heading";
+    }
+
     private async void OnPageSetupClick(object? sender, RoutedEventArgs e)
     {
         Canvas.CommitEdit();
 
         var document = Canvas.Document;
+        var page = document.CurrentPage;
+
         var setup = await PageSetupDialog.ShowAsync(
             this, document.PageWidth, document.PageHeight, document.Margin,
-            document.DrawingBounds, document.Pages.Count);
+            document.DrawingBounds, document.Pages.Count,
+            page.Background, page.BackgroundTo, page.BackgroundAngle);
 
         if (setup is null)
             return;
 
         document.SetPageSize(setup.Size.Width, setup.Size.Height, setup.AllPages);
         document.SetMargin(setup.Margin, setup.AllPages);
+        document.SetPaper(setup.Background, setup.BackgroundTo, setup.BackgroundAngle, setup.AllPages);
         Canvas.SyncPageSize();
 
         var what = setup.AllPages && document.Pages.Count > 1 ? "Every page" : "This page";

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
+using Avalonia.Media;
 using AVASvgMaker.Models;
 
 namespace AVASvgMaker.Engine;
@@ -966,6 +967,60 @@ public class DiagramDocument
     /// recorded when the pages already have that size.
     /// </summary>
     /// <summary>Sets the margin guide, on the current page or on all of them.</summary>
+    /// <summary>What the paper is painted with: one colour, or a run between two.</summary>
+    public void SetPaper(Color background, Color? backgroundTo, double angle, bool allPages = false)
+    {
+        var targets = allPages ? _pages : (IReadOnlyList<DiagramPage>)[CurrentPage];
+        var changed = false;
+
+        foreach (var page in targets)
+        {
+            if (page.Background == background && page.BackgroundTo == backgroundTo &&
+                Math.Abs(page.BackgroundAngle - angle) < 0.01)
+                continue;
+
+            page.Background = background;
+            page.BackgroundTo = backgroundTo;
+            page.BackgroundAngle = angle;
+            changed = true;
+        }
+
+        if (changed)
+            MarkModified();
+    }
+
+    /// <summary>The page's own furniture: what it says across it, and along its edges.</summary>
+    public void SetFurniture(
+        string watermark, Color watermarkColour, double watermarkAngle,
+        string header, string footer, double headFootSize, Color headFootColour,
+        bool allPages = false)
+    {
+        var targets = allPages ? _pages : (IReadOnlyList<DiagramPage>)[CurrentPage];
+        var changed = false;
+
+        foreach (var page in targets)
+        {
+            if (page.Watermark == watermark && page.WatermarkColor == watermarkColour &&
+                Math.Abs(page.WatermarkAngle - watermarkAngle) < 0.01 &&
+                page.Header == header && page.Footer == footer &&
+                Math.Abs(page.HeadFootSize - headFootSize) < 0.01 &&
+                page.HeadFootColor == headFootColour)
+                continue;
+
+            page.Watermark = watermark;
+            page.WatermarkColor = watermarkColour;
+            page.WatermarkAngle = watermarkAngle;
+            page.Header = header;
+            page.Footer = footer;
+            page.HeadFootSize = headFootSize;
+            page.HeadFootColor = headFootColour;
+            changed = true;
+        }
+
+        if (changed)
+            MarkModified();
+    }
+
     public void SetMargin(double margin, bool allPages = false)
     {
         margin = Math.Max(0, margin);

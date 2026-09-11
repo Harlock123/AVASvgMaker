@@ -70,6 +70,7 @@
                 <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Click="OnSaveAsClick" />
                 <Separator />
                 <MenuItem Header="Page set_up..." Click="OnPageSetupClick" />
+                <MenuItem Header="Page _furniture..." Click="OnPageFurnitureClick" />
                 <Separator />
                 <MenuItem Header="_Import">
                     <MenuItem Header="_SVG..." Click="OnImportSvgClick" />
@@ -330,6 +331,20 @@
                         <views:ColorSwatchPicker x:Name="FillPicker" />
                         <CheckBox x:Name="FillNoneCheck" Content="None" VerticalAlignment="Center"
                                   IsThreeState="True" IsCheckedChanged="OnFillNoneChanged" />
+                    </StackPanel>
+
+                    <CheckBox x:Name="FadeCheck" Content="Fade to" Margin="0,4,0,0"
+                              IsThreeState="True" IsCheckedChanged="OnFadeChanged" />
+
+                    <StackPanel x:Name="FadeRow" Orientation="Horizontal" Spacing="8" IsVisible="False">
+                        <views:ColorSwatchPicker x:Name="FillToPicker" />
+                        <ComboBox x:Name="FadeAngleBox" Width="104" SelectionChanged="OnFadeAngleChanged">
+                            <ComboBoxItem Tag="90">Down</ComboBoxItem>
+                            <ComboBoxItem Tag="270">Up</ComboBoxItem>
+                            <ComboBoxItem Tag="0">Across</ComboBoxItem>
+                            <ComboBoxItem Tag="180">Back</ComboBoxItem>
+                            <ComboBoxItem Tag="45">Diagonal</ComboBoxItem>
+                        </ComboBox>
                     </StackPanel>
 
                     <TextBlock Classes="section" Text="LINE" />

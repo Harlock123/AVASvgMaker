@@ -90,7 +90,7 @@ public class ContainerShape : DiagramShape
     {
         var pen = CreatePen();
 
-        context.DrawRectangle(new SolidColorBrush(Fill), pen, Bounds);
+        context.DrawRectangle(FillBrush(), pen, Bounds);
         context.DrawRectangle(new SolidColorBrush(HeaderFill()), pen, HeaderBounds);
 
         if (withText)

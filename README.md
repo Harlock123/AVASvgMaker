@@ -74,6 +74,8 @@ Or [build it yourself](#building).
 - **Align, distribute and match size** - line a selection up on any edge, space it evenly, or size it to the shape selected last
 - **Drawing order** - bring to front, forward, backward, send to back, for one shape or a group
 - **Shape formatting** - fill and line colour, line style and weight, and for text the colour, size, font, bold, italic and alignment, applied to the whole selection from a properties panel
+- **Fades** - any shape, and the paper itself, can run from one colour to another in any of five directions
+- **Page furniture** - a watermark across the page and a line along the top and the bottom, which can name the page number, the count, the page's name or the date
 - **Containers and swimlanes** - pools, lanes and grouping boxes that hold what is dropped into them and carry it when they move, with lanes you can drag to different heights
 - **Data behind a shape** - named fields a shape carries, which its label can show and which travel with it into `.avadiag` and Visio alike
 
@@ -402,7 +404,7 @@ heights, version 9 the font a label is in, version 10 grouping, version 11 the m
 version 12 rotation, version 13 shapes carrying an outline of their own, version 14 a
 connector label moved by hand, version 15 markings drawn over a path's face and not filled, and
 version 16 where a label sits in its shape - or outside it, and version 17 the data a shape
-carries. Older files still load: a version 5 file, which
+carries, and version 18 fades and a page's own furniture. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
@@ -414,7 +416,8 @@ outlines of its own, because nothing could make one; and a file up to version 13
 labels, so they sit where the line puts them; and a file up to version 14 has no markings over
 a path, because nothing could make those either; and a file up to version 15 puts every label
 in the middle of the shape it belongs to, which was the only place there was; and a file up to
-version 16 has no data on its shapes, there having been nowhere to put any. The on-disk
+version 16 has no data on its shapes, there having been nowhere to put any; and a file up to
+version 17 has white paper, flat fills and bare pages, none of which could be said otherwise. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -442,7 +445,7 @@ fields because its end points define it.
 
 | Group | What it does |
 |---|---|
-| **File menu** | New, Open, Save, Save As, Page set up, Import (SVG, Visio), Export (SVG, PDF, Visio, PNG, JPEG, WebP, BMP), Exit |
+| **File menu** | New, Open, Save, Save As, Page set up, Page furniture, Import (SVG, Visio), Export (SVG, PDF, Visio, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, Reset label position, Shape data, and saving a selection as a shape of your own |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, rotating left, right or straight, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
@@ -465,7 +468,7 @@ Down the right-hand side, applying to everything selected:
 
 | | |
 |---|---|
-| **Fill** | Colour from a 24-swatch palette or a hex value, or None for a shape with no fill at all |
+| **Fill** | Colour from a 24-swatch palette or a hex value, or None for a shape with no fill at all; and a **fade** to a second colour in any of five directions |
 | **Line** | Colour or None, style (solid, dashed, dotted), and weight |
 | **Text** | Colour, size, font, bold, italic, and where the label sits in its shape - left, centred or right, and top, middle or bottom |
 
@@ -543,6 +546,56 @@ The data is the shape's own. It is saved with the drawing, copied with the shape
 out to Visio and back: Visio keeps the same thing in a shape's Property section, and a drawing
 whose stencil defines fields - a name, a location, a room - arrives with those fields on the
 shapes that have them, ready to fill in.
+
+## Fades
+
+![Fades on shapes and on the paper](Images/fades.png)
+
+Any shape can be filled with a **fade** that runs from one colour to another: tick **Fade to**
+in the properties panel, pick the far colour, and choose which way it runs - down, up, across,
+back or diagonally. The fill colour stays the near end, so a shape that stops fading keeps the
+colour it had.
+
+It works on everything a colour works on, pools and lanes and containers included, which is
+where a fade earns its keep: a band of colour at the heading of a lane that thins out across
+the rest of it reads as a heading without shouting.
+
+The **paper** fades the same way, from **Page setup**. A page that is not flat white is often
+all a diagram needs to stop looking like a screenshot of a spreadsheet.
+
+Two stops and an angle, and no more than that. Three stops, a radial sweep, a mid-point that is
+not the middle - those are a painting tool's business, and each would have to be carried
+through the file, the SVG, the PDF and Visio for the sake of an effect nobody asked for.
+
+## Page furniture
+
+![A page with a watermark, a header and a footer](Images/page-furniture.png)
+
+**File -> Page furniture...** puts a **watermark** across the page and a line of text along the
+**top** and the **bottom**.
+
+None of it is a shape. It cannot be selected, dragged or glued to, and it is drawn by the page
+rather than being part of the drawing - which is the point of it: a footer that could be
+dragged out of place would be worse than no footer. The watermark goes under the drawing so
+that what is on the page stays readable over it; the header and footer go over.
+
+A header or footer can name things in the same braces a shape's label uses, so there is one
+thing to learn rather than two:
+
+| | |
+|---|---|
+| `{page}` | Which page this is |
+| `{pages}` | How many there are |
+| `{name}` | The page's name, as the tab shows it |
+| `{date}` `{time}` | When it was drawn - filled in as it is drawn, not as it was typed |
+
+So a footer of `Page {page} of {pages}   ·   {date}` is right on every page and stays right
+when pages are added, removed or reordered. It is saved as the question, not the answer.
+
+The watermark is sized to cross the page rather than set in points: what it is for is to be
+unmissable. It can run diagonally, across, steeply or straight up.
+
+Either can be set on this page alone or on every page at once.
 
 ## Rotation
 
@@ -974,7 +1027,8 @@ AVASvgMaker/
     PageSize.cs          The paper presets, and matching a size back to one
   Engine/     Document state, with no UI dependencies
     DiagramDocument.cs   Pages, page size, z-ordered shape list, hit testing, clamping, change events
-    DiagramPage.cs       One page: a name and the shapes on it
+    DiagramPage.cs       One page: a name, its paper, its furniture and the shapes on it
+    PageFurniture.cs     The watermark, header and footer a page draws for itself
     DiagramFile.cs       The native .avadiag format - on-disk records, read and write
     ShapeClipboard.cs    Copy and paste, carried as the same JSON
     ShapeArranger.cs     Aligning, spacing, matching sizes and drawing order
@@ -1006,6 +1060,7 @@ AVASvgMaker/
     PageSetupDialog.cs   Paper size, orientation, and fit-to-drawing
     RasterExportDialog.cs  Export scale and quality, and the pixel size it comes to
     ShapeDataDialog.cs   The fields a shape carries, to fill in
+    PageFurnitureDialog.cs  The watermark, header and footer for a page
 
 AVASvgMaker.Tests/       The regression suite - headless, and no part of a release build
 Tools/GuideBuilder/      Turns USERGUIDE.md into USERGUIDE.pdf
@@ -1230,6 +1285,8 @@ Where it would go next, if it went anywhere:
 - A themed fill, which needs Visio's quick-style matrix rather than only its colours
 - A mapping between Visio's gallery of line ends and the twelve here, which needs a drawing
   that actually uses them to work out which of its numbers is which shape
+- A fade on a page or a shape does not go out to Visio, which keeps gradients in a form of its
+  own; such a shape exports as its near colour
 - Widening the block of a label that has not been moved: the corners appear only once it has a
   block of its own, so nudging it is the way to get at them
 - Anything that treats the data as data - a report, a filter, colouring a shape by a field's

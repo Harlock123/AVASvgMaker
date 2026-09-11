@@ -77,11 +77,15 @@ public static class RasterExporter
 
         using (var context = bitmap.CreateDrawingContext())
         {
-            context.DrawRectangle(Brushes.White, null,
+            context.DrawRectangle(document.CurrentPage.Paper(), null,
                 new Rect(0, 0, document.PageWidth, document.PageHeight));
+
+            PageFurniture.DrawWatermark(context, document, document.CurrentPage);
 
             foreach (var shape in document.Shapes)
                 shape.Render(context);
+
+            PageFurniture.DrawRunningHeads(context, document, document.CurrentPage);
         }
 
         switch (format)

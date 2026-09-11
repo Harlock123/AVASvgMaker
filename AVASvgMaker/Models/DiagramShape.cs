@@ -84,6 +84,19 @@ public abstract class DiagramShape
         return sb.ToString();
     }
     public Color Fill { get; set; } = DefaultFill;
+
+    /// <summary>
+    /// The far end of a fill that fades, and the direction it fades in. Nothing for a shape
+    /// filled flat, which is most of them - <see cref="Fill"/> is the near end either way, so
+    /// a shape that stops fading keeps the colour it had.
+    /// </summary>
+    public Color? FillTo { get; set; }
+
+    /// <summary>Degrees clockwise from left-to-right: 0 runs across, 90 runs down.</summary>
+    public double FillAngle { get; set; } = 90;
+
+    /// <summary>The fade this shape is filled with, if it fades at all.</summary>
+    public Gradient? Fade => FillTo is { } far ? new Gradient(Fill, far, FillAngle) : null;
     public Color Stroke { get; set; } = DefaultStroke;
     public Color TextColor { get; set; } = DefaultTextColor;
     public double StrokeThickness { get; set; } = 2;
@@ -372,11 +385,13 @@ public abstract class DiagramShape
         Draw(context, withText);
     }
 
+    /// <summary>What the shape is filled with: one colour, or a run between two.</summary>
+    protected IBrush FillBrush() => Fade?.Brush() ?? new SolidColorBrush(Fill);
+
     /// <summary>Draws the shape upright; <paramref name="withText"/> is false while its label is being edited.</summary>
     protected virtual void Draw(DrawingContext context, bool withText)
     {
-        var brush = new SolidColorBrush(Fill);
-        context.DrawGeometry(brush, CreatePen(), CreateGeometry());
+        context.DrawGeometry(FillBrush(), CreatePen(), CreateGeometry());
 
         if (withText)
             RenderText(context);
@@ -544,8 +559,35 @@ public abstract class DiagramShape
     protected abstract string SvgBody();
 
     protected string SvgStyle() =>
-        $"fill=\"{SvgPaint(Fill)}\" stroke=\"{SvgPaint(Stroke)}\" " +
+        $"fill=\"{SvgFill()}\" stroke=\"{SvgPaint(Stroke)}\" " +
         $"stroke-width=\"{Num(StrokeThickness)}\"{SvgDash()}";
+
+    /// <summary>
+    /// The paint for the body. A fade is a definition elsewhere in the file pointed at by
+    /// name, so asking for the paint is also what puts the definition in - see
+    /// <see cref="SvgDefs"/>, which the shape's own element carries with it.
+    /// </summary>
+    private string SvgFill()
+    {
+        if (Fade is not { } fade)
+            return SvgPaint(Fill);
+
+        var (defs, paint) = fade.Svg();
+        _svgDefs = defs;
+
+        return paint;
+    }
+
+    /// <summary>The definitions the last <see cref="SvgStyle"/> asked for, and nothing after.</summary>
+    protected string SvgDefs()
+    {
+        var defs = _svgDefs;
+        _svgDefs = string.Empty;
+
+        return defs;
+    }
+
+    private string _svgDefs = string.Empty;
 
     /// <summary>Dash lengths in user units, matching what <see cref="CreatePen"/> draws.</summary>
     protected string SvgDash() => StrokeStyle switch
@@ -571,8 +613,16 @@ public abstract class DiagramShape
                           $"{Num(Bounds.Center.X)} {Num(Bounds.Center.Y)})\">");
 
         var body = SvgBody();
+
+        // The body is written first because writing it is what settles whether a fade was
+        // used; its definition then goes in ahead of it, which SVG is content with either way.
         if (!string.IsNullOrEmpty(body))
+        {
+            if (SvgDefs() is { Length: > 0 } defs)
+                sb.AppendLine("  " + defs);
+
             sb.AppendLine("  " + body);
+        }
 
         if (!string.IsNullOrWhiteSpace(DisplayText))
             sb.Append(SvgText());

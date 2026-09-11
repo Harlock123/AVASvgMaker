@@ -100,7 +100,7 @@ public class CylinderShape : DiagramShape
 
     protected override void Draw(DrawingContext context, bool withText)
     {
-        var brush = new SolidColorBrush(Fill);
+        var brush = FillBrush();
         var pen = CreatePen();
 
         context.DrawGeometry(brush, pen, CreateGeometry());

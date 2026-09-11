@@ -35,7 +35,7 @@ public class StencilShape : DiagramShape
         var pen = CreatePen();
 
         if (_stencil.Outline is not null)
-            context.DrawGeometry(new SolidColorBrush(Fill), pen, CreateGeometry());
+            context.DrawGeometry(FillBrush(), pen, CreateGeometry());
 
         if (_stencil.Detail is { } detail)
             context.DrawGeometry(null, pen, StencilPath.ToGeometry(detail, Bounds));

@@ -30,7 +30,7 @@ public static partial class DiagramFile
     /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand.
     /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 17;
+    public const int CurrentVersion = 18;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -77,6 +77,34 @@ public static partial class DiagramFile
 
         /// <summary>Version 11 onwards, and omitted when there is no margin guide to draw.</summary>
         public double? Margin { get; set; }
+
+        /// <summary>
+        /// The paper, version 18 onwards. Written only for a page that is not plain white,
+        /// which is nearly all of them.
+        /// </summary>
+        public string? Background { get; set; }
+
+        public string? BackgroundTo { get; set; }
+
+        public double? BackgroundAngle { get; set; }
+
+        /// <summary>
+        /// The page's own furniture, version 18 onwards: words across it, and a line along the
+        /// top and the bottom. Written only for a page that has any.
+        /// </summary>
+        public string? Watermark { get; set; }
+
+        public string? WatermarkColor { get; set; }
+
+        public double? WatermarkAngle { get; set; }
+
+        public string? Header { get; set; }
+
+        public string? Footer { get; set; }
+
+        public double? HeadFootSize { get; set; }
+
+        public string? HeadFootColor { get; set; }
 
         public List<ShapeRecord> Shapes { get; set; } = [];
     }
@@ -165,6 +193,14 @@ public static partial class DiagramFile
         public double[]? TextFrame { get; set; }
 
         /// <summary>
+        /// The far end of a fill that fades, and which way it runs. Version 18 onwards, and
+        /// written only for a shape that fades at all.
+        /// </summary>
+        public string? FillTo { get; set; }
+
+        public double? FillAngle { get; set; }
+
+        /// <summary>
         /// The data the shape carries. Version 17 onwards, and written only for a shape that
         /// carries any - which is most of them not at all.
         /// </summary>
@@ -248,7 +284,21 @@ public static partial class DiagramFile
                 Name = page.Name,
                 Width = page.Width,
                 Height = page.Height,
-                Margin = page.Margin > 0 ? page.Margin : null
+                Margin = page.Margin > 0 ? page.Margin : null,
+                Background = page.Background == Colors.White ? null : page.Background.ToString(),
+                BackgroundTo = page.BackgroundTo?.ToString(),
+                BackgroundAngle = page.BackgroundTo is null || Math.Abs(page.BackgroundAngle - 90) < 1e-9
+                    ? null
+                    : page.BackgroundAngle,
+                Watermark = Said(page.Watermark),
+                WatermarkColor = page.Watermark.Length == 0 ? null : page.WatermarkColor.ToString(),
+                WatermarkAngle = page.Watermark.Length == 0 ? null : page.WatermarkAngle,
+                Header = Said(page.Header),
+                Footer = Said(page.Footer),
+                HeadFootSize = page.Header.Length + page.Footer.Length == 0 ? null : page.HeadFootSize,
+                HeadFootColor = page.Header.Length + page.Footer.Length == 0
+                    ? null
+                    : page.HeadFootColor.ToString()
             };
 
             foreach (var shape in page.Shapes)
@@ -290,6 +340,10 @@ public static partial class DiagramFile
             Height = isConnector ? null : bounds.Height,
             Text = string.IsNullOrEmpty(shape.Text) ? null : shape.Text,
             Fill = shape.Fill.ToString(),
+            FillTo = shape.FillTo?.ToString(),
+            FillAngle = shape.FillTo is null || Math.Abs(shape.FillAngle - 90) < 1e-9
+                ? null
+                : shape.FillAngle,
             Stroke = shape.Stroke.ToString(),
             TextColor = shape.TextColor.ToString(),
             StrokeThickness = shape.StrokeThickness,
@@ -406,6 +460,18 @@ public static partial class DiagramFile
             }
 
             page.Margin = Math.Max(0, pageRecord.Margin ?? 0);
+            page.Background = ToColor(pageRecord.Background, Colors.White);
+            page.BackgroundTo = pageRecord.BackgroundTo is { Length: > 0 } far
+                ? ToColor(far, Colors.White)
+                : null;
+            page.BackgroundAngle = pageRecord.BackgroundAngle ?? 90;
+            page.Watermark = pageRecord.Watermark ?? string.Empty;
+            page.WatermarkColor = ToColor(pageRecord.WatermarkColor, page.WatermarkColor);
+            page.WatermarkAngle = pageRecord.WatermarkAngle ?? -30;
+            page.Header = pageRecord.Header ?? string.Empty;
+            page.Footer = pageRecord.Footer ?? string.Empty;
+            page.HeadFootSize = pageRecord.HeadFootSize is > 0 and var size ? size : 11;
+            page.HeadFootColor = ToColor(pageRecord.HeadFootColor, page.HeadFootColor);
 
             // First pass builds the shapes, second pass glues connectors to them, so a
             // connector can reference a shape that is drawn above it. The table is per page,
@@ -488,6 +554,8 @@ public static partial class DiagramFile
 
         shape.Text = record.Text ?? string.Empty;
         shape.Fill = ToColor(record.Fill, DiagramShape.DefaultFill);
+        shape.FillTo = record.FillTo is { Length: > 0 } fades ? ToColor(fades, shape.Fill) : null;
+        shape.FillAngle = record.FillAngle ?? 90;
         shape.Stroke = ToColor(record.Stroke, DiagramShape.DefaultStroke);
         shape.TextColor = ToColor(record.TextColor, DiagramShape.DefaultTextColor);
         shape.StrokeThickness = record.StrokeThickness > 0 ? record.StrokeThickness : 2;
@@ -536,6 +604,9 @@ public static partial class DiagramFile
 
     private static T Parse<T>(string? text, T fallback) where T : struct, Enum =>
         Enum.TryParse<T>(text, out var value) ? value : fallback;
+
+    /// <summary>Text worth writing down, which is text that says something.</summary>
+    private static string? Said(string text) => string.IsNullOrWhiteSpace(text) ? null : text;
 
     private static Color ToColor(string? text, Color fallback) =>
         Color.TryParse(text, out var color) ? color : fallback;

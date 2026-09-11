@@ -58,7 +58,7 @@ public static class PdfExporter
 
             var canvas = pdf.BeginPage((float)width, (float)height);
 
-            var visual = new PageVisual(page);
+            var visual = new PageVisual(document, page);
             visual.Measure(new Size(width, height));
             visual.Arrange(new Rect(0, 0, width, height));
 
@@ -79,18 +79,22 @@ public static class PdfExporter
     /// carrying. Skia's <c>RasterDpi</c> would scale the content too - it divides by it - but
     /// that is a side effect of a setting that means something else, so it is left alone.
     /// </summary>
-    private sealed class PageVisual(DiagramPage page) : Control
+    private sealed class PageVisual(DiagramDocument document, DiagramPage page) : Control
     {
         public override void Render(DrawingContext context)
         {
             using var scale = context.PushTransform(
                 Matrix.CreateScale(PointsPerPixel, PointsPerPixel));
 
-            context.DrawRectangle(Brushes.White, null,
+            context.DrawRectangle(page.Paper(), null,
                 new Rect(0, 0, page.Width, page.Height));
+
+            PageFurniture.DrawWatermark(context, document, page);
 
             foreach (var shape in page.Shapes)
                 shape.Render(context);
+
+            PageFurniture.DrawRunningHeads(context, document, page);
         }
     }
 }
