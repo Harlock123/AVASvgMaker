@@ -40,7 +40,8 @@ public class VisioTests
         double height = 6,
         bool background = false,
         string colours = "",
-        string theme = "")
+        string theme = "",
+        string styles = "")
     {
         var stream = new MemoryStream();
 
@@ -64,6 +65,7 @@ public class VisioTests
             Put("visio/document.xml",
                 $"<VisioDocument xmlns='{Main}'>" +
                 (colours.Length > 0 ? $"<Colors>{colours}</Colors>" : string.Empty) +
+                (styles.Length > 0 ? $"<StyleSheets>{styles}</StyleSheets>" : string.Empty) +
                 "</VisioDocument>");
 
             if (theme.Length > 0)
@@ -679,6 +681,171 @@ public class VisioTests
         Assert.Equal(1, connector.EndPort);
     }
 
+    /// <summary>A connector between two points, with whatever line-end cells are handed in.</summary>
+    private static string Line(string ends = "") =>
+        "<Shape ID='3' Type='Shape'>" +
+        "<Cell N='PinX' V='3'/><Cell N='PinY' V='4'/>" +
+        "<Cell N='Width' V='2'/><Cell N='Height' V='0'/>" +
+        "<Cell N='BeginX' V='2.5'/><Cell N='BeginY' V='4'/>" +
+        "<Cell N='EndX' V='4.5'/><Cell N='EndY' V='4'/>" + ends + "</Shape>";
+
+    /// <summary>One style sheet, pointing at another for whatever it does not say itself.</summary>
+    private static string Style(string id, string cells, string? next = null)
+    {
+        var chain = next is null
+            ? string.Empty
+            : $" LineStyle='{next}' FillStyle='{next}' TextStyle='{next}'";
+
+        return $"<StyleSheet ID='{id}' NameU='S{id}'{chain}>{cells}</StyleSheet>";
+    }
+
+    [AvaloniaFact]
+    public void AShapeTakesWhatItDoesNotStateFromItsStyle()
+    {
+        var read = VisioImporter.Read(Drawing(
+            Square(extra: "<Cell N='LineWeight' V='0.04'/>").Replace("<Shape ID='1'", "<Shape ID='1' LineStyle='4'"),
+            styles: Style("4", "<Cell N='LineColor' V='#aa3311'/><Cell N='LineWeight' V='0.01'/>")));
+
+        var shape = read.Document.Pages[0].Shapes[0];
+
+        // The colour comes from the style; the weight the shape states for itself outranks it.
+        Assert.Equal(Color.Parse("#aa3311"), shape.Stroke);
+        Assert.Equal(96 * 0.04, shape.StrokeThickness, 1);
+    }
+
+    [AvaloniaFact]
+    public void AStyleHandsOnWhatItDoesNotSayEither()
+    {
+        // How a real drawing is put together: Normal says nothing, and points at a style that
+        // points at another, and the answer is several links out from the shape.
+        var read = VisioImporter.Read(Drawing(
+            Square().Replace("<Shape ID='1'", "<Shape ID='1' LineStyle='3'"),
+            styles: Style("3", string.Empty, "6") +
+                    Style("6", string.Empty, "0") +
+                    Style("0", "<Cell N='LineColor' V='#123456'/>")));
+
+        Assert.Equal(Color.Parse("#123456"), read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void TheFirstStyleWithSomethingToSayIsTheOneThatSaysIt()
+    {
+        var read = VisioImporter.Read(Drawing(
+            Square().Replace("<Shape ID='1'", "<Shape ID='1' LineStyle='3'"),
+            styles: Style("3", "<Cell N='LineColor' V='#00ff00'/>", "0") +
+                    Style("0", "<Cell N='LineColor' V='#123456'/>")));
+
+        Assert.Equal(Colors.Lime, read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void EachKindOfCellFollowsItsOwnStyle()
+    {
+        // A shape points at three styles at once, and a cell goes to whichever of them it
+        // belongs to: the line style knows nothing about fills.
+        var shape = Square().Replace("<Shape ID='1'", "<Shape ID='1' LineStyle='1' FillStyle='2' TextStyle='3'");
+
+        var read = VisioImporter.Read(Drawing(shape,
+            styles: Style("1", "<Cell N='LineColor' V='#111111'/><Cell N='FillForegnd' V='#999999'/>") +
+                    Style("2", "<Cell N='FillForegnd' V='#222222'/><Cell N='LineColor' V='#999999'/>") +
+                    Style("3", "<Section N='Character'><Row IX='0'><Cell N='Size' V='0.25'/></Row></Section>")));
+
+        var box = read.Document.Pages[0].Shapes[0];
+
+        Assert.Equal(Color.Parse("#111111"), box.Stroke);
+        Assert.Equal(Color.Parse("#222222"), box.Fill);
+        Assert.Equal(24, box.FontSize, 1);
+    }
+
+    [AvaloniaFact]
+    public void AStyleSayingItIsThemedStillMeansTheTheme()
+    {
+        // The usual shape of a real drawing: the styles pass the question along until one of
+        // them says "ask the theme", and the walk has to stop there rather than carry on to
+        // the black-and-white defaults underneath.
+        var read = VisioImporter.Read(Drawing(
+            Square(extra: "<Cell N='QuickStyleLineColor' V='100'/>")
+                .Replace("<Shape ID='1'", "<Shape ID='1' LineStyle='6'"),
+            theme: Variation("AB12CD"),
+            styles: Style("6", "<Cell N='LineColor' V='Themed'/>", "0") +
+                    Style("0", "<Cell N='LineColor' V='0'/>")));
+
+        Assert.Equal(Color.Parse("#AB12CD"), read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void AStyleThatPointsAtItselfIsNotFollowedForEver()
+    {
+        var read = VisioImporter.Read(Drawing(
+            Square().Replace("<Shape ID='1'", "<Shape ID='1' LineStyle='5'"),
+            styles: Style("5", string.Empty, "5")));
+
+        Assert.Equal(DiagramShape.DefaultStroke, read.Document.Pages[0].Shapes[0].Stroke);
+    }
+
+    [AvaloniaFact]
+    public void AnArrowheadCanComeFromAStyleToo()
+    {
+        var read = VisioImporter.Read(Drawing(
+            Line().Replace("<Shape ID='3'", "<Shape ID='3' LineStyle='7'"),
+            styles: Style("7", "<Cell N='EndArrow' V='4'/>")));
+
+        var line = Assert.Single(read.Document.Pages[0].Shapes.OfType<ConnectorShape>());
+
+        Assert.Equal(EndCapStyle.Arrow, line.EndCap);
+        Assert.Equal(EndCapStyle.None, line.StartCap);
+    }
+
+    [AvaloniaFact]
+    public void AConnectorWithNoArrowStatedAnywhereIsDrawnWithout()
+    {
+        // Every imported connector used to be given an arrow whatever the drawing said, which
+        // put arrowheads on the plain associations of a use-case diagram that never had any.
+        var read = VisioImporter.Read(Drawing(Line()));
+        var line = Assert.Single(read.Document.Pages[0].Shapes.OfType<ConnectorShape>());
+
+        Assert.Equal(EndCapStyle.None, line.StartCap);
+        Assert.Equal(EndCapStyle.None, line.EndCap);
+    }
+
+    [AvaloniaFact]
+    public void AConnectorThatSaysItHasNoArrowIsDrawnWithout()
+    {
+        var read = VisioImporter.Read(Drawing(Line(
+            "<Cell N='BeginArrow' V='0'/><Cell N='EndArrow' V='0'/>")));
+
+        var line = Assert.Single(read.Document.Pages[0].Shapes.OfType<ConnectorShape>());
+
+        Assert.Equal(EndCapStyle.None, line.StartCap);
+        Assert.Equal(EndCapStyle.None, line.EndCap);
+    }
+
+    [AvaloniaFact]
+    public void AnEndTheDrawingAsksForIsDrawn()
+    {
+        // Which of Visio's forty-odd ends it is cannot be told from here, so it becomes an
+        // arrow - but that there is one at all is read, and read at the right end.
+        var read = VisioImporter.Read(Drawing(Line(
+            "<Cell N='BeginArrow' V='0'/><Cell N='EndArrow' V='4'/>")));
+
+        var line = Assert.Single(read.Document.Pages[0].Shapes.OfType<ConnectorShape>());
+
+        Assert.Equal(EndCapStyle.None, line.StartCap);
+        Assert.Equal(EndCapStyle.Arrow, line.EndCap);
+    }
+
+    [AvaloniaFact]
+    public void AnEndAtTheOtherEndIsDrawnThere()
+    {
+        var read = VisioImporter.Read(Drawing(Line(
+            "<Cell N='BeginArrow' V='13'/><Cell N='EndArrow' V='0'/>")));
+
+        var line = Assert.Single(read.Document.Pages[0].Shapes.OfType<ConnectorShape>());
+
+        Assert.Equal(EndCapStyle.Arrow, line.StartCap);
+        Assert.Equal(EndCapStyle.None, line.EndCap);
+    }
+
     [AvaloniaFact]
     public void ABackgroundPageIsSceneryForAnotherAndIsLeftOut()
     {
@@ -940,6 +1107,29 @@ public class VisioTests
 
         Assert.Equal(2, connector.StartPort);
         Assert.Equal(0, connector.EndPort);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(EndCapStyle.None, EndCapStyle.None)]
+    [InlineData(EndCapStyle.Arrow, EndCapStyle.Arrow)]
+    [InlineData(EndCapStyle.HollowArrow, EndCapStyle.Arrow)]
+    [InlineData(EndCapStyle.CrowsFoot, EndCapStyle.Arrow)]
+    [InlineData(EndCapStyle.Diamond, EndCapStyle.Arrow)]
+    public void AnEndThatIsDrawnAtAllComesBackDrawn(EndCapStyle drawn, EndCapStyle expected)
+    {
+        // The twelve ends here and Visio's gallery are different sets, so only an end or no
+        // end survives. Anything that was not the plain arrow used to come back as no end at
+        // all, which lost the direction of the line along with its notation.
+        var line = new ConnectorShape(new Point(50, 60), new Point(300, 220))
+        {
+            StartCap = drawn,
+            EndCap = drawn
+        };
+
+        var back = Assert.Single(RoundTrip(OnePage(line)).Pages[0].Shapes.OfType<ConnectorShape>());
+
+        Assert.Equal(expected, back.StartCap);
+        Assert.Equal(expected, back.EndCap);
     }
 
     [AvaloniaFact]

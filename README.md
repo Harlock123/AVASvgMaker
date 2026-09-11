@@ -320,12 +320,13 @@ those files draw.
 | **Pages** | Each page at its own size, in inches converted at 96 to the inch, with Visio's y-up origin turned over to ours. Background pages are scenery for another page and are counted rather than imported |
 | **Geometry** | `MoveTo`, `LineTo`, `ArcTo`, `EllipticalArcTo`, `Ellipse`, `CubBezTo`, `QuadBezTo` and their relative forms. Arcs become beziers, solved through the three points the file gives; an elliptical arc is solved by squashing its ellipse into a circle and carrying the answer back. `NURBSTo` and `PolylineTo` are taken as straight runs to where they end |
 | **Masters** | Resolved for the shape, for the shapes inside it, and cell by cell, as above |
+| **Styles** | A shape takes what it does not state from a style sheet, and a style sheet from another in turn, so a drawing's ordinary formatting sits several links out from the shape that shows it. Which chain a cell follows is decided by what the cell is - a line matter, a fill one or a text one - since a shape points at three styles at once |
 | **Frames** | A group's own turn, flip and stretch reach everything it holds, rather than only shifting it sideways. Where the model has no room for a mirror the flip is folded into the outline, since every mirrored frame is some turn of a shape flipped once |
 | **Theme colours** | A colour cell may name a colour, number one in the drawing's table, say "Themed", or say nothing at all - which for a quick-styled shape also means the theme. The theme's variations are read from the theme part, and the shape's quick-style cells count along them |
 | **Splines** | A `PolylineTo` draws every corner its formula lists. A `NURBSTo` is evaluated as the curve it describes, weights included, and sampled into a smooth run |
 | **Style** | Line colour, weight and pattern; fill colour. A section Visio will not fill is kept off the body, so a line ruled across a shape's face stays a line instead of being swallowed by the fill |
 | **Text** | The words, and the size, weight, slant, colour and alignment from the shape's `Character` and `Paragraph` sections. Also the block they sit in, which Visio sizes and pins separately and which need not be on the shape at all - the name under a stick figure hangs below it |
-| **Connectors** | A shape with a begin and an end becomes a connector. The page's `Connects` list says which end is stuck to which shape, and whether it is stuck to the shape itself - free to leave from wherever suits - or held to one named connection point |
+| **Connectors** | A shape with a begin and an end becomes a connector. The page's `Connects` list says which end is stuck to which shape, and whether it is stuck to the shape itself - free to leave from wherever suits - or held to one named connection point. Whether each end is drawn with something is read; which of Visio's forty-odd line ends it is, is not |
 | **Groups** | Read through, each child placed in its parent's frame |
 
 | Not read | |
@@ -333,6 +334,7 @@ those files draw.
 | **Themed fills** | A themed *line* is resolved; a themed *fill* is not. Visio tints one through a quick-style matrix that is not read here, and a shape painted solid in its own line colour would be further from the truth than an empty one. A fill the drawing states outright is used |
 | **Formulas** | Cells carry both a computed value and the formula behind it. Only the value is read - except on the rows that draw a spline, where the run of control points is in the formula and nowhere else |
 | **Spline knots** | A `SplineStart` and its `SplineKnot` rows state one control point each, and how their knots run cannot be settled from the file alone, so the run of points itself is drawn. A `NURBSTo` states its own degree and knots, and its knot vector is taken to be clamped - the ordinary reading, which pins the curve's ends to the first and last control points |
+| **Which line end** | Visio numbers its line ends out of a gallery of some forty-odd. The twelve here are a different set, chosen for UML and entity-relationship notation, and nothing in the file says which of its numbers is which shape. So an end that is drawn becomes a plain arrow, and one that is not stays empty - which is the part that can be read for certain, and the part that carries the direction of the line |
 | **Gradients, shadows, images, OLE objects** | Nothing here can hold them |
 | **Layers, data, hyperlinks** | Not part of this model |
 
@@ -347,7 +349,9 @@ shape, which is how Visio's own files put them, so a shape resized in Visio keep
 proportions.
 
 Shapes, their outlines, fills, line colours, weights and dash patterns, rotation, text and how
-it is set, connectors with their arrowheads, and glue - both kinds - all go. The package holds
+it is set, connectors, and glue - both kinds - all go. A line end that is drawn at all goes out
+as a plain arrow, for want of a mapping between the two galleries; that loses a hollow arrow's
+meaning, where it used to lose the end altogether. The package holds
 the parts a Visio file is made of: content types, package and document relationships, a
 document part, a pages part, and a part per page.
 
@@ -486,17 +490,21 @@ buttons moves it to the top or the bottom.
 A label can also leave its shape altogether - which is how a name hangs under a stick figure.
 Select a shape with a label and a **grip** appears out to its side, on a stalk like the turn
 handle's: drag it and the label goes with it, and a dashed box shows where the words are being
-wrapped. **Edit -> Reset label position** puts it back.
+wrapped. Once the label has a block of its own, that block has **corners**, and dragging one
+makes it wider or taller - so a label taken off a narrow shape need not go on wrapping to that
+shape's width. **Edit -> Reset label position** puts the whole thing back.
 
 The grip is off to the side rather than on the words, because the middle of a shape is how you
-take hold of the shape itself. It is drawn in a fixed violet for the same reason the turn
-handle is a fixed yellow: the selection takes the desktop's accent colour, and a handle that
-means something else has to stay legible whatever that turns out to be.
+take hold of the shape itself. The corners appear only once the label has been moved: while the
+block is still simply the shape, its corners would sit exactly on the shape's own and neither
+could be grabbed. Both are drawn as violet circles, against the shape's square handles in the
+desktop's accent colour and the turn handle's fixed yellow - three kinds of handle that mean
+three different things, and none of which should be mistaken for another.
 
-Where the label sits is held as fractions of the shape rather than as a position on the page,
-so it travels with the shape when it moves and stretches with it when it is resized - and a
-label on a turned shape swings round with the turn. It is saved with the drawing, and it
-survives a trip out to Visio and back.
+Where the label sits and how big its block is are both held as fractions of the shape rather
+than as a position on the page, so they travel with the shape when it moves, scale with it when
+it is resized, and swing round with it when it is turned. Both are saved with the drawing, and
+both survive a trip out to Visio and back.
 
 ## Rotation
 
@@ -695,6 +703,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag a handle | Resize, snapped to the grid. On a turned shape the handles ride round with it, and the corner you grab is the corner that moves |
 | Drag the round handle above a shape | Turn it about its middle; hold `Shift` to snap to 15° |
 | Drag the round handle beside a shape | Move its label, which can be taken clear of the shape altogether |
+| Drag a corner of a moved label's block | Stretch the block the words are wrapped into |
 | Drag a handle on a multiple selection | Stretch the whole selection, each shape keeping its place and size in proportion |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
 | Drag a connector's end handle | Re-route it; drop on a shape to glue, on the page to un-glue |
@@ -1181,9 +1190,10 @@ Where it would go next, if it went anywhere:
   from a drawing one
 - Confirmation that what the Visio exporter writes opens in Visio itself
 - A themed fill, which needs Visio's quick-style matrix rather than only its colours
-- Sizing a label's block by dragging it, rather than only moving it: the block keeps whatever
-  size it came with, so a label dragged off a narrow shape still wraps to that shape's width
-- Visio's own line ends, which neither the importer nor the exporter maps to the twelve here
+- A mapping between Visio's gallery of line ends and the twelve here, which needs a drawing
+  that actually uses them to work out which of its numbers is which shape
+- Widening the block of a label that has not been moved: the corners appear only once it has a
+  block of its own, so nudging it is the way to get at them
 
 ## License
 

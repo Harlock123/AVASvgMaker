@@ -165,14 +165,18 @@ Drag it and the label goes with it; a dashed box shows where the words are being
 shape itself stays where it is - the grip is off to the side precisely so that taking hold of
 the middle of a shape still moves the shape.
 
-**Edit -> Reset label position** puts the label back in the middle.
+Once a label has a block of its own, the block has **corners**. Drag one to make it wider or
+taller - which is how a label taken off a narrow shape stops wrapping to that shape's width.
+
+**Edit -> Reset label position** puts the whole thing back in the middle.
 
 A label that has been moved stays with its shape: move the shape and the label follows, resize
-it and the label moves in proportion, turn it and the label swings round with it. It is saved
-with your drawing and it survives a trip out to Visio and back.
+it and the label moves and stretches in proportion, turn it and the label swings round with it.
+It is saved with your drawing and it survives a trip out to Visio and back.
 
-The block keeps whatever size it started with, so a label dragged off a narrow shape still
-wraps to that shape's width. Widening it is not something the editor does yet.
+The corners only appear once the label has been moved. While the block is still simply the
+shape, its corners would sit exactly on the shape's own and neither could be grabbed - so to
+widen a label that is still in its shape, nudge it off first.
 
 Where the selected shapes disagree, a control shows a dash rather than pretending they match;
 choosing something then applies it to all of them. With nothing selected the panel sets the
@@ -327,8 +331,14 @@ weight, slant, colour and alignment. It also reads the block the text sits in, w
 places separately and which need not be on the shape at all - so the name under a stick figure
 arrives under the figure.
 
-Colours come through even when the drawing does not name them: a shape may point at the current
-theme instead, and the theme is read.
+Whether a connector has an arrowhead on each end is read, though not which of Visio's forty-odd
+line ends it is - those and the twelve here are different sets, so an end that is drawn comes in
+as a plain arrow. A connector the drawing gives no arrowhead comes in without one.
+
+Colours come through even when the drawing does not name them. A shape may leave its formatting
+to a *style* - a named set the drawing keeps to one side, which may itself defer to another -
+or to the current theme, and both are followed. Most of what you see in a Visio drawing is set
+this way rather than on the shapes themselves.
 
 Two things it cannot bring in:
 

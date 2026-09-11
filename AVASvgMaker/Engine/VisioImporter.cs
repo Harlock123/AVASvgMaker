@@ -53,6 +53,7 @@ public static class VisioImporter
     private sealed record Reading(
         IReadOnlyDictionary<string, Master> Masters,
         Palette Palette,
+        Styles Styles,
         DiagramPage Page,
         double PageHeight,
         Dictionary<string, DiagramShape> ById,
@@ -63,6 +64,108 @@ public static class VisioImporter
     private sealed record Tally(string One, string Many)
     {
         public string Say(int count) => count == 1 ? $"1 {One}" : $"{count} {Many}";
+    }
+
+    /// <summary>
+    /// The drawing's style sheets: named sets of formatting that a shape can take its line,
+    /// its fill or its text from rather than stating them itself.
+    ///
+    /// A shape points at up to three of them at once - one for each of those - and a style
+    /// sheet may point at another in turn, so a drawing's ordinary formatting is often several
+    /// links away from the shape that shows it. Which chain a cell follows is decided by what
+    /// the cell is: LineWeight is a line matter, FillPattern a fill one, and a cell that is
+    /// none of the three is not a style's business and is not looked for in one.
+    /// </summary>
+    private sealed class Styles
+    {
+        public static readonly Styles Empty = new(new Dictionary<string, XElement>());
+
+        private readonly IReadOnlyDictionary<string, XElement> _sheets;
+
+        private Styles(IReadOnlyDictionary<string, XElement> sheets) => _sheets = sheets;
+
+        public static Styles Read(ZipArchive package)
+        {
+            var sheets = new Dictionary<string, XElement>();
+            var document = Part(package, "visio/document.xml");
+
+            foreach (var sheet in document?.Root?.Element(V + "StyleSheets")?.Elements(V + "StyleSheet") ?? [])
+                if ((string?)sheet.Attribute("ID") is { } id)
+                    sheets[id] = sheet;
+
+            return sheets.Count == 0 ? Empty : new Styles(sheets);
+        }
+
+        /// <summary>Which of a shape's three styles a cell is answered by, if any.</summary>
+        private static string? Chain(string name)
+        {
+            // The variation is one number the whole shape is coloured out of rather than a
+            // line matter, but a style that states it states it for all three, so the line's
+            // chain will do to find it by.
+            if (name.StartsWith("Line", StringComparison.Ordinal) ||
+                name.StartsWith("QuickStyleLine", StringComparison.Ordinal) ||
+                name is "BeginArrow" or "EndArrow" or "BeginArrowSize" or "EndArrowSize"
+                     or "Rounding" or "QuickStyleVariation")
+                return "LineStyle";
+
+            if (name.StartsWith("Fill", StringComparison.Ordinal) ||
+                name.StartsWith("Shdw", StringComparison.Ordinal) ||
+                name.StartsWith("QuickStyleFill", StringComparison.Ordinal))
+                return "FillStyle";
+
+            if (name.StartsWith("Txt", StringComparison.Ordinal) ||
+                name.StartsWith("QuickStyleFont", StringComparison.Ordinal) ||
+                name.EndsWith("Margin", StringComparison.Ordinal) ||
+                name is "VerticalAlign" or "TextBkgnd")
+                return "TextStyle";
+
+            return null;
+        }
+
+        /// <summary>A cell, from whichever style the sheet in hand hands it on to.</summary>
+        public string? Cell(XElement owner, string name) =>
+            Chain(name) is { } chain ? Walk(owner, chain, sheet => Value(sheet, name)) : null;
+
+        /// <summary>A cell from the first row of a named section, down the text style's chain.</summary>
+        public string? Cell(XElement owner, string section, string name) =>
+            Walk(owner, "TextStyle", sheet => Value(sheet, section, name));
+
+        /// <summary>
+        /// Follows one of the three chains from the shape outwards, stopping at the first
+        /// style that has something to say. A style that points at itself, or a pair that
+        /// point at each other, would otherwise go round for ever - so the walk is bounded by
+        /// the number of sheets there are.
+        /// </summary>
+        private string? Walk(XElement owner, string chain, Func<XElement, string?> read)
+        {
+            var at = (string?)owner.Attribute(chain);
+
+            for (var step = 0; step <= _sheets.Count && at is not null; step++)
+            {
+                if (!_sheets.TryGetValue(at, out var sheet))
+                    return null;
+
+                if (read(sheet) is { } value)
+                    return value;
+
+                at = (string?)sheet.Attribute(chain);
+            }
+
+            return null;
+        }
+
+        private static string? Value(XElement sheet, string name) => sheet
+            .Elements(V + "Cell")
+            .FirstOrDefault(cell => (string?)cell.Attribute("N") == name)
+            ?.Attribute("V")?.Value;
+
+        private static string? Value(XElement sheet, string section, string name) => sheet
+            .Elements(V + "Section")
+            .FirstOrDefault(part => (string?)part.Attribute("N") == section)
+            ?.Elements(V + "Row").FirstOrDefault()
+            ?.Elements(V + "Cell")
+            .FirstOrDefault(cell => (string?)cell.Attribute("N") == name)
+            ?.Attribute("V")?.Value;
     }
 
     /// <summary>
@@ -78,14 +181,22 @@ public static class VisioImporter
     /// <summary>A geometry section once it has inherited what it did not restate.</summary>
     private sealed record Figure(string? Index, bool Shown, bool Filled, IReadOnlyList<Step> Steps);
 
-    private sealed record Sheet(XElement Element, Sheet? Master)
+    private sealed record Sheet(XElement Element, Sheet? Master, Styles Styles)
     {
+        /// <summary>
+        /// What the shape says, then what its master says, then what the styles either of them
+        /// points at say. A style is asked last: it is where a drawing keeps the formatting it
+        /// has not troubled to state, so anything actually stated outranks it.
+        /// </summary>
         public string? Cell(string name)
         {
             var own = Element.Elements(V + "Cell")
                 .FirstOrDefault(cell => (string?)cell.Attribute("N") == name);
 
-            return own is not null ? (string?)own.Attribute("V") : Master?.Cell(name);
+            if (own is not null)
+                return (string?)own.Attribute("V");
+
+            return Master?.Cell(name) ?? Styles.Cell(Element, name);
         }
 
         public double Number(string name, double fallback = 0) =>
@@ -105,7 +216,10 @@ public static class VisioImporter
             var own = row?.Elements(V + "Cell")
                 .FirstOrDefault(cell => (string?)cell.Attribute("N") == name);
 
-            return own is not null ? (string?)own.Attribute("V") : Master?.Cell(section, name);
+            if (own is not null)
+                return (string?)own.Attribute("V");
+
+            return Master?.Cell(section, name) ?? Styles.Cell(Element, section, name);
         }
 
         /// <summary>
@@ -209,7 +323,8 @@ public static class VisioImporter
         var pagesPart = Part(package, "visio/pages/pages.xml")
                         ?? throw new InvalidDataException("That is not a Visio drawing.");
 
-        var masters = ReadMasters(package);
+        var styles = Styles.Read(package);
+        var masters = ReadMasters(package, styles);
         var palette = Palette.Read(package);
         var document = new DiagramDocument();
         var pages = new List<DiagramPage>();
@@ -244,7 +359,7 @@ public static class VisioImporter
             if (relationship is not null && links.TryGetValue(relationship, out var path) &&
                 Part(package, "visio/pages/" + path) is { Root: not null } contents)
             {
-                total += ReadPage(contents.Root, page, height, masters, palette, skipped);
+                total += ReadPage(contents.Root, page, height, masters, palette, styles, skipped);
             }
 
             pages.Add(page);
@@ -268,9 +383,10 @@ public static class VisioImporter
 
     private static int ReadPage(
         XElement root, DiagramPage page, double pageHeight,
-        IReadOnlyDictionary<string, Master> masters, Palette palette, Dictionary<Tally, int> skipped)
+        IReadOnlyDictionary<string, Master> masters, Palette palette, Styles styles,
+        Dictionary<Tally, int> skipped)
     {
-        var reading = new Reading(masters, palette, page, pageHeight,
+        var reading = new Reading(masters, palette, styles, page, pageHeight,
             new Dictionary<string, DiagramShape>(), [], skipped);
 
         var count = 0;
@@ -330,10 +446,10 @@ public static class VisioImporter
             ? inherited?.Stamp
             : (string?)element.Attribute("MasterShape") is { } part &&
               inherited?.Parts.TryGetValue(part, out var piece) == true
-                ? new Sheet(piece, null)
+                ? new Sheet(piece, null, reading.Styles)
                 : null;
 
-        var sheet = new Sheet(element, stencil);
+        var sheet = new Sheet(element, stencil, reading.Styles);
 
         var id = (string?)element.Attribute("ID") ?? string.Empty;
         var width = sheet.Number("Width");
@@ -359,7 +475,8 @@ public static class VisioImporter
                 VisioFormat.ToPage(to.X, to.Y, reading.PageHeight))
             {
                 Routing = ConnectorRouting.Straight,
-                EndCap = EndCapStyle.Arrow,
+                StartCap = Cap(sheet, "BeginArrow"),
+                EndCap = Cap(sheet, "EndArrow"),
                 Text = Words(element)
             };
 
@@ -491,6 +608,20 @@ public static class VisioImporter
             ? string.Empty
             : string.Concat(text.Nodes().OfType<System.Xml.Linq.XText>().Select(node => node.Value)).Trim();
     }
+
+    /// <summary>
+    /// What one end of a connector is drawn with. Visio numbers its line ends out of a gallery
+    /// of some forty-odd; the twelve here are a different set, chosen for UML and
+    /// entity-relationship notation, and the two do not map onto one another. Nothing in this
+    /// file, nor anything to hand, says which number is which shape - so only the part that
+    /// can be read for certain is read: whether there is an end at all.
+    ///
+    /// It matters more than it sounds. Every imported connector used to be given an arrow
+    /// whatever the drawing said, which put arrowheads on the plain associations of a use-case
+    /// diagram that never had any.
+    /// </summary>
+    private static EndCapStyle Cap(Sheet sheet, string cell) =>
+        Math.Abs(sheet.Number(cell)) < 0.5 ? EndCapStyle.None : EndCapStyle.Arrow;
 
     /// <summary>How the shape's words are set: size, weight, colour, and which edge they hug.</summary>
     private static void Lettering(DiagramShape shape, Sheet sheet, Palette palette)
@@ -1252,7 +1383,7 @@ public static class VisioImporter
 
     #region The package
 
-    private static IReadOnlyDictionary<string, Master> ReadMasters(ZipArchive package)
+    private static IReadOnlyDictionary<string, Master> ReadMasters(ZipArchive package, Styles styles)
     {
         var masters = new Dictionary<string, Master>();
         var index = Part(package, "visio/masters/masters.xml");
@@ -1290,7 +1421,7 @@ public static class VisioImporter
             }
 
             Index(shape);
-            masters[id] = new Master(new Sheet(shape, null), parts);
+            masters[id] = new Master(new Sheet(shape, null, styles), parts);
         }
 
         return masters;

@@ -300,13 +300,21 @@ public static class VisioExporter
             Cell("Angle", 0) + Cell("BeginX", begin.X) + Cell("BeginY", begin.Y) +
             Cell("EndX", end.X) + Cell("EndY", end.Y) +
             Cell("ObjType", 2) +
-            Cell("BeginArrow", line.StartCap == EndCapStyle.Arrow ? 4 : 0) +
-            Cell("EndArrow", line.EndCap == EndCapStyle.Arrow ? 4 : 0) +
+            Cell("BeginArrow", Arrow(line.StartCap)) + Cell("EndArrow", Arrow(line.EndCap)) +
             Paint(line) + Lettering(line);
 
         return $"<Shape ID=\"{id}\" NameU=\"Connector.{id}\" Type=\"Shape\" LineStyle=\"0\" FillStyle=\"0\" " +
                $"TextStyle=\"0\">{cells}{Geometry(outline.ToString(), filled: false, from: 0)}{Words(line)}</Shape>";
     }
+
+    /// <summary>
+    /// Visio's number for a line end. Its gallery and the twelve here are different sets, and
+    /// nothing to hand says which of its numbers is which shape, so every end that is drawn at
+    /// all goes out as a plain filled arrow. That loses a hollow arrow's meaning - but it used
+    /// to lose the whole end, since anything that was not the plain arrow was written as no
+    /// end at all.
+    /// </summary>
+    private static int Arrow(EndCapStyle cap) => cap == EndCapStyle.None ? 0 : 4;
 
     private static string Words(DiagramShape shape) =>
         string.IsNullOrEmpty(shape.Text) ? string.Empty : $"<Text>{Escape(shape.Text)}</Text>";
