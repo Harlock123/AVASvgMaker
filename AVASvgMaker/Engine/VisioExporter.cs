@@ -244,7 +244,7 @@ public static class VisioExporter
             Paint(shape) + Lettering(shape);
 
         return $"<Shape ID=\"{id}\" NameU=\"Sheet.{id}\" Type=\"Shape\" LineStyle=\"0\" FillStyle=\"0\" " +
-               $"TextStyle=\"0\">{cells}{Outline(shape)}{Words(shape)}</Shape>";
+               $"TextStyle=\"0\">{cells}{Outline(shape)}{Data(shape)}{Words(shape)}</Shape>";
     }
 
     /// <summary>
@@ -304,7 +304,7 @@ public static class VisioExporter
             Paint(line) + Lettering(line);
 
         return $"<Shape ID=\"{id}\" NameU=\"Connector.{id}\" Type=\"Shape\" LineStyle=\"0\" FillStyle=\"0\" " +
-               $"TextStyle=\"0\">{cells}{Geometry(outline.ToString(), filled: false, from: 0)}{Words(line)}</Shape>";
+               $"TextStyle=\"0\">{cells}{Geometry(outline.ToString(), filled: false, from: 0)}{Data(line)}{Words(line)}</Shape>";
     }
 
     /// <summary>
@@ -318,6 +318,34 @@ public static class VisioExporter
 
     private static string Words(DiagramShape shape) =>
         string.IsNullOrEmpty(shape.Text) ? string.Empty : $"<Text>{Escape(shape.Text)}</Text>";
+
+    /// <summary>
+    /// The data the shape carries, as the section Visio keeps it in. A field with nothing in
+    /// it is written the way Visio writes one - no formula, and a value of zero standing for
+    /// the absence rather than for the digit.
+    /// </summary>
+    private static string Data(DiagramShape shape)
+    {
+        if (shape.Fields.Count == 0)
+            return string.Empty;
+
+        var rows = new StringBuilder();
+
+        foreach (var field in shape.Fields)
+        {
+            var empty = string.IsNullOrEmpty(field.Value);
+
+            rows.Append($"<Row N=\"{Escape(field.Name)}\">" +
+                        (empty
+                            ? "<Cell N=\"Value\" V=\"0\" F=\"No Formula\"/>"
+                            : $"<Cell N=\"Value\" V=\"{Escape(field.Value)}\" U=\"STR\"/>") +
+                        Cell("Label", Escape(field.Caption)) +
+                        Cell("Type", 0) + Cell("Invisible", 0) +
+                        "</Row>");
+        }
+
+        return $"<Section N=\"Property\">{rows}</Section>";
+    }
 
     private static string Paint(DiagramShape shape)
     {

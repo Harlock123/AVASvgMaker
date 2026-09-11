@@ -223,6 +223,55 @@ public static class VisioImporter
         }
 
         /// <summary>
+        /// The rows of a named section, the master's and the shape's own merged by the name
+        /// each row carries. A shape that fills in one field of what its master defines keeps
+        /// the rest of the definition, the same as it does for a corner of its outline.
+        /// </summary>
+        public IReadOnlyList<(string Name, XElement Row)> Rows(string section)
+        {
+            var merged = new List<(string Name, XElement Row)>(Master?.Rows(section) ?? []);
+
+            var own = Element.Elements(V + "Section")
+                .Where(part => (string?)part.Attribute("N") == section)
+                .SelectMany(part => part.Elements(V + "Row"));
+
+            foreach (var row in own)
+            {
+                if ((string?)row.Attribute("N") is not { } name)
+                    continue;
+
+                var at = merged.FindIndex(entry => entry.Name == name);
+
+                if (at >= 0)
+                    merged[at] = (name, Merge(merged[at].Row, row));
+                else
+                    merged.Add((name, row));
+            }
+
+            return merged;
+        }
+
+        /// <summary>The master's row with the shape's own cells laid over it.</summary>
+        private static XElement Merge(XElement under, XElement over)
+        {
+            var merged = new XElement(under);
+
+            foreach (var cell in over.Elements(V + "Cell"))
+            {
+                if ((string?)cell.Attribute("N") is not { } name)
+                    continue;
+
+                merged.Elements(V + "Cell")
+                    .FirstOrDefault(existing => (string?)existing.Attribute("N") == name)
+                    ?.Remove();
+
+                merged.Add(new XElement(cell));
+            }
+
+            return merged;
+        }
+
+        /// <summary>
         /// The shape's outline, inherited all the way down. Visio writes only what differs
         /// from the master - a section, a row within it, or a single number within that row -
         /// so a shape's geometry has to be built by laying its own words over its master's
@@ -434,7 +483,9 @@ public static class VisioImporter
 
     #region Shapes
 
-    private static int ReadShape(XElement element, Reading reading, Master? inherited, Matrix parent)
+    private static int ReadShape(
+        XElement element, Reading reading, Master? inherited, Matrix parent,
+        IReadOnlyList<ShapeField>? carried = null)
     {
         // A shape either stamps a whole master, or - inside a stamped group - answers to one
         // particular shape within the master its parent stamped, by that shape's own ID.
@@ -489,23 +540,34 @@ public static class VisioImporter
 
         var count = 0;
 
+        // The box the shape ends up occupying, and how it ends up sitting in it. Anything
+        // above the shape may have turned it, flipped it or stretched it, so the answer comes
+        // from the frame itself rather than from the shape's own cells.
+        var drawn = width > 0 && height > 0;
+
+        var (bounds, turn, mirrored) = drawn
+            ? Sits(mine, width, height, reading.PageHeight)
+            : (default, 0, false);
+
+        var outline = drawn ? Outline(sheet, width, height, mirrored) : null;
+
+        // A group's data belongs to the group as a thing - the stick figure's name is the
+        // figure's, not its head's - and a group that draws nothing of its own is here only
+        // as the shapes inside it. So when the holder is not itself drawn, what it carries
+        // goes down to whatever is drawn in its place.
+        var own = Data(sheet);
+        var below = outline is null ? Gathered(carried, own) : carried;
+
         // A group holds its children in its own frame; the frame is carried down rather than
         // each child being given a position it does not have.
         var children = element.Element(V + "Shapes");
 
         if (children is not null)
             foreach (var child in children.Elements(V + "Shape"))
-                count += ReadShape(child, reading, inherited, mine);
+                count += ReadShape(child, reading, inherited, mine, below);
 
-        if (width <= 0 || height <= 0)
+        if (!drawn)
             return count;
-
-        // The box the shape ends up occupying, and how it ends up sitting in it. Anything
-        // above the shape may have turned it, flipped it or stretched it, so the answer comes
-        // from the frame itself rather than from the shape's own cells.
-        var (bounds, turn, mirrored) = Sits(mine, width, height, reading.PageHeight);
-
-        var outline = Outline(sheet, width, height, mirrored);
 
         if (outline is not { } drawing)
         {
@@ -523,6 +585,8 @@ public static class VisioImporter
 
         shape.Text = Words(element);
         shape.Rotation = turn;
+
+        shape.Fields.AddRange(Gathered(carried, own));
 
         Lettering(shape, sheet, reading.Palette);
         Block(shape, sheet, width, height, mirrored);
@@ -607,6 +671,66 @@ public static class VisioImporter
         return text is null
             ? string.Empty
             : string.Concat(text.Nodes().OfType<System.Xml.Linq.XText>().Select(node => node.Value)).Trim();
+    }
+
+    /// <summary>
+    /// The data the shape carries, from its Property section. A row is named by the field's
+    /// name and says what to call it, what it holds, and whether Visio shows it at all.
+    ///
+    /// Rows marked invisible are the drawing's own book-keeping - a stencil marks its shapes
+    /// with what kind of thing they are - and Visio does not show them either, so they are
+    /// left where they are rather than filling every imported shape with them.
+    /// </summary>
+    private static List<ShapeField> Data(Sheet sheet)
+    {
+        var fields = new List<ShapeField>();
+
+        foreach (var (name, row) in sheet.Rows("Property"))
+        {
+            if (VisioFormat.Number(RowCell(row, "Invisible")) != 0)
+                continue;
+
+            var cell = row.Elements(V + "Cell")
+                .FirstOrDefault(entry => (string?)entry.Attribute("N") == "Value");
+
+            // A property with no formula holds nothing. Visio writes the value of such a cell
+            // as 0, which is not the string "0" the field would then appear to contain.
+            var unset = (string?)cell?.Attribute("F") == "No Formula";
+
+            fields.Add(new ShapeField
+            {
+                Name = name,
+                Label = RowCell(row, "Label") is { Length: > 0 } label ? label : name,
+                Value = unset ? string.Empty : (string?)cell?.Attribute("V") ?? string.Empty
+            });
+        }
+
+        return fields;
+    }
+
+    /// <summary>
+    /// What a shape was handed from above and what it says for itself, as one list. A shape
+    /// that names a field its holder already named answers for it.
+    /// </summary>
+    private static List<ShapeField> Gathered(IReadOnlyList<ShapeField>? carried, List<ShapeField> own)
+    {
+        if (carried is null || carried.Count == 0)
+            return own;
+
+        var gathered = carried.Select(field => field.Copy()).ToList();
+
+        foreach (var field in own)
+        {
+            var at = gathered.FindIndex(existing =>
+                string.Equals(existing.Name, field.Name, StringComparison.OrdinalIgnoreCase));
+
+            if (at >= 0)
+                gathered[at] = field;
+            else
+                gathered.Add(field);
+        }
+
+        return gathered;
     }
 
     /// <summary>

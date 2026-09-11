@@ -107,6 +107,8 @@
                 <MenuItem Header="_Reset connector route" Click="OnResetRouteClick" />
                 <MenuItem Header="Reset _label position" Click="OnResetLabelClick" />
                 <Separator />
+                <MenuItem Header="Shape _data..." InputGesture="F4" Click="OnShapeDataClick" />
+                <Separator />
                 <MenuItem Header="Save selection as a _shape..." Click="OnSaveStencilClick" />
             </MenuItem>
             <MenuItem Header="_Arrange">

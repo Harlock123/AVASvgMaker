@@ -30,7 +30,7 @@ public static partial class DiagramFile
     /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand.
     /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 16;
+    public const int CurrentVersion = 17;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -82,6 +82,17 @@ public static partial class DiagramFile
     }
 
     /// <summary>One shape. List order is z-order, and <see cref="Id"/> is what connectors glue to.</summary>
+    /// <summary>One named field of a shape's data.</summary>
+    private sealed class FieldRecord
+    {
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Written only when it says something the name does not.</summary>
+        public string? Label { get; set; }
+
+        public string? Value { get; set; }
+    }
+
     private sealed class ShapeRecord
     {
         public int Id { get; set; }
@@ -152,6 +163,12 @@ public static partial class DiagramFile
         /// 16 onwards, and written only for a shape whose label is not simply its own box.
         /// </summary>
         public double[]? TextFrame { get; set; }
+
+        /// <summary>
+        /// The data the shape carries. Version 17 onwards, and written only for a shape that
+        /// carries any - which is most of them not at all.
+        /// </summary>
+        public FieldRecord[]? Fields { get; set; }
 
         /// <summary>
         /// A lane's share of its pool. Version 8 onwards, and only written for a lane that
@@ -293,6 +310,17 @@ public static partial class DiagramFile
             TextFrame = shape.TextFrame is { } frame
                 ? [frame.X, frame.Y, frame.Width, frame.Height]
                 : null,
+            Fields = shape.Fields.Count == 0
+                ? null
+                : shape.Fields.Select(field => new FieldRecord
+                {
+                    Name = field.Name,
+                    Label = string.Equals(field.Label, field.Name, StringComparison.Ordinal)
+                            || string.IsNullOrWhiteSpace(field.Label)
+                        ? null
+                        : field.Label,
+                    Value = string.IsNullOrEmpty(field.Value) ? null : field.Value
+                }).ToArray(),
             LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
                         && Math.Abs(lane.LaneShare - 1) > 1e-9
                 ? lane.LaneShare
@@ -476,6 +504,15 @@ public static partial class DiagramFile
         // Four numbers, or nothing at all for a label that simply fills its shape.
         if (record.TextFrame is { Length: 4 } frame)
             shape.TextFrame = new Rect(frame[0], frame[1], frame[2], frame[3]);
+
+        foreach (var field in record.Fields ?? [])
+            if (!string.IsNullOrWhiteSpace(field.Name))
+                shape.Fields.Add(new ShapeField
+                {
+                    Name = field.Name,
+                    Label = field.Label ?? field.Name,
+                    Value = field.Value ?? string.Empty
+                });
 
         // Absent before version 8, and absent since for any lane on the standard share.
         if (shape is ContainerShape { Kind: ShapeKind.Lane } lane && record.LaneShare is { } share && share > 0)

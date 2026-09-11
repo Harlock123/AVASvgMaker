@@ -846,6 +846,129 @@ public class VisioTests
         Assert.Equal(EndCapStyle.None, line.EndCap);
     }
 
+    /// <summary>A Property row, the way Visio writes one.</summary>
+    private static string Property(string name, string? value, string label = "", string invisible = "0") =>
+        $"<Row N='{name}'>" +
+        (value is null
+            ? "<Cell N='Value' V='0' F='No Formula'/>"
+            : $"<Cell N='Value' V='{value}' U='STR'/>") +
+        (label.Length > 0 ? $"<Cell N='Label' V='{label}'/>" : string.Empty) +
+        $"<Cell N='Type' V='0'/><Cell N='Invisible' V='{invisible}'/></Row>";
+
+    [AvaloniaFact]
+    public void TheDataAShapeCarriesComesOverWithIt()
+    {
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            "<Section N='Property'>" +
+            Property("Owner", "Accounts") +
+            Property("Cost", "1200", label: "Annual cost") +
+            "</Section>")));
+
+        var shape = read.Document.Pages[0].Shapes[0];
+
+        Assert.Equal(2, shape.Fields.Count);
+        Assert.Equal("Owner", shape.Fields[0].Name);
+        Assert.Equal("Accounts", shape.Fields[0].Value);
+        Assert.Equal("Annual cost", shape.Fields[1].Caption);
+    }
+
+    [AvaloniaFact]
+    public void AFieldWithNoFormulaIsEmptyRatherThanHoldingAZero()
+    {
+        // Visio writes an unset property's value as 0 with no formula behind it. Read as the
+        // number it looks like, every blank field in a drawing would arrive holding "0".
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            $"<Section N='Property'>{Property("Owner", null)}</Section>")));
+
+        var field = Assert.Single(read.Document.Pages[0].Shapes[0].Fields);
+
+        Assert.Equal("Owner", field.Name);
+        Assert.Equal(string.Empty, field.Value);
+    }
+
+    [AvaloniaFact]
+    public void TheDrawingsOwnBookkeepingIsLeftWhereItIs()
+    {
+        // A stencil marks its shapes with what kind of thing they are, and hides the marks.
+        // Visio does not show them either, and every imported shape carrying a ShapeClass
+        // would be noise rather than data.
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            "<Section N='Property'>" +
+            Property("Owner", "Accounts") +
+            Property("ShapeClass", "Connectivity", invisible: "1") +
+            "</Section>")));
+
+        var field = Assert.Single(read.Document.Pages[0].Shapes[0].Fields);
+
+        Assert.Equal("Owner", field.Name);
+    }
+
+    [AvaloniaFact]
+    public void AShapeFillsInTheFieldsItsMasterDefines()
+    {
+        // How a real drawing carries data: the stencil defines the fields, empty, and each
+        // shape fills in its own answers. Read without merging, a shape would have either the
+        // master's blanks or only the one field it happened to answer.
+        var stamp = "<Shape ID='1' Type='Shape' Master='7'>" +
+                    "<Cell N='PinX' V='2'/><Cell N='PinY' V='4'/>" +
+                    "<Cell N='Width' V='1'/><Cell N='Height' V='1'/>" +
+                    "<Section N='Property'><Row N='Owner'>" +
+                    "<Cell N='Value' V='Accounts' U='STR'/></Row></Section></Shape>";
+
+        var master = Square("5", extra:
+            "<Section N='Property'>" +
+            Property("Owner", null, label: "Owned by") +
+            Property("Location", null) +
+            "</Section>");
+
+        var read = VisioImporter.Read(Drawing(stamp, masters: master));
+        var shape = read.Document.Pages[0].Shapes[0];
+
+        Assert.Equal(2, shape.Fields.Count);
+
+        // The value is the shape's own; the label it did not restate is still the master's.
+        Assert.Equal("Accounts", shape.Fields[0].Value);
+        Assert.Equal("Owned by", shape.Fields[0].Caption);
+        Assert.Equal("Location", shape.Fields[1].Name);
+        Assert.Equal(string.Empty, shape.Fields[1].Value);
+    }
+
+    [AvaloniaFact]
+    public void DataOnAGroupGoesToWhatIsDrawnInItsPlace()
+    {
+        // How a real stencil carries it: the data belongs to the group - a stick figure's name
+        // is the figure's, not its head's - and the group draws nothing itself, being only the
+        // shapes inside it. Read without handing it down, the data would arrive nowhere.
+        var group = "<Shape ID='1' Type='Group'>" +
+                    "<Cell N='PinX' V='4'/><Cell N='PinY' V='3'/>" +
+                    "<Cell N='Width' V='0'/><Cell N='Height' V='0'/>" +
+                    "<Section N='Property'>" + Property("Owner", "Accounts") + "</Section>" +
+                    "<Shapes>" + Square("2") + "</Shapes></Shape>";
+
+        var read = VisioImporter.Read(Drawing(group));
+        var shape = Assert.Single(read.Document.Pages[0].Shapes);
+
+        var field = Assert.Single(shape.Fields);
+        Assert.Equal("Accounts", field.Value);
+    }
+
+    [AvaloniaFact]
+    public void AShapeInsideAGroupAnswersForAFieldTheGroupNamed()
+    {
+        var group = "<Shape ID='1' Type='Group'>" +
+                    "<Cell N='PinX' V='4'/><Cell N='PinY' V='3'/>" +
+                    "<Cell N='Width' V='0'/><Cell N='Height' V='0'/>" +
+                    "<Section N='Property'>" + Property("Owner", "Accounts") + "</Section>" +
+                    "<Shapes>" + Square("2", extra:
+                        "<Section N='Property'>" + Property("Owner", "Payroll") + "</Section>") +
+                    "</Shapes></Shape>";
+
+        var read = VisioImporter.Read(Drawing(group));
+        var field = Assert.Single(Assert.Single(read.Document.Pages[0].Shapes).Fields);
+
+        Assert.Equal("Payroll", field.Value);
+    }
+
     [AvaloniaFact]
     public void ABackgroundPageIsSceneryForAnotherAndIsLeftOut()
     {
@@ -1130,6 +1253,28 @@ public class VisioTests
 
         Assert.Equal(expected, back.StartCap);
         Assert.Equal(expected, back.EndCap);
+    }
+
+    [AvaloniaFact]
+    public void DataGoesOutToVisioAndComesBack()
+    {
+        var box = ShapeFactory.Create(ShapeKind.Rectangle, new Rect(20, 20, 200, 120));
+        box.Text = "{Owner}";
+        box.Fields.Add(new ShapeField { Name = "Owner", Label = "Owned by", Value = "Accounts" });
+        box.Fields.Add(new ShapeField { Name = "Spare", Label = "Spare", Value = string.Empty });
+
+        var back = RoundTrip(OnePage(box)).Pages[0].Shapes[0];
+
+        Assert.Equal(2, back.Fields.Count);
+        Assert.Equal("Accounts", back.Fields[0].Value);
+        Assert.Equal("Owned by", back.Fields[0].Caption);
+
+        // The empty one comes back empty rather than holding the zero it was written as.
+        Assert.Equal(string.Empty, back.Fields[1].Value);
+
+        // The label is still the question, not the answer it was showing.
+        Assert.Equal("{Owner}", back.Text);
+        Assert.Equal("Accounts", back.DisplayText);
     }
 
     [AvaloniaFact]

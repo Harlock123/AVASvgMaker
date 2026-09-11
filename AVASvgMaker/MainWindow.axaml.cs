@@ -1160,6 +1160,59 @@ public partial class MainWindow : Window
 
     private void OnResetLabelClick(object? sender, RoutedEventArgs e) => Canvas.ResetLabels();
 
+    private void OnShapeDataClick(object? sender, RoutedEventArgs e) => _ = ShapeDataAsync();
+
+    /// <summary>
+    /// The data one shape carries. One rather than several: the fields are the shape's own,
+    /// and a dialog offering to put the same set on everything selected would be offering
+    /// something a good deal less useful than it looked.
+    /// </summary>
+    private async Task ShapeDataAsync()
+    {
+        Canvas.CommitEdit();
+
+        if (Canvas.Document.Selection.Count != 1 || Canvas.Document.Selected is not { } shape)
+        {
+            StatusText.Text = Canvas.Document.Selection.Count == 0
+                ? "Select a shape to give it data"
+                : "Shape data is set one shape at a time";
+
+            return;
+        }
+
+        // The words as drawn rather than the label behind them: a shape labelled "{Host}"
+        // is known to whoever is looking at it as db01.
+        var caption = string.IsNullOrWhiteSpace(shape.DisplayText)
+            ? $"Data for this {ShapeFactory.DisplayName(shape.Kind).ToLowerInvariant()}"
+            : $"Data for \"{shape.DisplayText.Trim().Replace('\n', ' ')}\"";
+
+        if (await ShapeDataDialog.ShowAsync(this, caption, shape.Fields) is not { } fields)
+            return;
+
+        if (fields.Count == shape.Fields.Count &&
+            fields.Zip(shape.Fields).All(pair =>
+                pair.First.Name == pair.Second.Name &&
+                pair.First.Label == pair.Second.Label &&
+                pair.First.Value == pair.Second.Value))
+            return;
+
+        using (Canvas.Document.BeginBatch())
+        {
+            shape.Fields.Clear();
+            shape.Fields.AddRange(fields);
+            Canvas.Document.MarkModified();
+        }
+
+        Canvas.InvalidateVisual();
+
+        StatusText.Text = fields.Count switch
+        {
+            0 => "Cleared the shape's data",
+            1 => "1 field on the shape",
+            _ => $"{fields.Count} fields on the shape"
+        };
+    }
+
     private void OnClearClick(object? sender, RoutedEventArgs e) => Canvas.ClearPage();
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
@@ -1182,6 +1235,11 @@ public partial class MainWindow : Window
 
         switch (e.Key)
         {
+            case Key.F4:
+                OnShapeDataClick(sender, e);
+                e.Handled = true;
+                return;
+
             case Key.F9:
                 OnToggleToolboxClick(sender, e);
                 e.Handled = true;

@@ -75,6 +75,7 @@ Or [build it yourself](#building).
 - **Drawing order** - bring to front, forward, backward, send to back, for one shape or a group
 - **Shape formatting** - fill and line colour, line style and weight, and for text the colour, size, font, bold, italic and alignment, applied to the whole selection from a properties panel
 - **Containers and swimlanes** - pools, lanes and grouping boxes that hold what is dropped into them and carry it when they move, with lanes you can drag to different heights
+- **Data behind a shape** - named fields a shape carries, which its label can show and which travel with it into `.avadiag` and Visio alike
 
 **Getting work in and out**
 
@@ -326,6 +327,7 @@ those files draw.
 | **Splines** | A `PolylineTo` draws every corner its formula lists. A `NURBSTo` is evaluated as the curve it describes, weights included, and sampled into a smooth run |
 | **Style** | Line colour, weight and pattern; fill colour. A section Visio will not fill is kept off the body, so a line ruled across a shape's face stays a line instead of being swallowed by the fill |
 | **Text** | The words, and the size, weight, slant, colour and alignment from the shape's `Character` and `Paragraph` sections. Also the block they sit in, which Visio sizes and pins separately and which need not be on the shape at all - the name under a stick figure hangs below it |
+| **Data** | A shape's `Property` section, name by name, with the master's definitions and the shape's own answers merged. Data on a group goes to whatever is drawn in its place, a group being only the shapes inside it. Rows Visio marks invisible are the drawing's own book-keeping and are left where they are |
 | **Connectors** | A shape with a begin and an end becomes a connector. The page's `Connects` list says which end is stuck to which shape, and whether it is stuck to the shape itself - free to leave from wherever suits - or held to one named connection point. Whether each end is drawn with something is read; which of Visio's forty-odd line ends it is, is not |
 | **Groups** | Read through, each child placed in its parent's frame |
 
@@ -399,7 +401,8 @@ added containers, version 6 multiple pages, version 7 a paper size per page, ver
 heights, version 9 the font a label is in, version 10 grouping, version 11 the margin guide,
 version 12 rotation, version 13 shapes carrying an outline of their own, version 14 a
 connector label moved by hand, version 15 markings drawn over a path's face and not filled, and
-version 16 where a label sits in its shape - or outside it. Older files still load: a version 5 file, which
+version 16 where a label sits in its shape - or outside it, and version 17 the data a shape
+carries. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
@@ -410,7 +413,8 @@ version 11 has no angles, so its shapes come back upright; and a file up to vers
 outlines of its own, because nothing could make one; and a file up to version 13 has no moved
 labels, so they sit where the line puts them; and a file up to version 14 has no markings over
 a path, because nothing could make those either; and a file up to version 15 puts every label
-in the middle of the shape it belongs to, which was the only place there was. The on-disk
+in the middle of the shape it belongs to, which was the only place there was; and a file up to
+version 16 has no data on its shapes, there having been nowhere to put any. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -439,7 +443,7 @@ fields because its end points define it.
 | Group | What it does |
 |---|---|
 | **File menu** | New, Open, Save, Save As, Page set up, Import (SVG, Visio), Export (SVG, PDF, Visio, PNG, JPEG, WebP, BMP), Exit |
-| **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, Reset label position, and saving a selection as a shape of your own |
+| **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, Reset label position, Shape data, and saving a selection as a shape of your own |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, rotating left, right or straight, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, rulers, smart guides, and folding either side panel away - plus a zoom box in the status bar |
@@ -505,6 +509,40 @@ Where the label sits and how big its block is are both held as fractions of the 
 than as a position on the page, so they travel with the shape when it moves, scale with it when
 it is resized, and swing round with it when it is turned. Both are saved with the drawing, and
 both survive a trip out to Visio and back.
+
+## Data behind a shape
+
+![Two boxes with the same label, and the data behind one of them](Images/shape-data.png)
+
+A shape can carry **data**: named fields, each with a value. `Edit -> Shape data...`, or `F4`,
+opens what one shape carries and lets you add to it, change it, or take it away.
+
+This is the thing a diagram tool has and a drawing tool does not - a box that *is* a server,
+rather than a box that says "server".
+
+The fields are put on the page by naming one in the shape's label, in braces. A label of
+
+```
+{Host}
+{Role}, owned by {Owner}
+```
+
+draws as **db01 / primary, owned by Accounts**, and goes on drawing the right thing when the
+answer changes: the label is not a copy of the value, it is a question the shape answers each
+time it is asked. Both boxes above carry that identical label.
+
+Only a name that matches a field is replaced, so there is nothing to escape and a label that
+happens to contain braces is not mangled for it - `{note}`, with no field of that name, is
+drawn exactly as typed. A name is matched whatever case it is written in.
+
+A field has a **name**, which is what the label calls it, and may also have a **label** of its
+own for when the name is not what you would want to read on screen - `Owner` named in the text,
+"Owned by" shown in the dialog.
+
+The data is the shape's own. It is saved with the drawing, copied with the shape, and carried
+out to Visio and back: Visio keeps the same thing in a shape's Property section, and a drawing
+whose stencil defines fields - a name, a location, a room - arrives with those fields on the
+shapes that have them, ready to fill in.
 
 ## Rotation
 
@@ -713,6 +751,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Edit > Reset connector route | Hand the selected connectors back to the router |
 | Edit > Reset label position | Put the selected shapes' labels back in the middle |
 | Double-click a shape, or `F2` | Edit its label in place |
+| `F4` | The data the selected shape carries |
 | Text tool, click the page | Add a text box and start typing |
 | Arrow keys | Nudge the selection by one grid cell, while the page has the keyboard |
 | `Alt` + arrow keys | The same, from anywhere in the window - after using a panel or a toolbar box, a bare arrow belongs to whatever was touched last |
@@ -966,6 +1005,7 @@ AVASvgMaker/
     RulerStrip.cs        The scale along the top and down the side
     PageSetupDialog.cs   Paper size, orientation, and fit-to-drawing
     RasterExportDialog.cs  Export scale and quality, and the pixel size it comes to
+    ShapeDataDialog.cs   The fields a shape carries, to fill in
 
 AVASvgMaker.Tests/       The regression suite - headless, and no part of a release build
 Tools/GuideBuilder/      Turns USERGUIDE.md into USERGUIDE.pdf
@@ -1186,14 +1226,14 @@ been worked through.
 
 Where it would go next, if it went anywhere:
 
-- Data behind a shape - fields, and a way to show them - which is what separates a diagram tool
-  from a drawing one
 - Confirmation that what the Visio exporter writes opens in Visio itself
 - A themed fill, which needs Visio's quick-style matrix rather than only its colours
 - A mapping between Visio's gallery of line ends and the twelve here, which needs a drawing
   that actually uses them to work out which of its numbers is which shape
 - Widening the block of a label that has not been moved: the corners appear only once it has a
   block of its own, so nudging it is the way to get at them
+- Anything that treats the data as data - a report, a filter, colouring a shape by a field's
+  value. The fields are carried and shown; nothing yet reasons about them
 
 ## License
 

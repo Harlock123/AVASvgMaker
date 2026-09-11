@@ -182,6 +182,34 @@ Where the selected shapes disagree, a control shows a dash rather than pretendin
 choosing something then applies it to all of them. With nothing selected the panel sets the
 formatting for the next shape you draw.
 
+## Data behind a shape
+
+![Two boxes with the same label, and the data behind one of them](Images/shape-data.png)
+
+A shape can carry **data**: named fields with values. Select a shape and press `F4`, or use
+**Edit -> Shape data...**, to see what it carries and to add, change or remove fields.
+
+To put a field on the page, name it in the shape's label between braces. A label of
+
+```
+{Host}
+{Role}, owned by {Owner}
+```
+
+draws as **db01 / primary, owned by Accounts** - and when you change the value, the label
+changes with it. Both boxes in the picture have exactly that label; all that differs is the
+data behind them.
+
+Only a name that matches a field is replaced, so a label that happens to contain braces is
+left alone. Case does not matter: `{host}` finds a field called `Host`.
+
+A field has a **name** - what the label calls it - and can have a **label** of its own for
+when the name is not what you would want to read, such as `Owner` in the text and "Owned by"
+in the dialog.
+
+The data belongs to the shape. It is saved with your drawing, and it travels to Visio and back:
+a Visio drawing whose stencil defines fields arrives with those fields ready to fill in.
+
 ## Arranging
 
 The **Arrange** menu works on a selection:
@@ -366,6 +394,7 @@ copy of Visio to try it with. If you have one, the result either way is worth re
 | `Ctrl+Z` `Ctrl+Y` | Undo, Redo |
 | `Ctrl+X` `Ctrl+C` `Ctrl+V` `Ctrl+D` | Cut, Copy, Paste, Duplicate |
 | `Ctrl+A` | Select all |
+| `F4` | The data the selected shape carries |
 | `Ctrl+G` `Ctrl+Shift+G` | Group, Ungroup |
 | `Ctrl+Shift+F` `Ctrl+Shift+B` | Bring to front, Send to back |
 | `Ctrl+]` `Ctrl+[` | Bring forward, Send backward |

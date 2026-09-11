@@ -32,6 +32,57 @@ public abstract class DiagramShape
     }
 
     public string Text { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The data the shape carries. Empty for most shapes; a shape that stands for something
+    /// with facts attached to it keeps them here.
+    /// </summary>
+    public List<ShapeField> Fields { get; } = [];
+
+    /// <summary>
+    /// The words as drawn: the label with any field named in braces replaced by its value, so
+    /// that a box labelled "{Owner}" shows who owns it and goes on showing it when the answer
+    /// changes.
+    ///
+    /// Only a name that matches a field is replaced. A brace with anything else between is
+    /// left exactly as typed - there is nothing to escape, and a label that happens to contain
+    /// braces is not mangled for it.
+    /// </summary>
+    public string DisplayText => Fields.Count == 0 ? Text : Filled(Text);
+
+    private string Filled(string text)
+    {
+        if (text.IndexOf('{') < 0)
+            return text;
+
+        var sb = new StringBuilder(text.Length);
+
+        for (var i = 0; i < text.Length; i++)
+        {
+            var close = text[i] == '{' ? text.IndexOf('}', i + 1) : -1;
+
+            if (close < 0)
+            {
+                sb.Append(text[i]);
+                continue;
+            }
+
+            var name = text[(i + 1)..close];
+            var field = Fields.FirstOrDefault(entry =>
+                string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase));
+
+            if (field is null)
+            {
+                sb.Append(text[i]);
+                continue;
+            }
+
+            sb.Append(field.Value);
+            i = close;
+        }
+
+        return sb.ToString();
+    }
     public Color Fill { get; set; } = DefaultFill;
     public Color Stroke { get; set; } = DefaultStroke;
     public Color TextColor { get; set; } = DefaultTextColor;
@@ -395,7 +446,7 @@ public abstract class DiagramShape
     {
         var lines = new List<string>();
 
-        foreach (var paragraph in Text.Replace("\r\n", "\n").Split('\n'))
+        foreach (var paragraph in DisplayText.Replace("\r\n", "\n").Split('\n'))
         {
             var words = paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (words.Length == 0)
@@ -466,7 +517,7 @@ public abstract class DiagramShape
 
     protected void RenderText(DrawingContext context)
     {
-        if (string.IsNullOrWhiteSpace(Text))
+        if (string.IsNullOrWhiteSpace(DisplayText))
             return;
 
         var area = TextArea;
@@ -523,7 +574,7 @@ public abstract class DiagramShape
         if (!string.IsNullOrEmpty(body))
             sb.AppendLine("  " + body);
 
-        if (!string.IsNullOrWhiteSpace(Text))
+        if (!string.IsNullOrWhiteSpace(DisplayText))
             sb.Append(SvgText());
 
         if (IsRotated)
