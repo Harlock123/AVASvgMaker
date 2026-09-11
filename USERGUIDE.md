@@ -154,9 +154,25 @@ the right of its shape, the second puts it at the top, the middle or the bottom.
 
 ![Labels down the shape, and one that has left it](Images/labels.png)
 
-A label can also sit *outside* the shape it belongs to - the name under a stick figure is the
-usual case. Nothing in the editor draws one that way yet, but a label that arrives like that in
-a Visio drawing keeps its place, is saved with your work, and goes back out to Visio as it came.
+## Moving a label off its shape
+
+![The grip that moves a label](Images/label-grip.png)
+
+A label can also leave its shape altogether - a name under a figure, or a caption beside a box.
+
+Select a shape that has a label and a small round **grip** appears out to its side, on a stalk.
+Drag it and the label goes with it; a dashed box shows where the words are being wrapped. The
+shape itself stays where it is - the grip is off to the side precisely so that taking hold of
+the middle of a shape still moves the shape.
+
+**Edit -> Reset label position** puts the label back in the middle.
+
+A label that has been moved stays with its shape: move the shape and the label follows, resize
+it and the label moves in proportion, turn it and the label swings round with it. It is saved
+with your drawing and it survives a trip out to Visio and back.
+
+The block keeps whatever size it started with, so a label dragged off a narrow shape still
+wraps to that shape's width. Widening it is not something the editor does yet.
 
 Where the selected shapes disagree, a control shows a dash rather than pretending they match;
 choosing something then applies it to all of them. With nothing selected the panel sets the

@@ -1158,6 +1158,8 @@ public partial class MainWindow : Window
 
     private void OnResetRouteClick(object? sender, RoutedEventArgs e) => Canvas.ResetRoutes();
 
+    private void OnResetLabelClick(object? sender, RoutedEventArgs e) => Canvas.ResetLabels();
+
     private void OnClearClick(object? sender, RoutedEventArgs e) => Canvas.ClearPage();
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)

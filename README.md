@@ -53,7 +53,7 @@ Or [build it yourself](#building).
 - **Margin guide** - a dashed inset per page, to keep work clear of the edge
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
 - **Rotation** - drag the handle above a shape to turn it, or turn a selection in right angles from the menu
-- **Labels that leave their shape** - a label sits top, middle or bottom, and can carry a frame of its own that puts it beside or below the shape it belongs to
+- **Labels that leave their shape** - a label sits top, middle or bottom, and can be dragged clear of the shape it belongs to, staying with it as it moves and resizes
 
 **Connectors**
 
@@ -435,7 +435,7 @@ fields because its end points define it.
 | Group | What it does |
 |---|---|
 | **File menu** | New, Open, Save, Save As, Page set up, Import (SVG, Visio), Export (SVG, PDF, Visio, PNG, JPEG, WebP, BMP), Exit |
-| **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, and saving a selection as a shape of your own |
+| **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, Reset label position, and saving a selection as a shape of your own |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, rotating left, right or straight, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
 | **View menu** | Zoom in, Zoom out, Actual size, Fit page, rulers, smart guides, and folding either side panel away - plus a zoom box in the status bar |
@@ -479,11 +479,24 @@ can still be given a fill afterwards.
 ![Labels down the shape, and one that has left it](Images/labels.png)
 
 A label sits in the middle of its shape unless told otherwise, and the second row of alignment
-buttons moves it to the top or the bottom. A shape can also carry a **frame** for its label -
-a box of its own, held as fractions of the shape so it moves and stretches with it, and free to
-sit outside the shape altogether. That is how a name hangs under a stick figure. Nothing in the
-editor draws one yet; it arrives with a Visio drawing that has one, survives saving and comes
-back, and is written out again on the way to `.vsdx`.
+buttons moves it to the top or the bottom.
+
+![The grip that moves a label, and the block the words are wrapped into](Images/label-grip.png)
+
+A label can also leave its shape altogether - which is how a name hangs under a stick figure.
+Select a shape with a label and a **grip** appears out to its side, on a stalk like the turn
+handle's: drag it and the label goes with it, and a dashed box shows where the words are being
+wrapped. **Edit -> Reset label position** puts it back.
+
+The grip is off to the side rather than on the words, because the middle of a shape is how you
+take hold of the shape itself. It is drawn in a fixed violet for the same reason the turn
+handle is a fixed yellow: the selection takes the desktop's accent colour, and a handle that
+means something else has to stay legible whatever that turns out to be.
+
+Where the label sits is held as fractions of the shape rather than as a position on the page,
+so it travels with the shape when it moves and stretches with it when it is resized - and a
+label on a turned shape swings round with the turn. It is saved with the drawing, and it
+survives a trip out to Visio and back.
 
 ## Rotation
 
@@ -681,6 +694,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag a shape | Move it. It lines up with the edges and middles of the other shapes where it comes close to one, and falls back to the grid on whichever axis nothing lined up |
 | Drag a handle | Resize, snapped to the grid. On a turned shape the handles ride round with it, and the corner you grab is the corner that moves |
 | Drag the round handle above a shape | Turn it about its middle; hold `Shift` to snap to 15° |
+| Drag the round handle beside a shape | Move its label, which can be taken clear of the shape altogether |
 | Drag a handle on a multiple selection | Stretch the whole selection, each shape keeping its place and size in proportion |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
 | Drag a connector's end handle | Re-route it; drop on a shape to glue, on the page to un-glue |
@@ -688,6 +702,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag a connector's midpoint handle | Slide that segment sideways. Where it meets a shape, new bends appear rather than tearing it off |
 | Double-click a bend | Take it out again, without having to drag it anywhere |
 | Edit > Reset connector route | Hand the selected connectors back to the router |
+| Edit > Reset label position | Put the selected shapes' labels back in the middle |
 | Double-click a shape, or `F2` | Edit its label in place |
 | Text tool, click the page | Add a text box and start typing |
 | Arrow keys | Nudge the selection by one grid cell, while the page has the keyboard |
@@ -1166,7 +1181,9 @@ Where it would go next, if it went anywhere:
   from a drawing one
 - Confirmation that what the Visio exporter writes opens in Visio itself
 - A themed fill, which needs Visio's quick-style matrix rather than only its colours
-- Drawing a label's frame in the editor, rather than only carrying one that arrived with a file
+- Sizing a label's block by dragging it, rather than only moving it: the block keeps whatever
+  size it came with, so a label dragged off a narrow shape still wraps to that shape's width
+- Visio's own line ends, which neither the importer nor the exporter maps to the twelve here
 
 ## License
 

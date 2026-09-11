@@ -93,6 +93,13 @@ public class DrawingCanvas : Decorator
     /// <summary>The handle that turns a shape, round rather than square so it reads differently.</summary>
     private static readonly IBrush RotateHandleBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD8, 0x66));
 
+    /// <summary>
+    /// The handle that moves a shape's label, and the box the label sits in. A fixed violet,
+    /// like the turn handle's fixed yellow: the selection is drawn in the desktop's accent
+    /// colour, and a handle that means something else has to stay legible whatever that is.
+    /// </summary>
+    private static readonly IBrush LabelHandleBrush = new SolidColorBrush(Color.FromRgb(0xC0, 0x8A, 0xE8));
+
     /// <summary>A bend that letting go of would remove.</summary>
     private static readonly IBrush DoomedHandleBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x5A, 0x4A));
 
@@ -118,6 +125,9 @@ public class DrawingCanvas : Decorator
     /// <summary>What the turn snaps to while shift is held.</summary>
     private const double RotateStep = 15;
 
+    /// <summary>How far to the side of the label its grip sits, in screen pixels.</summary>
+    private const double LabelGripReach = 20;
+
     /// <summary>How near an edge has to come before a drag lines up with it, in screen pixels.</summary>
     private const double GuideReachPixels = 6;
 
@@ -132,6 +142,9 @@ public class DrawingCanvas : Decorator
 
     /// <summary>Where the label offset stood when a drag of it began.</summary>
     private Vector _labelGrip;
+
+    /// <summary>The label's frame when a drag of it began, as fractions of its shape.</summary>
+    private Rect _labelStart;
 
     /// <summary>Where each shape of a selection stood when a stretch of the whole lot began.</summary>
     private readonly List<(DiagramShape Shape, Rect Start, Point[] Points)> _scaling = [];
@@ -588,6 +601,8 @@ public class DrawingCanvas : Decorator
                     turn.Width / 2, turn.Height / 2);
             }
 
+            DrawLabelGrip(context, selection[0], outline);
+
             return;
         }
 
@@ -678,6 +693,82 @@ public class DrawingCanvas : Decorator
     }
 
     /// <summary>
+    /// Puts the shape's label where the drag has taken it. The frame is held as fractions of
+    /// the shape, so the move is measured in the shape's own upright frame - a turned shape's
+    /// label travels with the turn rather than across the screen.
+    /// </summary>
+    private void MoveLabel(DiagramShape shape, Point pagePoint)
+    {
+        var box = shape.Bounds;
+
+        if (box.Width <= 0 || box.Height <= 0)
+            return;
+
+        var moved = shape.Unrotate(pagePoint) - shape.Unrotate(_dragOrigin);
+
+        shape.TextFrame = new Rect(
+            _labelStart.X + moved.X / box.Width,
+            _labelStart.Y + moved.Y / box.Height,
+            _labelStart.Width,
+            _labelStart.Height);
+
+        _dragChanged = true;
+        InvalidateVisual();
+        ReportStatus();
+    }
+
+    /// <summary>Puts every selected shape's label back in the middle of the shape.</summary>
+    public void ResetLabels()
+    {
+        var moved = Document.Selection.Where(shape => shape.TextFrame is not null).ToList();
+
+        if (moved.Count == 0)
+            return;
+
+        using (Document.BeginBatch())
+        {
+            foreach (var shape in moved)
+                shape.TextFrame = null;
+
+            Document.MarkModified();
+        }
+
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// The grip that moves the label, and - once the label has been moved off the shape - the
+    /// box the words are wrapped into, so it is clear where they will go.
+    /// </summary>
+    private void DrawLabelGrip(DrawingContext context, DiagramShape shape, IPen outline)
+    {
+        if (LabelGrip(shape) is not { } grip)
+            return;
+
+        var area = shape.LabelArea;
+        var pen = ScreenPen(LabelHandleBrush, 1);
+
+        if (shape.TextFrame is not null)
+        {
+            var corners = new[]
+            {
+                new Point(area.Left, area.Top), new Point(area.Right, area.Top),
+                new Point(area.Right, area.Bottom), new Point(area.Left, area.Bottom)
+            };
+
+            var dashed = ScreenDashPen(LabelHandleBrush, 1, 4);
+
+            for (var i = 0; i < corners.Length; i++)
+                context.DrawLine(dashed,
+                    Turned(shape, corners[i]),
+                    Turned(shape, corners[(i + 1) % corners.Length]));
+        }
+
+        context.DrawLine(pen, Turned(shape, new Point(area.Left, area.Center.Y)), grip.Center);
+        context.DrawEllipse(LabelHandleBrush, outline, grip.Center, grip.Width / 2, grip.Height / 2);
+    }
+
+    /// <summary>
     /// Where the turn handle sits: above the top of the shape, on a short stalk, in the frame
     /// the shape is already turned into so it travels round with it.
     /// </summary>
@@ -690,6 +781,26 @@ public class DrawingCanvas : Decorator
         var above = new Point(bounds.Center.X, bounds.Top - Screen(RotateHandleReach));
 
         return HandleRect(Turned(shape, above));
+    }
+
+    /// <summary>
+    /// Where the grip that moves a shape's label sits: out to the side of the block the words
+    /// are in, on a short stalk, so it is clear what it belongs to and clear that it is not
+    /// another corner to drag. Off to the side rather than on the label, because the middle of
+    /// a shape is where one grabs the shape itself.
+    ///
+    /// Nothing for a shape with no words to move, or for a connector, whose label is dragged
+    /// by taking hold of the label itself - there being no shape underneath to confuse it with.
+    /// </summary>
+    private Rect? LabelGrip(DiagramShape shape)
+    {
+        if (shape is ConnectorShape || string.IsNullOrWhiteSpace(shape.Text))
+            return null;
+
+        var area = shape.LabelArea;
+        var beside = new Point(area.Left - Screen(LabelGripReach), area.Center.Y);
+
+        return HandleRect(Turned(shape, beside));
     }
 
     /// <summary>A point in the shape's upright frame, moved to where the turn puts it.</summary>
@@ -1109,6 +1220,20 @@ public class DrawingCanvas : Decorator
             return;
         }
 
+        // A shape's label is moved by its grip rather than by taking hold of the words, which
+        // are in the middle of the shape and so are how one takes hold of the shape itself.
+        if (Document.Selection.Count == 1 && Document.Selected is { } lettered &&
+            LabelGrip(lettered) is { } gripped && gripped.Inflate(Screen(2)).Contains(pagePoint))
+        {
+            _dragMode = DragMode.MovingLabel;
+            _dragOrigin = pagePoint;
+            _labelStart = lettered.TextFrame ?? new Rect(0, 0, 1, 1);
+
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+
         var handle = HandleAt(pagePoint);
 
         if (handle >= 0 && Document.Selection.Count > 1)
@@ -1429,6 +1554,10 @@ public class DrawingCanvas : Decorator
                 _dragChanged = true;
                 InvalidateVisual();
                 ReportStatus();
+                return;
+
+            case DragMode.MovingLabel when Document.Selected is { } lettered:
+                MoveLabel(lettered, pagePoint);
                 return;
 
             case DragMode.Rotating when Document.Selected is { } turning:
@@ -1874,6 +2003,13 @@ public class DrawingCanvas : Decorator
             RotateHandle(turnable) is { } spot && spot.Inflate(Screen(2)).Contains(pagePoint))
         {
             Cursor = new Cursor(StandardCursorType.Hand);
+            return;
+        }
+
+        if (Document.Selection.Count == 1 && Document.Selected is { } lettered &&
+            LabelGrip(lettered) is { } gripped && gripped.Inflate(Screen(2)).Contains(pagePoint))
+        {
+            Cursor = new Cursor(StandardCursorType.SizeAll);
             return;
         }
 

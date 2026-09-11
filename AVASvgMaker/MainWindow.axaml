@@ -105,6 +105,7 @@
                 <MenuItem Header="_Clear page" Click="OnClearClick" />
                 <Separator />
                 <MenuItem Header="_Reset connector route" Click="OnResetRouteClick" />
+                <MenuItem Header="Reset _label position" Click="OnResetLabelClick" />
                 <Separator />
                 <MenuItem Header="Save selection as a _shape..." Click="OnSaveStencilClick" />
             </MenuItem>
