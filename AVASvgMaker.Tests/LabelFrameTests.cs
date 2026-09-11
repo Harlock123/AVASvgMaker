@@ -146,6 +146,105 @@ public class LabelFrameTests
         Assert.Equal(shape.Bounds, shape.LabelArea);
     }
 
+    /// <summary>A corner of the block the label is wrapped into.</summary>
+    private static Point Corner(DiagramShape shape, bool right, bool bottom)
+    {
+        var area = shape.LabelArea;
+
+        return new Point(right ? area.Right : area.Left, bottom ? area.Bottom : area.Top);
+    }
+
+    /// <summary>A shape whose label has been taken off it, ready to be stretched.</summary>
+    private static (DrawingCanvas Canvas, DiagramShape Shape) Moved()
+    {
+        var (canvas, shape) = Lettered();
+
+        Harness.Drag(canvas, Grip(canvas, shape), Grip(canvas, shape) + new Vector(0, 150));
+
+        return (canvas, shape);
+    }
+
+    [AvaloniaFact]
+    public void ALabelStillInItsShapeHasNoCornersToDrag()
+    {
+        // They would sit exactly on the shape's own, and neither could be grabbed.
+        var (canvas, shape) = Lettered();
+        var where = shape.Bounds;
+
+        Harness.Drag(canvas, Corner(shape, true, true), Corner(shape, true, true) + new Vector(80, 0));
+
+        Assert.Null(shape.TextFrame);
+        Assert.NotEqual(where, shape.Bounds);
+    }
+
+    [AvaloniaFact]
+    public void DraggingACornerOfTheBlockWidensIt()
+    {
+        var (canvas, shape) = Moved();
+        var was = shape.LabelArea;
+
+        Harness.Drag(canvas, Corner(shape, true, false), Corner(shape, true, false) + new Vector(100, 0));
+
+        Assert.Equal(was.Width + 100, shape.LabelArea.Width, 1);
+        Assert.Equal(was.Left, shape.LabelArea.Left, 1);
+    }
+
+    [AvaloniaFact]
+    public void WideningTheBlockLetsTheWordsRunFurtherBeforeTheyWrap()
+    {
+        // The point of the whole thing: a label taken off a narrow shape should not have to
+        // keep wrapping to that shape's width.
+        var (canvas, shape) = Moved();
+
+        shape.Text = "a good deal more text than will fit across it";
+
+        var before = shape.LabelArea.Width;
+        Harness.Drag(canvas, Corner(shape, true, false), Corner(shape, true, false) + new Vector(160, 0));
+
+        Assert.True(shape.LabelArea.Width > before + 100,
+            $"the block went from {before:0} to {shape.LabelArea.Width:0}");
+    }
+
+    [AvaloniaFact]
+    public void StretchingTheBlockLeavesTheShapeAlone()
+    {
+        var (canvas, shape) = Moved();
+        var where = shape.Bounds;
+
+        Harness.Drag(canvas, Corner(shape, true, true), Corner(shape, true, true) + new Vector(60, 60));
+
+        Assert.Equal(where, shape.Bounds);
+    }
+
+    [AvaloniaFact]
+    public void AStretchedBlockKeepsItsProportionsAsTheShapeResizes()
+    {
+        var (canvas, shape) = Moved();
+
+        Harness.Drag(canvas, Corner(shape, true, false), Corner(shape, true, false) + new Vector(100, 0));
+
+        var share = shape.LabelArea.Width / shape.Bounds.Width;
+
+        shape.Bounds = new Rect(shape.Bounds.X, shape.Bounds.Y, 400, 100);
+
+        Assert.Equal(share, shape.LabelArea.Width / shape.Bounds.Width, 3);
+    }
+
+    [AvaloniaFact]
+    public void StretchingALabelIsOneStepToUndo()
+    {
+        var (canvas, shape) = Moved();
+        var history = new UndoStack(canvas.Document);
+        var was = shape.LabelArea.Width;
+
+        Harness.Drag(canvas, Corner(shape, true, false), Corner(shape, true, false) + new Vector(100, 0));
+
+        Assert.True(history.CanUndo);
+        history.Undo();
+
+        Assert.Equal(was, canvas.Document.Shapes[0].LabelArea.Width, 1);
+    }
+
     [AvaloniaFact]
     public void AShapeWithNoWordsHasNothingToMove()
     {

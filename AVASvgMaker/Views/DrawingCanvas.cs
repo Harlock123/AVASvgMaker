@@ -42,6 +42,7 @@ public class DrawingCanvas : Decorator
         ResizingSelection,
         Rotating,
         MovingLabel,
+        SizingLabel,
         DrawingConnector,
         Marquee
     }
@@ -717,6 +718,31 @@ public class DrawingCanvas : Decorator
         ReportStatus();
     }
 
+    /// <summary>
+    /// Stretches the block the label is wrapped into. It is measured in the shape's upright
+    /// frame and then kept as fractions of the shape, the same as the block's position, so a
+    /// block widened on a turned shape widens along the shape rather than across the screen.
+    /// </summary>
+    private void SizeLabel(DiagramShape shape, Point pagePoint)
+    {
+        var box = shape.Bounds;
+
+        if (box.Width <= 0 || box.Height <= 0)
+            return;
+
+        var area = Resize(_dragStartBounds, _activeHandle, shape.Unrotate(pagePoint));
+
+        shape.TextFrame = new Rect(
+            (area.X - box.X) / box.Width,
+            (area.Y - box.Y) / box.Height,
+            area.Width / box.Width,
+            area.Height / box.Height);
+
+        _dragChanged = true;
+        InvalidateVisual();
+        ReportStatus();
+    }
+
     /// <summary>Puts every selected shape's label back in the middle of the shape.</summary>
     public void ResetLabels()
     {
@@ -735,6 +761,51 @@ public class DrawingCanvas : Decorator
 
         InvalidateVisual();
     }
+
+    /// <summary>
+    /// The corners of the block the label is wrapped into, for dragging it wider or taller.
+    /// Only for a label that has been given a block of its own: while the block is simply the
+    /// shape, its corners would sit exactly on the shape's own and neither could be grabbed.
+    /// </summary>
+    private Rect[] LabelHandles(DiagramShape shape)
+    {
+        if (shape.TextFrame is null || LabelGrip(shape) is null)
+            return [];
+
+        var area = shape.LabelArea;
+
+        return
+        [
+            HandleRect(Turned(shape, new Point(area.Left, area.Top)), 0.8),
+            HandleRect(Turned(shape, new Point(area.Right, area.Top)), 0.8),
+            HandleRect(Turned(shape, new Point(area.Right, area.Bottom)), 0.8),
+            HandleRect(Turned(shape, new Point(area.Left, area.Bottom)), 0.8)
+        ];
+    }
+
+    /// <summary>Which corner of the label's block is under the pointer, if any.</summary>
+    private int LabelHandleAt(Point pagePoint)
+    {
+        if (Document.Selection.Count != 1 || Document.Selected is not { } shape)
+            return -1;
+
+        var handles = LabelHandles(shape);
+
+        for (var i = 0; i < handles.Length; i++)
+            if (handles[i].Inflate(Screen(2)).Contains(pagePoint))
+                return i;
+
+        return -1;
+    }
+
+    /// <summary>A corner of the label's block, as one of the eight a shape is resized by.</summary>
+    private static int LabelCorner(int index) => index switch
+    {
+        1 => 2,
+        2 => 4,
+        3 => 6,
+        _ => 0
+    };
 
     /// <summary>
     /// The grip that moves the label, and - once the label has been moved off the shape - the
@@ -766,6 +837,11 @@ public class DrawingCanvas : Decorator
 
         context.DrawLine(pen, Turned(shape, new Point(area.Left, area.Center.Y)), grip.Center);
         context.DrawEllipse(LabelHandleBrush, outline, grip.Center, grip.Width / 2, grip.Height / 2);
+
+        // Round, and in the label's own colour, so they are not taken for the shape's corners.
+        foreach (var handle in LabelHandles(shape))
+            context.DrawEllipse(LabelHandleBrush, outline, handle.Center,
+                handle.Width / 2, handle.Height / 2);
     }
 
     /// <summary>
@@ -1234,6 +1310,19 @@ public class DrawingCanvas : Decorator
             return;
         }
 
+        // A corner of the label's block, before the shape's own corners: where the two overlap
+        // the label is the one that has been deliberately put there.
+        if (LabelHandleAt(pagePoint) is var corner and >= 0 && Document.Selected is { } sizing)
+        {
+            _dragMode = DragMode.SizingLabel;
+            _activeHandle = LabelCorner(corner);
+            _dragStartBounds = sizing.LabelArea;
+
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+
         var handle = HandleAt(pagePoint);
 
         if (handle >= 0 && Document.Selection.Count > 1)
@@ -1558,6 +1647,10 @@ public class DrawingCanvas : Decorator
 
             case DragMode.MovingLabel when Document.Selected is { } lettered:
                 MoveLabel(lettered, pagePoint);
+                return;
+
+            case DragMode.SizingLabel when Document.Selected is { } stretching:
+                SizeLabel(stretching, pagePoint);
                 return;
 
             case DragMode.Rotating when Document.Selected is { } turning:
@@ -2010,6 +2103,12 @@ public class DrawingCanvas : Decorator
             LabelGrip(lettered) is { } gripped && gripped.Inflate(Screen(2)).Contains(pagePoint))
         {
             Cursor = new Cursor(StandardCursorType.SizeAll);
+            return;
+        }
+
+        if (LabelHandleAt(pagePoint) is var labelCorner and >= 0)
+        {
+            Cursor = new Cursor(HandleCursors[LabelCorner(labelCorner)]);
             return;
         }
 
