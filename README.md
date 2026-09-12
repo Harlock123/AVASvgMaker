@@ -58,7 +58,7 @@ Or [build it yourself](#building).
 **Connectors**
 
 - **Connection points** - every shape offers four attachment points, sitting on the shape's own outline rather than the box around it; they light up while a connector is being drawn and the end snaps to the nearest one
-- **Glue** - an end dropped on a shape sticks to it and tracks the shape as it moves and resizes
+- **Glue** - an end dropped on a shape, or within a grid step of one of its connection points, sticks to it and tracks the shape as it moves and resizes
 - **Right-angle routing** - routed connectors keep clear of the shapes in their way and of each other, put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved or resized
 - **Adjustable bends** - a selected connector offers a grab point on each end, on every bend, and on the middle of every segment; dragging a middle point adds bends, and dropping one back on the line takes it away again
 - **Twelve line ends** - including the hollow arrow and diamond that UML needs, and the entity-relationship crow's foot family
@@ -83,6 +83,7 @@ Or [build it yourself](#building).
 
 - **Save and load** - a native `.avadiag` document that keeps what SVG export cannot: glue, ports, hand-placed bends, containment and z-order
 - **Seven export formats** - SVG, PDF and Visio as vectors, PNG, JPEG, WebP and BMP as pictures
+- **Mermaid** - the page as a `flowchart` code block, for pasting into a README, a wiki or a pull request
 - **SVG import** - reads a drawing back in as editable shapes, and says what it could not take
 - **Visio import and export** - reads and writes modern `.vsdx` drawings, masters and glue included
 - **Vector export** - SVG writes real SVG primitives, not a bitmap trace; PDF comes out the size the page says it is, with the text still selectable, and carries every page of a document in one file
@@ -327,6 +328,8 @@ those files draw.
 | **Frames** | A group's own turn, flip and stretch reach everything it holds, rather than only shifting it sideways. Where the model has no room for a mirror the flip is folded into the outline, since every mirrored frame is some turn of a shape flipped once |
 | **Theme colours** | A colour cell may name a colour, number one in the drawing's table, say "Themed", or say nothing at all - which for a quick-styled shape also means the theme. The theme's variations are read from the theme part, and the shape's quick-style cells count along them |
 | **Splines** | A `PolylineTo` draws every corner its formula lists. A `NURBSTo` is evaluated as the curve it describes, weights included, and sampled into a smooth run |
+| **Fades** | A fill that runs between colours, which Visio marks with a fill pattern of its own and keeps as a section of stops. There is room for two here, so the ends are taken and any stop in between is lost |
+| **The paper** | A page sheet in Visio has no fill at all, so a coloured page there is a shape covering one. A page that opens with an unstroked shape the size of itself is read as the paper rather than as something to click on - and written back out the same way |
 | **Style** | Line colour, weight and pattern; fill colour. A section Visio will not fill is kept off the body, so a line ruled across a shape's face stays a line instead of being swallowed by the fill |
 | **Text** | The words, and the size, weight, slant, colour and alignment from the shape's `Character` and `Paragraph` sections. Also the block they sit in, which Visio sizes and pins separately and which need not be on the shape at all - the name under a stick figure hangs below it |
 | **Data** | A shape's `Property` section, name by name, with the master's definitions and the shape's own answers merged. Data on a group goes to whatever is drawn in its place, a group being only the shapes inside it. Rows Visio marks invisible are the drawing's own book-keeping and are left where they are |
@@ -353,7 +356,7 @@ shape, which is how Visio's own files put them, so a shape resized in Visio keep
 proportions.
 
 Shapes, their outlines, fills, line colours, weights and dash patterns, rotation, text and how
-it is set, connectors, and glue - both kinds - all go. A line end that is drawn at all goes out
+it is set, fades, connectors, and glue - both kinds - all go. A line end that is drawn at all goes out
 as a plain arrow, for want of a mapping between the two galleries; that loses a hollow arrow's
 meaning, where it used to lose the end altogether. The package holds
 the parts a Visio file is made of: content types, package and document relationships, a
@@ -364,6 +367,59 @@ built to the file format and its output is read back by the importer - the round
 the test, and it is in the suite as thirty-odd assertions on shapes, colour, text, rotation,
 glue and page count - but *it has not been opened in Visio itself.* If you try it, the result
 either way is worth knowing.
+
+## Mermaid
+
+![The page as Mermaid](Images/mermaid.png)
+
+**File -> Export -> Mermaid...** writes the page as a Mermaid `flowchart` and shows it, coloured,
+to be read and copied.
+
+The colouring is [SyntaxColorizer](https://github.com/Harlock123/SyntaxColorizer), which learned
+Mermaid for this - one of the few highlighters that knows the language rather than approximating
+it with something adjacent.
+
+It is shown rather than saved because that is what it is for. Every other export here writes a
+file; this one is text to paste into a README, a wiki or a pull request, where it stays readable
+in a code review and can be edited as text by someone who has never seen this editor.
+
+It is also the one export that **gives up the drawing rather than reproducing it**. Mermaid does
+not take positions at all - there is no syntax for them. You say what connects to what and a
+layout engine works out the arrangement, placing each node by how deep it sits in the chain. So
+what goes out is the drawing's meaning: its boxes, the shape of each, what they say, what joins
+them, and which boxes are inside which container.
+
+![A drawing, and the Mermaid exported from it](Images/mermaid-before-after.png)
+
+Both halves of that are the same diagram. Every shape kept its kind, its colour and its words;
+the dashed line stayed dashed, the labels stayed on their lines, and the container came through
+as a subgraph. What did not survive is where anything was: the three boxes drawn in a row across
+the top come out stacked, because the connectors run through them in a chain and a chain is what
+Mermaid draws.
+
+That is worth knowing before you reach for it. A diagram that is a flow of steps travels well.
+A diagram whose point is its arrangement - a floor plan, a rack layout, a network laid out to
+match the building - does not, and you want SVG or PDF for that.
+
+| | |
+|---|---|
+| **Shapes** | Each becomes the node nearest it in Mermaid's vocabulary - a diamond to `{}`, an ellipse to `(())`, a cylinder to `[()]`, a hexagon to `{{}}`, and anything Mermaid has no shape for to a plain box |
+| **Direction** | Mermaid takes one, and the drawing already knows which way it reads: whichever way its connectors mostly run. A page with no connectors goes down |
+| **Lines** | Solid, dashed and thick each have their own arrow, with or without a head, and a connector's label goes on the line |
+| **Containers** | A pool, lane or box becomes a `subgraph` holding what is inside it |
+| **Paint** | A shape painted away from the default carries a `style` line |
+| **Labels** | Always quoted, so a label full of brackets stays a label. A quotation mark and a bar are written as entities: quoting settles what a bracket means, but a bar is what ends a line's label |
+
+What cannot go, and is said rather than dropped: a shape's angle, a fade, a text box, a page's
+own furniture, and any connector not joined to a shape at both ends - Mermaid joins one named
+node to another, and a line with a loose end names neither.
+
+That last one is a useful check on a drawing. A connector that *looks* attached but reports
+itself as joined to nothing was never glued, and would have come adrift the moment the shape
+was moved.
+
+Every case above was put through Mermaid's own parser while this was written, including a page
+of all ninety-odd shape kinds at once and labels full of brackets, quotes, bars and arrows.
 
 ## Rulers and guides
 
@@ -394,6 +450,7 @@ a shape may go:
 | **`.bmp`** | Export only. The same render as the PNG, written as a 24-bit uncompressed Windows bitmap, for tools that will take nothing else. Much the larger file for exactly the same picture |
 | **`.pdf`** | Export only. Vector pages at their true physical size, each at its own, with the text left as text - the whole document in one file, or just the page you are on. The one to print or to attach |
 | **`.vsdx`** | Export, and import. Modern Visio, every page of the document in the one file. Lossy in both directions, and honestly so - see [Visio drawings](#visio-drawings) |
+| **Mermaid** | Export only, and shown rather than written. The page's meaning as a `flowchart` block - see [Mermaid](#mermaid) |
 
 A file records its format id and a version number, and the reader refuses both foreign JSON
 and files written by a future version rather than loading them incorrectly. Version 2 added
@@ -445,7 +502,7 @@ fields because its end points define it.
 
 | Group | What it does |
 |---|---|
-| **File menu** | New, Open, Save, Save As, Page set up, Page furniture, Import (SVG, Visio), Export (SVG, PDF, Visio, PNG, JPEG, WebP, BMP), Exit |
+| **File menu** | New, Open, Save, Save As, Page set up, Page furniture, Import (SVG, Visio), Export (SVG, PDF, Visio, Mermaid, PNG, JPEG, WebP, BMP), Exit |
 | **Edit menu** | Undo, Redo, Cut, Copy, Paste, Duplicate, Select all, Delete, Clear page, Reset connector route, Reset label position, Shape data, and saving a selection as a shape of your own |
 | **Arrange menu** | Align (6 ways), Distribute (2), Make same size (3), the four drawing-order commands, rotating left, right or straight, grouping and ungrouping, and evening a pool's lane heights |
 | **Page menu** | New, Duplicate, Rename, Delete, Previous, Next, and moving the page left or right among its siblings |
@@ -502,11 +559,12 @@ makes it wider or taller - so a label taken off a narrow shape need not go on wr
 shape's width. **Edit -> Reset label position** puts the whole thing back.
 
 The grip is off to the side rather than on the words, because the middle of a shape is how you
-take hold of the shape itself. The corners appear only once the label has been moved: while the
-block is still simply the shape, its corners would sit exactly on the shape's own and neither
-could be grabbed. Both are drawn as violet circles, against the shape's square handles in the
-desktop's accent colour and the turn handle's fixed yellow - three kinds of handle that mean
-three different things, and none of which should be mistaken for another.
+take hold of the shape itself. While the block is still the shape, its corners step a handle's
+width outside the shape's own, so that both can be grabbed; once the label has a block
+somewhere of its own they sit on it. Both grip and corners are violet circles, against the
+shape's square handles in the desktop's accent colour and the turn handle's fixed yellow -
+three kinds of handle that mean three different things, and none of which should be mistaken
+for another.
 
 Where the label sits and how big its block is are both held as fractions of the shape rather
 than as a position on the page, so they travel with the shape when it moves, scale with it when
@@ -566,6 +624,15 @@ all a diagram needs to stop looking like a screenshot of a spreadsheet.
 Two stops and an angle, and no more than that. Three stops, a radial sweep, a mid-point that is
 not the middle - those are a painting tool's business, and each would have to be carried
 through the file, the SVG, the PDF and Visio for the sake of an effect nobody asked for.
+
+A shape's fade goes out to Visio and comes back: Visio marks one with a fill pattern of its own
+and keeps the run of colours in a section beside it. Visio allows as many stops as it likes, so
+a drawing that comes in with more than two keeps its ends and loses the middle.
+
+The paper travels too, though not as a page setting - a Visio page sheet has no fill at all,
+and a coloured page there is a shape covering one. So it goes out as that shape and is read
+back into the paper again, which is also how a Visio drawing that paints its own background
+arrives here as a coloured page rather than as a sheet over the top of everything.
 
 ## Page furniture
 
@@ -797,7 +864,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag a corner of a moved label's block | Stretch the block the words are wrapped into |
 | Drag a handle on a multiple selection | Stretch the whole selection, each shape keeping its place and size in proportion |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
-| Drag a connector's end handle | Re-route it; drop on a shape to glue, on the page to un-glue |
+| Drag a connector's end handle | Re-route it; drop on a shape - or within a grid step of one of its connection points - to glue, on bare page to un-glue |
 | Drag a connector's corner handle | Move that bend; the segments either side keep their right angles. Drop it back on the line between its neighbours and it is taken out - the handle turns red first, so you can see it coming |
 | Drag a connector's midpoint handle | Slide that segment sideways. Where it meets a shape, new bends appear rather than tearing it off |
 | Double-click a bend | Take it out again, without having to drag it anywhere |
@@ -1044,6 +1111,7 @@ AVASvgMaker/
     RasterExporter.cs    Document -> PNG, JPEG, WebP or BMP, at a chosen scale
     RasterFormat.cs      The four picture formats, and what each one is called
     PdfExporter.cs       Document -> a vector PDF page
+    MermaidExporter.cs   A page -> a Mermaid flowchart, meaning rather than layout
     VisioFormat.cs       The units, origin and namespaces a .vsdx is written in
     VisioImporter.cs     .vsdx -> pages of shapes, masters and glue resolved
     VisioExporter.cs     Document -> a .vsdx package, every page in the one file
@@ -1061,7 +1129,10 @@ AVASvgMaker/
     RasterExportDialog.cs  Export scale and quality, and the pixel size it comes to
     ShapeDataDialog.cs   The fields a shape carries, to fill in
     PageFurnitureDialog.cs  The watermark, header and footer for a page
+    MermaidDialog.cs     The page as Mermaid, coloured, to read and copy
 
+packages/                SyntaxColorizer 1.1.0, until that version is on nuget.org
+nuget.config             Points at packages/ as well as nuget.org, for the same reason
 AVASvgMaker.Tests/       The regression suite - headless, and no part of a release build
 Tools/GuideBuilder/      Turns USERGUIDE.md into USERGUIDE.pdf
 USERGUIDE.md             The guide for using the app; the PDF is generated from it
@@ -1285,10 +1356,9 @@ Where it would go next, if it went anywhere:
 - A themed fill, which needs Visio's quick-style matrix rather than only its colours
 - A mapping between Visio's gallery of line ends and the twelve here, which needs a drawing
   that actually uses them to work out which of its numbers is which shape
-- A fade on a page or a shape does not go out to Visio, which keeps gradients in a form of its
-  own; such a shape exports as its near colour
-- Widening the block of a label that has not been moved: the corners appear only once it has a
-  block of its own, so nudging it is the way to get at them
+- Which way round Visio measures a gradient's angle is not something that can be settled
+  without Visio to look at. It follows the shape-rotation convention, so if it is wrong it is
+  wrong in one place and by one sign
 - Anything that treats the data as data - a report, a filter, colouring a shape by a field's
   value. The fields are carried and shown; nothing yet reasons about them
 

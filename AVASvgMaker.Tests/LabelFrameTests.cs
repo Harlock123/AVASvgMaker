@@ -164,10 +164,24 @@ public class LabelFrameTests
         return (canvas, shape);
     }
 
-    [AvaloniaFact]
-    public void ALabelStillInItsShapeHasNoCornersToDrag()
+    /// <summary>
+    /// A corner of the label's block. While the block is still the shape, the corners step a
+    /// handle's width outside it so that they and the shape's own can both be grabbed.
+    /// </summary>
+    private static Point BlockCorner(DrawingCanvas canvas, DiagramShape shape, bool right, bool bottom)
     {
-        // They would sit exactly on the shape's own, and neither could be grabbed.
+        var area = shape.LabelArea;
+        var clear = shape.TextFrame is null ? 8 / canvas.Zoom : 0;
+
+        return new Point(
+            right ? area.Right + clear : area.Left - clear,
+            bottom ? area.Bottom + clear : area.Top - clear);
+    }
+
+    [AvaloniaFact]
+    public void TheShapesOwnCornerStillResizesTheShape()
+    {
+        // The label's corners step outside the shape's, so the shape's own are where they were.
         var (canvas, shape) = Lettered();
         var where = shape.Bounds;
 
@@ -175,6 +189,24 @@ public class LabelFrameTests
 
         Assert.Null(shape.TextFrame);
         Assert.NotEqual(where, shape.Bounds);
+    }
+
+    [AvaloniaFact]
+    public void ALabelThatHasNotBeenMovedCanStillBeWidened()
+    {
+        // It has no block of its own yet; stretching one gives it the block it was drawn in.
+        var (canvas, shape) = Lettered();
+        var where = shape.Bounds;
+        var was = shape.LabelArea.Width;
+
+        var grip = BlockCorner(canvas, shape, right: true, bottom: false);
+        Harness.Drag(canvas, grip, grip + new Vector(100, 0));
+
+        Assert.NotNull(shape.TextFrame);
+        Assert.Equal(was + 100, shape.LabelArea.Width, 1);
+
+        // And the shape it belongs to has not moved or changed size.
+        Assert.Equal(where, shape.Bounds);
     }
 
     [AvaloniaFact]

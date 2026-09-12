@@ -147,6 +147,13 @@ public class DrawingCanvas : Decorator
     /// <summary>The label's frame when a drag of it began, as fractions of its shape.</summary>
     private Rect _labelStart;
 
+    /// <summary>
+    /// How far the pointer was from the block's corner when a stretch of it began. The corner
+    /// handles are drawn clear of the block while it is still the shape, so without this the
+    /// block would jump that far outwards before it began to follow the pointer.
+    /// </summary>
+    private Vector _labelGrab;
+
     /// <summary>Where each shape of a selection stood when a stretch of the whole lot began.</summary>
     private readonly List<(DiagramShape Shape, Rect Start, Point[] Points)> _scaling = [];
 
@@ -474,6 +481,61 @@ public class DrawingCanvas : Decorator
         _glueTarget is null ? [] : [_glueTarget];
 
     /// <summary>
+    /// What an end dropped here should glue to, and which of that shape's points it should be
+    /// pinned to - or nothing, for an end dropped on bare page.
+    ///
+    /// A shape under the pointer is the obvious answer, but it is not the only one. A shape is
+    /// only as big as its outline, and an outline can sit a long way inside the box around it:
+    /// the corner of a diamond's box is outside the diamond, and so is most of an ellipse's.
+    /// Dropping an end there used to glue to nothing at all while looking for all the world
+    /// like it had landed on the shape - and it stayed looking that way until the shape was
+    /// moved and the line stayed behind.
+    ///
+    /// So a point near a shape's connection point counts as being on that shape. Near means
+    /// within a grid step, which is what the pointer is already being snapped to, and never
+    /// less than the radius a port has always snapped from.
+    /// </summary>
+    private (DiagramShape? Shape, int Port) GlueAt(Point pagePoint)
+    {
+        var under = Document.Shapes
+            .Where(shape => shape is not ConnectorShape)
+            .LastOrDefault(shape => shape.HitTest(pagePoint));
+
+        if (under is not null)
+            return (under, NearestPort(under, pagePoint));
+
+        var reach = Math.Max(Grid.Size, Screen(PortSnapPixels));
+        var closest = double.MaxValue;
+
+        DiagramShape? found = null;
+        var port = -1;
+
+        foreach (var shape in Document.Shapes)
+        {
+            if (shape is ConnectorShape)
+                continue;
+
+            var points = shape.ConnectionPoints;
+
+            for (var i = 0; i < points.Count; i++)
+            {
+                var gap = Math.Sqrt(
+                    Math.Pow(points[i].X - pagePoint.X, 2) +
+                    Math.Pow(points[i].Y - pagePoint.Y, 2));
+
+                if (gap > reach || gap >= closest)
+                    continue;
+
+                closest = gap;
+                found = shape;
+                port = i;
+            }
+        }
+
+        return (found, port);
+    }
+
+    /// <summary>
     /// Finds the connection point nearest the pointer on a shape, within the snap radius.
     /// Returns -1 to attach to the shape without pinning to a point.
     /// </summary>
@@ -735,7 +797,7 @@ public class DrawingCanvas : Decorator
         if (box.Width <= 0 || box.Height <= 0)
             return;
 
-        var area = Resize(_dragStartBounds, _activeHandle, shape.Unrotate(pagePoint));
+        var area = Resize(_dragStartBounds, _activeHandle, shape.Unrotate(pagePoint) - _labelGrab);
 
         shape.TextFrame = new Rect(
             (area.X - box.X) / box.Width,
@@ -769,22 +831,31 @@ public class DrawingCanvas : Decorator
 
     /// <summary>
     /// The corners of the block the label is wrapped into, for dragging it wider or taller.
-    /// Only for a label that has been given a block of its own: while the block is simply the
-    /// shape, its corners would sit exactly on the shape's own and neither could be grabbed.
+    ///
+    /// Where the block is still the shape itself, its corners would sit exactly on the shape's
+    /// own and neither could be grabbed - so they step outside it by a handle's width. Once
+    /// the label has been moved somewhere of its own there is nothing to collide with and they
+    /// sit on the block, where they belong.
     /// </summary>
     private Rect[] LabelHandles(DiagramShape shape)
     {
-        if (shape.TextFrame is null || LabelGrip(shape) is null)
+        if (LabelGrip(shape) is null)
             return [];
 
         var area = shape.LabelArea;
+        var clear = shape.TextFrame is null ? Screen(HandleSize) : 0;
+
+        Rect Corner(double x, double y) =>
+            HandleRect(Turned(shape, new Point(
+                x < area.Center.X ? x - clear : x + clear,
+                y < area.Center.Y ? y - clear : y + clear)), 0.8);
 
         return
         [
-            HandleRect(Turned(shape, new Point(area.Left, area.Top)), 0.8),
-            HandleRect(Turned(shape, new Point(area.Right, area.Top)), 0.8),
-            HandleRect(Turned(shape, new Point(area.Right, area.Bottom)), 0.8),
-            HandleRect(Turned(shape, new Point(area.Left, area.Bottom)), 0.8)
+            Corner(area.Left, area.Top),
+            Corner(area.Right, area.Top),
+            Corner(area.Right, area.Bottom),
+            Corner(area.Left, area.Bottom)
         ];
     }
 
@@ -802,6 +873,15 @@ public class DrawingCanvas : Decorator
 
         return -1;
     }
+
+    /// <summary>Which corner of a block one of its four handles belongs to.</summary>
+    private static Point BlockCorner(Rect block, int index) => index switch
+    {
+        1 => new Point(block.Right, block.Top),
+        2 => new Point(block.Right, block.Bottom),
+        3 => new Point(block.Left, block.Bottom),
+        _ => new Point(block.Left, block.Top)
+    };
 
     /// <summary>A corner of the label's block, as one of the eight a shape is resized by.</summary>
     private static int LabelCorner(int index) => index switch
@@ -1329,6 +1409,11 @@ public class DrawingCanvas : Decorator
             _dragMode = DragMode.SizingLabel;
             _activeHandle = LabelCorner(corner);
             _dragStartBounds = sizing.LabelArea;
+            _labelGrab = sizing.Unrotate(pagePoint) - BlockCorner(_dragStartBounds, corner);
+
+            // A label that has not been moved has no block of its own yet; stretching one
+            // gives it the block it was drawn in, which is the shape.
+            sizing.TextFrame ??= new Rect(0, 0, 1, 1);
 
             e.Pointer.Capture(this);
             e.Handled = true;
@@ -1575,8 +1660,9 @@ public class DrawingCanvas : Decorator
 
     private void StartConnector(Point pagePoint, PointerPressedEventArgs e)
     {
-        var target = Document.HitTest(pagePoint, Screen(LineHitPixels)) as DiagramShape;
-        var port = NearestPort(target, pagePoint);
+        // The same question the far end is asked, so a line begun near a shape is glued to it
+        // rather than merely starting next to it.
+        var (target, port) = GlueAt(pagePoint);
         var anchor = target?.Bounds.Center ?? Grid.Snap(pagePoint);
 
         _pendingConnector = new ConnectorShape(anchor, Grid.Snap(pagePoint))
@@ -1697,12 +1783,8 @@ public class DrawingCanvas : Decorator
                 return;
 
             case DragMode.DrawingConnector when _pendingConnector is { } pending:
-                _glueTarget = Document.Shapes
-                    .Where(shape => shape is not ConnectorShape)
-                    .LastOrDefault(shape => shape.HitTest(pagePoint));
-
+                (_glueTarget, _portIndex) = GlueAt(pagePoint);
                 _portShape = _glueTarget;
-                _portIndex = NearestPort(_glueTarget, pagePoint);
 
                 pending.End = _glueTarget?.Bounds.Center ?? Grid.Snap(pagePoint);
                 pending.EndShape = _glueTarget;
@@ -1720,11 +1802,7 @@ public class DrawingCanvas : Decorator
 
         if (Tool == EditorTool.Connector)
         {
-            var over = Document.Shapes
-                .Where(shape => shape is not ConnectorShape)
-                .LastOrDefault(shape => shape.HitTest(pagePoint));
-
-            var port = NearestPort(over, pagePoint);
+            var (over, port) = GlueAt(pagePoint);
 
             if (!ReferenceEquals(over, _glueTarget) || port != _portIndex)
             {
@@ -1864,13 +1942,10 @@ public class DrawingCanvas : Decorator
 
     private void DragEndpoint(ConnectorShape connector, Point pagePoint)
     {
-        // An end point dropped on a shape glues to it; dropped on the page it un-glues.
-        _glueTarget = Document.Shapes
-            .Where(shape => shape is not ConnectorShape)
-            .LastOrDefault(shape => shape.HitTest(pagePoint));
-
+        // An end point dropped on a shape - or near enough to one of its points - glues to it;
+        // dropped on bare page it un-glues.
+        (_glueTarget, _portIndex) = GlueAt(pagePoint);
         _portShape = _glueTarget;
-        _portIndex = NearestPort(_glueTarget, pagePoint);
 
         var anchor = _glueTarget?.Bounds.Center ?? Grid.Snap(pagePoint);
 

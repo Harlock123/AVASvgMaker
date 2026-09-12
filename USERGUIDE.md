@@ -100,6 +100,11 @@ Every shape offers four connection points, and they sit on the shape itself rath
 box around it - a line meets a triangle on its sloping side and a cylinder on the curve of its
 cap. They light up while you are drawing a connector.
 
+You do not have to land exactly on the shape. Dropping an end within a grid step of one of its
+connection points sticks to it just the same, which matters for shapes whose outline sits well
+inside the box around them - a diamond, an ellipse, a triangle. Drop an end well clear of
+everything and it stays loose, as it should.
+
 **Route** in the toolbar chooses between a straight line and a right-angled one. A right-angled
 connector keeps clear of the shapes in its way, and of the other connectors, and re-routes
 itself whenever anything it depends on moves.
@@ -174,9 +179,8 @@ A label that has been moved stays with its shape: move the shape and the label f
 it and the label moves and stretches in proportion, turn it and the label swings round with it.
 It is saved with your drawing and it survives a trip out to Visio and back.
 
-The corners only appear once the label has been moved. While the block is still simply the
-shape, its corners would sit exactly on the shape's own and neither could be grabbed - so to
-widen a label that is still in its shape, nudge it off first.
+While the block is still the shape, its corners sit a little outside the shape's own so that
+you can grab either; once the label has been moved they sit on the block itself.
 
 Where the selected shapes disagree, a control shows a dash rather than pretending they match;
 choosing something then applies it to all of them. With nothing selected the panel sets the
@@ -223,6 +227,9 @@ It works on pools, lanes and containers too, which is where it is most useful - 
 colour at a lane's heading that thins out across the rest of it.
 
 The **paper** can fade the same way, in **File -> Page setup**.
+
+A shape's fade travels to Visio and back, and so does the paper. A Visio drawing that fades
+through more than two colours keeps its two ends.
 
 ## Watermarks, headers and footers
 
@@ -357,6 +364,7 @@ colour and size you chose. Older files always open in newer versions.
 | SVG | Vector, for handing to another drawing tool |
 | PDF | Vector, at the true physical page size, with the text still selectable. The one to print or attach. Offers all pages or just the one you are on |
 | Visio | A modern `.vsdx` drawing, every page of the document in the one file |
+| Mermaid | The page as a Mermaid `flowchart`, shown on screen to copy rather than saved |
 | PNG | A picture, and the right answer nearly always. Choose 1x to 4x |
 | JPEG | For where nothing else is accepted. A diagram is the worst case for it, so the quality default is high |
 | WebP | Smaller than PNG at moderate quality |
@@ -364,6 +372,36 @@ colour and size you chose. Older files always open in newer versions.
 
 Whichever you choose, what is exported is the page and only the page: white paper, no grid, no
 selection handles and no workspace around it, whatever the screen happens to be showing.
+
+## Mermaid
+
+![The page as Mermaid](Images/mermaid.png)
+
+**File -> Export -> Mermaid...** turns the page into a Mermaid `flowchart` and shows it, coloured
+and numbered, so you can copy it into a README, a wiki page or a pull request.
+
+Mermaid works out the arrangement itself - there is no way to tell it where things go - so what
+travels is what your diagram *means*: the boxes, their shapes, their words, what joins what, and
+which boxes sit inside which container.
+
+![A drawing, and the Mermaid exported from it](Images/mermaid-before-after.png)
+
+Those are the same diagram. Every shape kept its kind, its colour and its words, the dashed line
+stayed dashed, and the container came through as a labelled box. What changed is where things
+are: the three shapes drawn in a row across the top come out stacked, because Mermaid places
+each one by how far along the chain of arrows it sits.
+
+So a diagram that is a flow of steps travels well. One whose point is its arrangement - a floor
+plan, a rack layout, a network drawn to match the building - does not, and SVG or PDF is what
+you want for that.
+
+Anything Mermaid has no room for - a turned shape, a fade, a loose text box, a page's watermark,
+a connector that is not joined to shapes at both ends - is named in the message rather than
+quietly dropped.
+
+That last one is worth reading. A connector reported as joined to nothing was never really stuck
+to the shapes it appears to touch, and would have come adrift as soon as one of them moved - so
+the message is a way of checking a drawing as well as exporting it.
 
 ## Importing SVG
 
