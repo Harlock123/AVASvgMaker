@@ -177,8 +177,16 @@ public static class VisioExporter
         var ids = new Dictionary<DiagramShape, int>();
         var id = 1;
 
+        // A page's own colour has nowhere to live in Visio: a page sheet has no fill at all,
+        // and a coloured page there is a shape covering one. So the paper goes out as the
+        // shape it would have to be - first, and therefore at the back - and is read back into
+        // the paper again rather than arriving as something to click on.
+        var paper = Paper(page, ref id, height);
+
         foreach (var shape in page.Shapes)
             ids[shape] = id++;
+
+        shapes.Append(paper);
 
         foreach (var shape in page.Shapes)
         {
@@ -194,6 +202,51 @@ public static class VisioExporter
                $"xml:space=\"preserve\"><Shapes>{shapes}</Shapes>" +
                (glue.Length > 0 ? $"<Connects>{glue}</Connects>" : string.Empty) +
                "</PageContents>";
+    }
+
+    /// <summary>
+    /// The paper, as the covering shape Visio would need it to be. Nothing at all for a page
+    /// that is plain white, which is most of them - an extra shape on every page would be a
+    /// poor trade for a colour nobody set.
+    /// </summary>
+    private static string Paper(DiagramPage page, ref int id, double pageHeight)
+    {
+        if (page.Background == Colors.White && page.Fade is null)
+            return string.Empty;
+
+        var width = VisioFormat.ToInches(page.Width);
+        var height = VisioFormat.ToInches(page.Height);
+        var number = id++;
+
+        var fade = page.Fade is not null;
+
+        var cells =
+            Cell("PinX", width / 2) + Cell("PinY", height / 2) +
+            Cell("Width", width) + Cell("Height", height) +
+            Cell("LocPinX", width / 2) + Cell("LocPinY", height / 2) +
+            Cell("Angle", 0) +
+            Cell("FillForegnd", Hex(page.Background)) +
+            Cell("FillPattern", fade ? 29 : 1) +
+            (fade
+                ? Cell("FillGradientEnabled", 1) + Cell("FillGradientDir", 0) +
+                  Cell("FillGradientAngle", VisioFormat.ToRadians(page.BackgroundAngle))
+                : string.Empty) +
+            Cell("LinePattern", 0);
+
+        var stops = page.Fade is { } run
+            ? "<Section N=\"FillGradient\">" +
+              $"<Row IX=\"0\">{Cell("GradientStopColor", Hex(run.From))}" +
+              $"{Cell("GradientStopColorTrans", 0)}{Cell("GradientStopPosition", 0)}</Row>" +
+              $"<Row IX=\"1\">{Cell("GradientStopColor", Hex(run.To))}" +
+              $"{Cell("GradientStopColorTrans", 0)}{Cell("GradientStopPosition", 1)}</Row>" +
+              "</Section>"
+            : string.Empty;
+
+        _ = pageHeight;
+
+        return $"<Shape ID=\"{number}\" NameU=\"Paper\" Type=\"Shape\" LineStyle=\"0\" " +
+               $"FillStyle=\"0\" TextStyle=\"0\">{cells}{stops}" +
+               Geometry(PathShape.Fallback, filled: true, from: 0) + "</Shape>";
     }
 
     /// <summary>Which end of which connector is stuck to which shape.</summary>
@@ -244,7 +297,7 @@ public static class VisioExporter
             Paint(shape) + Lettering(shape);
 
         return $"<Shape ID=\"{id}\" NameU=\"Sheet.{id}\" Type=\"Shape\" LineStyle=\"0\" FillStyle=\"0\" " +
-               $"TextStyle=\"0\">{cells}{Outline(shape)}{Data(shape)}{Words(shape)}</Shape>";
+               $"TextStyle=\"0\">{cells}{Fade(shape)}{Outline(shape)}{Data(shape)}{Words(shape)}</Shape>";
     }
 
     /// <summary>
@@ -320,6 +373,33 @@ public static class VisioExporter
         string.IsNullOrEmpty(shape.Text) ? string.Empty : $"<Text>{Escape(shape.Text)}</Text>";
 
     /// <summary>
+    /// The run of colours a fade is made of. Visio allows as many stops as you like; there
+    /// are two here, at either end, because two is all the model holds.
+    ///
+    /// The angle is turned the same way a shape's own turn is, Visio measuring both
+    /// anticlockwise in a page whose y runs up while ours runs down. Which way round a
+    /// gradient angle goes is not something that can be settled without Visio to look at, so
+    /// it follows the rotation rather than guessing separately - wrong together is one sign to
+    /// change, wrong apart is two.
+    /// </summary>
+    private static string Fade(DiagramShape shape)
+    {
+        if (shape.Fade is not { } fade)
+            return string.Empty;
+
+        string Stop(int index, Color colour, double at) =>
+            $"<Row IX=\"{index}\">" +
+            Cell("GradientStopColor", Hex(colour)) +
+            Cell("GradientStopColorTrans", 1 - colour.A / 255.0) +
+            Cell("GradientStopPosition", at) +
+            "</Row>";
+
+        return "<Section N=\"FillGradient\">" +
+               Stop(0, fade.From, 0) + Stop(1, fade.To, 1) +
+               "</Section>";
+    }
+
+    /// <summary>
     /// The data the shape carries, as the section Visio keeps it in. A field with nothing in
     /// it is written the way Visio writes one - no formula, and a value of zero standing for
     /// the absence rather than for the digit.
@@ -360,8 +440,17 @@ public static class VisioExporter
                 _ => 1
             };
 
+        // A fade is a fill pattern of its own - 29 - with the run of colours in a section and
+        // the near colour left in FillForegnd for anything that will not read the section.
+        var fade = shape.Fade is not null;
+
         return Cell("FillForegnd", Hex(shape.Fill)) +
-               Cell("FillPattern", solid ? 1 : 0) +
+               Cell("FillPattern", solid ? fade ? 29 : 1 : 0) +
+               (fade
+                   ? Cell("FillGradientEnabled", 1) +
+                     Cell("FillGradientDir", 0) +
+                     Cell("FillGradientAngle", VisioFormat.ToRadians(shape.FillAngle))
+                   : string.Empty) +
                Cell("FillForegndTrans", 1 - shape.Fill.A / 255.0) +
                Cell("LineColor", Hex(shape.Stroke)) +
                Cell("LinePattern", pattern) +

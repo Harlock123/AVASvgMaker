@@ -223,9 +223,13 @@ public static class VisioImporter
         }
 
         /// <summary>
-        /// The rows of a named section, the master's and the shape's own merged by the name
-        /// each row carries. A shape that fills in one field of what its master defines keeps
-        /// the rest of the definition, the same as it does for a corner of its outline.
+        /// The rows of a named section, the master's and the shape's own merged by whatever
+        /// each row is identified by. A shape that fills in one field of what its master
+        /// defines keeps the rest of the definition, the same as it does for a corner of its
+        /// outline.
+        ///
+        /// Which identifier that is depends on the section: a property row is known by its
+        /// name, a gradient stop only by its place in the run.
         /// </summary>
         public IReadOnlyList<(string Name, XElement Row)> Rows(string section)
         {
@@ -237,7 +241,7 @@ public static class VisioImporter
 
             foreach (var row in own)
             {
-                if ((string?)row.Attribute("N") is not { } name)
+                if (((string?)row.Attribute("N") ?? (string?)row.Attribute("IX")) is not { } name)
                     continue;
 
                 var at = merged.FindIndex(entry => entry.Name == name);
@@ -443,6 +447,23 @@ public static class VisioImporter
         foreach (var element in root.Element(V + "Shapes")?.Elements(V + "Shape") ?? [])
             count += ReadShape(element, reading, null, Matrix.Identity);
 
+        // A page that opens with an unstroked shape covering the whole of it is painting its
+        // background, which here is the paper. Left as a shape it would be a sheet over the
+        // drawing, catching every click meant for the bare page.
+        //
+        // Taken even when it is all the page has: a page that is nothing but a colour is an
+        // ordinary thing, and it comes out looking the same either way - what it loses is
+        // only the ability to be clicked on, which is the point.
+        if (Backdrop(reading.Page) is { } paper)
+        {
+            reading.Page.Background = paper.Fill;
+            reading.Page.BackgroundTo = paper.FillTo;
+            reading.Page.BackgroundAngle = paper.FillAngle;
+
+            reading.Page.Shapes.Remove(paper);
+            count--;
+        }
+
         // Glue is a page-level list of which end of which connector meets which shape.
         foreach (var connect in root.Element(V + "Connects")?.Elements(V + "Connect") ?? [])
         {
@@ -477,6 +498,29 @@ public static class VisioImporter
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// The shape a page opens with, if it is one covering the page with no outline - which is
+    /// how a drawing paints its background, Visio having nowhere else to put one.
+    /// </summary>
+    private static DiagramShape? Backdrop(DiagramPage page)
+    {
+        if (page.Shapes.Count == 0)
+            return null;
+
+        var first = page.Shapes[0];
+
+        if (first is ConnectorShape || first.Stroke.A != 0 || first.IsRotated ||
+            first.Text.Length > 0 || first.Fill.A == 0)
+            return null;
+
+        var bounds = first.Bounds;
+
+        return bounds.X <= 1 && bounds.Y <= 1 &&
+               bounds.Width >= page.Width - 2 && bounds.Height >= page.Height - 2
+            ? first
+            : null;
     }
 
     #endregion
@@ -674,6 +718,35 @@ public static class VisioImporter
     }
 
     /// <summary>
+    /// A fill that runs between colours. Visio marks one with a fill pattern of 29 and keeps
+    /// the run in a section of its own, as many stops as the drawing likes; there is room for
+    /// two here, so the ends are taken and whatever was in between is lost - which is the same
+    /// bargain the model strikes everywhere else.
+    /// </summary>
+    private static void Fade(DiagramShape shape, Sheet sheet, Palette palette)
+    {
+        var stops = sheet.Rows("FillGradient")
+            .Select(entry => (
+                Colour: Stated(RowCell(entry.Row, "GradientStopColor"), palette),
+                At: VisioFormat.Number(RowCell(entry.Row, "GradientStopPosition"), -1),
+                Clear: VisioFormat.Number(RowCell(entry.Row, "GradientStopColorTrans"))))
+            .Where(stop => stop.Colour is not null && stop.At >= 0)
+            .OrderBy(stop => stop.At)
+            .ToList();
+
+        if (stops.Count < 2)
+            return;
+
+        Color Solid((Color? Colour, double At, double Clear) stop) =>
+            Color.FromArgb((byte)Math.Clamp((1 - stop.Clear) * 255, 0, 255),
+                stop.Colour!.Value.R, stop.Colour.Value.G, stop.Colour.Value.B);
+
+        shape.Fill = Solid(stops[0]);
+        shape.FillTo = Solid(stops[^1]);
+        shape.FillAngle = VisioFormat.ToDegrees(sheet.Number("FillGradientAngle"));
+    }
+
+    /// <summary>
     /// The data the shape carries, from its Property section. A row is named by the field's
     /// name and says what to call it, what it holds, and whether Visio shows it at all.
     ///
@@ -828,6 +901,9 @@ public static class VisioImporter
             // solid in its own line colour would be further from the truth than an empty one.
             shape.Fill = filled ? Stated(sheet.Cell("FillForegnd"), palette) ?? Colors.Transparent
                                 : Colors.Transparent;
+
+            if (filled)
+                Fade(shape, sheet, palette);
         }
 
         // A line pattern of 0 is no line at all; anything past 1 is some sort of dash.

@@ -970,6 +970,58 @@ public class VisioTests
     }
 
     [AvaloniaFact]
+    public void AFillThatRunsBetweenColoursComesOver()
+    {
+        // Visio marks a fade with a fill pattern of its own and keeps the run in a section.
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            "<Cell N='FillPattern' V='29'/><Cell N='FillForegnd' V='#4682b4'/>" +
+            "<Cell N='FillGradientAngle' V='-1.5707963267949'/>" +
+            "<Section N='FillGradient'>" +
+            "<Row IX='0'><Cell N='GradientStopColor' V='#4682b4'/>" +
+            "<Cell N='GradientStopColorTrans' V='0'/><Cell N='GradientStopPosition' V='0'/></Row>" +
+            "<Row IX='1'><Cell N='GradientStopColor' V='#ffffff'/>" +
+            "<Cell N='GradientStopColorTrans' V='0'/><Cell N='GradientStopPosition' V='1'/></Row>" +
+            "</Section>")));
+
+        var shape = read.Document.Pages[0].Shapes[0];
+
+        Assert.Equal(Color.Parse("#4682b4"), shape.Fill);
+        Assert.Equal(Colors.White, Assert.NotNull(shape.FillTo));
+        Assert.Equal(90, shape.FillAngle, 1);
+    }
+
+    [AvaloniaFact]
+    public void OnlyTheEndsOfALongerRunAreKept()
+    {
+        // Visio allows as many stops as it likes and there is room for two here, so the ends
+        // are taken - in the order the positions put them, not the order the rows are in.
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            "<Cell N='FillPattern' V='29'/>" +
+            "<Section N='FillGradient'>" +
+            "<Row IX='0'><Cell N='GradientStopColor' V='#00ff00'/>" +
+            "<Cell N='GradientStopPosition' V='0.5'/></Row>" +
+            "<Row IX='1'><Cell N='GradientStopColor' V='#ff0000'/>" +
+            "<Cell N='GradientStopPosition' V='1'/></Row>" +
+            "<Row IX='2'><Cell N='GradientStopColor' V='#0000ff'/>" +
+            "<Cell N='GradientStopPosition' V='0'/></Row>" +
+            "</Section>")));
+
+        var shape = read.Document.Pages[0].Shapes[0];
+
+        Assert.Equal(Colors.Blue, shape.Fill);
+        Assert.Equal(Colors.Red, Assert.NotNull(shape.FillTo));
+    }
+
+    [AvaloniaFact]
+    public void AFlatFillStaysFlat()
+    {
+        var read = VisioImporter.Read(Drawing(Square(extra:
+            "<Cell N='FillPattern' V='1'/><Cell N='FillForegnd' V='#4682b4'/>")));
+
+        Assert.Null(read.Document.Pages[0].Shapes[0].FillTo);
+    }
+
+    [AvaloniaFact]
     public void ABackgroundPageIsSceneryForAnotherAndIsLeftOut()
     {
         var read = VisioImporter.Read(Drawing(Square(), background: true));
@@ -1112,6 +1164,129 @@ public class VisioTests
         // would not parse.
         if (kind != ShapeKind.Rectangle)
             Assert.NotEqual(PathShape.Fallback, back.UnitOutline);
+    }
+
+    [AvaloniaFact]
+    public void AFadeGoesOutToVisioAndComesBack()
+    {
+        var box = ShapeFactory.Create(ShapeKind.Rectangle, new Rect(20, 20, 200, 120));
+        box.Fill = Color.Parse("#4682B4");
+        box.FillTo = Colors.White;
+        box.FillAngle = 45;
+
+        var back = RoundTrip(OnePage(box)).Pages[0].Shapes[0];
+
+        Assert.Equal(Color.Parse("#4682B4"), back.Fill);
+        Assert.Equal(Colors.White, Assert.NotNull(back.FillTo));
+        Assert.Equal(45, back.FillAngle, 1);
+    }
+
+    [AvaloniaFact]
+    public void AFadedShapeIsWrittenWithTheFillPatternVisioWantsForOne()
+    {
+        // Without the pattern, Visio reads the section and fills the shape flat anyway.
+        var box = ShapeFactory.Create(ShapeKind.Rectangle, new Rect(20, 20, 200, 120));
+        box.FillTo = Colors.White;
+
+        using var stream = new MemoryStream();
+        VisioExporter.Write(OnePage(box), stream);
+
+        stream.Position = 0;
+        using var package = new ZipArchive(stream, ZipArchiveMode.Read);
+        using var reader = new StreamReader(package.GetEntry("visio/pages/page1.xml")!.Open());
+
+        var xml = reader.ReadToEnd();
+
+        Assert.Contains("N=\"FillPattern\" V=\"29\"", xml);
+        Assert.Contains("N=\"FillGradientEnabled\" V=\"1\"", xml);
+        Assert.Contains("<Section N=\"FillGradient\">", xml);
+    }
+
+    [AvaloniaFact]
+    public void AFlatShapeIsWrittenWithNoRunOfColoursAtAll()
+    {
+        using var stream = new MemoryStream();
+        VisioExporter.Write(OnePage(ShapeFactory.Create(ShapeKind.Rectangle, new Rect(20, 20, 100, 60))), stream);
+
+        stream.Position = 0;
+        using var package = new ZipArchive(stream, ZipArchiveMode.Read);
+        using var reader = new StreamReader(package.GetEntry("visio/pages/page1.xml")!.Open());
+
+        Assert.DoesNotContain("FillGradient", reader.ReadToEnd());
+    }
+
+    [AvaloniaFact]
+    public void ThePaperGoesOutToVisioAndComesBack()
+    {
+        // A Visio page sheet has no fill at all, so a coloured page there is a shape covering
+        // one. It goes out as that and is read back into the paper again.
+        var document = new DiagramDocument();
+        document.SetPages([new DiagramPage("Tinted") { Width = 800, Height = 600 }]);
+        document.SetPaper(Color.Parse("#FFEEDD"), null, 90);
+
+        var back = Assert.Single(RoundTrip(document).Pages);
+
+        Assert.Equal(Color.Parse("#FFEEDD"), back.Background);
+
+        // And not as something to click on.
+        Assert.Empty(back.Shapes);
+    }
+
+    [AvaloniaFact]
+    public void PaperThatFadesGoesOutAndComesBackFading()
+    {
+        var document = new DiagramDocument();
+        document.SetPages([new DiagramPage("Tinted") { Width = 800, Height = 600 }]);
+        document.SetPaper(Colors.White, Color.Parse("#DCE6F5"), 0);
+
+        var back = Assert.Single(RoundTrip(document).Pages);
+
+        Assert.Equal(Colors.White, back.Background);
+        Assert.Equal(Color.Parse("#DCE6F5"), Assert.NotNull(back.BackgroundTo));
+        Assert.Equal(0, back.BackgroundAngle, 1);
+    }
+
+    [AvaloniaFact]
+    public void PlainWhitePaperPutsNoExtraShapeOnThePage()
+    {
+        // An extra shape on every page would be a poor trade for a colour nobody set.
+        var box = ShapeFactory.Create(ShapeKind.Rectangle, new Rect(20, 20, 100, 60));
+
+        var back = RoundTrip(OnePage(box)).Pages[0];
+
+        Assert.Single(back.Shapes);
+        Assert.Equal(Colors.White, back.Background);
+    }
+
+    [AvaloniaFact]
+    public void ThePaperDoesNotMultiplyOnEveryTrip()
+    {
+        // Written as a shape and read back as a shape, a page would gain one each time round.
+        var document = new DiagramDocument();
+        document.SetPages([new DiagramPage("Tinted") { Width = 800, Height = 600 }]);
+        document.SetPaper(Color.Parse("#FFEEDD"), null, 90);
+        Harness.Box(document, new Rect(20, 20, 100, 60), "one");
+
+        var back = RoundTrip(RoundTrip(RoundTrip(document)));
+
+        Assert.Single(back.Pages[0].Shapes);
+        Assert.Equal(Color.Parse("#FFEEDD"), back.Pages[0].Background);
+    }
+
+    [AvaloniaFact]
+    public void ACoveringShapeThatIsDrawnIsStillAShape()
+    {
+        // One with an outline was put there on purpose and is not the page painting itself.
+        var read = VisioImporter.Read(Drawing(
+            "<Shape ID='1' Type='Shape'>" +
+            "<Cell N='PinX' V='4'/><Cell N='PinY' V='3'/>" +
+            "<Cell N='Width' V='8'/><Cell N='Height' V='6'/>" +
+            "<Cell N='LocPinX' V='4'/><Cell N='LocPinY' V='3'/>" +
+            "<Cell N='FillForegnd' V='#ffeedd'/><Cell N='LineColor' V='0'/>" +
+            Box + "</Shape>" + Square("2")));
+
+        Assert.Equal(2, read.Document.Pages[0].Shapes.Count);
+        Assert.Equal(Colors.White, read.Document.Pages[0].Background);
     }
 
     [AvaloniaFact]
