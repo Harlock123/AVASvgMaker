@@ -1,21 +1,21 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 
 PackageIdentifier: Harlock123.AVASvgMaker
-PackageVersion: 1.11.0
+PackageVersion: 1.12.0
 InstallerType: zip
 NestedInstallerType: portable
 UpgradeBehavior: install
 ReleaseDate: '2026-09-12'
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/Harlock123/AVASvgMaker/releases/download/v1.11.0/AVASvgMaker-1.11.0-win-x64.zip
-    InstallerSha256: E140A2BD0BC56EEBC2F67862E0A2B1FD5336ADEC5C3E474C59DA459C4B0C16B9
+    InstallerUrl: https://github.com/Harlock123/AVASvgMaker/releases/download/v1.12.0/AVASvgMaker-1.12.0-win-x64.zip
+    InstallerSha256: 9B95AE82D2316739AE7564E13CEA8B458FE2007AB2F6AE6554B4FCDFB58296F3
     NestedInstallerFiles:
       - RelativeFilePath: AVASvgMaker.exe
         PortableCommandAlias: avasvgmaker
   - Architecture: arm64
-    InstallerUrl: https://github.com/Harlock123/AVASvgMaker/releases/download/v1.11.0/AVASvgMaker-1.11.0-win-arm64.zip
-    InstallerSha256: AA6AD6C47BEEF0883808B8E6B0DECE9BEF40FACC446B828C603CF2EED00EF7D9
+    InstallerUrl: https://github.com/Harlock123/AVASvgMaker/releases/download/v1.12.0/AVASvgMaker-1.12.0-win-arm64.zip
+    InstallerSha256: 337FCF8DCE38D5336A5A4E8234D92673D7A2E881B8C6F196D84DA1601E0F94EE
     NestedInstallerFiles:
       - RelativeFilePath: AVASvgMaker.exe
         PortableCommandAlias: avasvgmaker

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
 PackageIdentifier: Harlock123.AVASvgMaker
-PackageVersion: 1.11.0
+PackageVersion: 1.12.0
 PackageLocale: en-US
 Publisher: Lonnie Watson
 PublisherUrl: https://github.com/Harlock123
@@ -26,6 +26,9 @@ Description: |-
   watermark, header and footer. Shapes can be grouped, rotated, gradient-filled, given data
   fields, and arranged with smart guides, rulers, containers and swimlanes.
 
+  The application follows the desktop's light and dark setting, or can be set to one of
+  thirteen built-in themes for desktops that do not announce one.
+
   It ships as a single self-contained executable: the .NET runtime and everything else it
   needs are inside the one file, so there is nothing else to install.
 Moniker: avasvgmaker
@@ -43,7 +46,7 @@ Tags:
   - vector-graphics
   - visio
   - vsdx
-ReleaseNotesUrl: https://github.com/Harlock123/AVASvgMaker/releases/tag/v1.11.0
+ReleaseNotesUrl: https://github.com/Harlock123/AVASvgMaker/releases/tag/v1.12.0
 Documentations:
   - DocumentLabel: User Guide
     DocumentUrl: https://github.com/Harlock123/AVASvgMaker/blob/main/USERGUIDE.md
