@@ -1357,7 +1357,10 @@ been worked through.
 
 Where it would go next, if it went anywhere:
 
-- Confirmation that what the Visio exporter writes opens in Visio itself
+- Confirmation that what the Visio exporter writes opens in Visio itself. Until someone has
+  opened one, the repository description says the app *reads* .vsdx and lists writing it among
+  the exports, rather than claiming a round trip nobody has watched work. Worth rewording once
+  it is confirmed
 - A themed fill, which needs Visio's quick-style matrix rather than only its colours
 - A mapping between Visio's gallery of line ends and the twelve here, which needs a drawing
   that actually uses them to work out which of its numbers is which shape
