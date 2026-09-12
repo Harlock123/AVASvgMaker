@@ -1624,6 +1624,38 @@ public partial class MainWindow : Window
 
     private void OnExportVisioClick(object? sender, RoutedEventArgs e) => _ = ExportVisioAsync();
 
+    private void OnExportMermaidClick(object? sender, RoutedEventArgs e) => _ = ExportMermaidAsync();
+
+    /// <summary>
+    /// The page as Mermaid, shown rather than saved. Every other export writes a file because
+    /// a file is what it is for; this one is text to be pasted into a README or a ticket, so
+    /// it is put where it can be read and copied.
+    /// </summary>
+    private async Task ExportMermaidAsync()
+    {
+        Canvas.CommitEdit();
+
+        try
+        {
+            var page = Canvas.Document.CurrentPage;
+            var result = MermaidExporter.Export(page);
+
+            StatusText.Text = result.Summary;
+
+            var caption = page.Shapes.Count == 0
+                ? "There is nothing on this page to write."
+                : result.Summary +
+                  ". Mermaid arranges the page itself, so what goes with it is what connects to what.";
+
+            await MermaidDialog.ShowAsync(this, result.Code, caption);
+        }
+        catch (Exception ex)
+        {
+            // Otherwise the task simply faults and the menu appears to do nothing at all.
+            StatusText.Text = $"Could not write the page as Mermaid: {ex.Message}";
+        }
+    }
+
     /// <summary>
     /// Writes the whole document as a Visio drawing. Every page goes, because a .vsdx holds
     /// pages the way our own file does and there is nothing to choose between.

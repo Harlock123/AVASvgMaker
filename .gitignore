@@ -102,3 +102,10 @@ coverage/
 # Crash dumps
 *.stackdump
 crash.log
+
+# SyntaxColorizer 1.1.0 is the first version with a Mermaid tokenizer in it, and until that
+# version reaches nuget.org the package is taken from packages/ beside nuget.config. It has to
+# be committed, because the release workflow builds from a clean checkout of this repository
+# and nothing else. Delete both when 1.1.0 is published.
+!packages/
+!packages/SyntaxColorizer.*.nupkg

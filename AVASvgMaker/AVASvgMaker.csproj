@@ -32,6 +32,9 @@
          Skia encodes JPEG and WebP, and writes the PDF. -->
     <PackageReference Include="Avalonia.Skia" Version="11.2.1" />
     <PackageReference Include="SkiaSharp" Version="2.88.8" />
+
+    <!-- The highlighter in the Mermaid dialog. See nuget.config about where 1.1.0 comes from. -->
+    <PackageReference Include="SyntaxColorizer" Version="1.1.0" />
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia.Diagnostics" Version="11.2.1">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>

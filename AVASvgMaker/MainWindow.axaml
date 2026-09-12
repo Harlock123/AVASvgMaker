@@ -81,6 +81,7 @@
                     <MenuItem Header="_SVG..." InputGesture="Ctrl+E" Click="OnExportSvgClick" />
                     <MenuItem Header="P_DF..." Click="OnExportPdfClick" />
                     <MenuItem Header="_Visio..." Click="OnExportVisioClick" />
+                    <MenuItem Header="_Mermaid..." Click="OnExportMermaidClick" />
                     <Separator />
                     <MenuItem Header="_PNG..." InputGesture="Ctrl+Shift+E" Click="OnExportPngClick" />
                     <MenuItem Header="_JPEG..." Click="OnExportJpegClick" />

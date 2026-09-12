@@ -5,5 +5,11 @@
 
     <Application.Styles>
         <FluentTheme />
+
+        <!--
+            The highlighter in the Mermaid dialog. A control brings its template with it but
+            the application has to say so; without this the box appears and stays empty.
+        -->
+        <StyleInclude Source="avares://SyntaxColorizer/Controls/SyntaxHighlightingTextBox.axaml" />
     </Application.Styles>
 </Application>
