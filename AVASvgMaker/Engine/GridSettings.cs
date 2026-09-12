@@ -9,6 +9,12 @@ public class GridSettings
     /// <summary>Every Nth line is drawn darker.</summary>
     public const int MajorEvery = 5;
 
+    /// <summary>
+    /// The sizes offered. Named here rather than in the toolbar's markup so that the settings
+    /// dialog offers the same five - two lists of grid sizes would sooner or later disagree.
+    /// </summary>
+    public static readonly double[] Sizes = [5, 10, 20, 25, 50];
+
     public bool ShowGrid { get; set; } = true;
     public bool SnapToGrid { get; set; } = true;
     public double Size { get; set; } = 10;

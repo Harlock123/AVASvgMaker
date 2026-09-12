@@ -882,11 +882,18 @@ nothing shows through and they read correctly whatever is behind them.
 | `Delete` / `Backspace` | Delete the selection, along with any connectors glued to it |
 | `Escape` | Back to the select tool, clearing the selection and any armed stencil |
 
-## Themes
+## Settings
 
 ![Choosing a theme](Images/settings-theme.png)
 
-**Edit -> Preferences** (`Ctrl+,`) chooses the colours the application's own chrome is drawn
+**Edit -> Preferences** (`Ctrl+,`) holds what belongs to the person rather than to the drawing,
+in three tabs: **Appearance**, **Defaults** and **Grid**. It is written to `settings.json` as
+soon as it changes rather than on the way out, because an application that loses your settings
+when it is closed the wrong way has not really got any.
+
+### Themes
+
+The theme chooses the colours the application's own chrome is drawn
 in: thirteen built-in themes - Dark, Light, Solarized, Nord, Gruvbox, Dracula, Tokyo Night,
 Catppuccin, and a high-contrast pair - or **Desktop**, which is to follow whatever the desktop
 is doing.
@@ -909,7 +916,7 @@ out. Cancel puts back whatever was on when the dialog opened.
 on; a diagram has to look the same to whoever it is sent to. Only the chrome around it
 follows.
 
-## Following the desktop
+### Following the desktop
 
 Choosing **Desktop** means taking the colours from the session, which works as well as the
 session allows. There are three cases and they are genuinely different:
@@ -946,6 +953,27 @@ keeps the dark palette it ships with.
 Settings live in `settings.json` beside the saved shapes, under `%AppData%\AVASvgMaker` on
 Windows and `~/.config/AVASvgMaker` elsewhere. A file that will not parse is ignored rather
 than being worth refusing to start over.
+
+### Defaults, and the trap under them
+
+![The default formatting](Images/settings-defaults.png)
+
+The **Defaults** tab holds the formatting a new shape is given - fill, line, weight, line
+style, font, size, colour, bold and italic - and **Grid** holds the grid a window starts on
+and the paper a new drawing starts on.
+
+There are two things a "default" could mean here, and keeping them apart is the whole design.
+The properties panel already sets formatting for the next shape when nothing is selected, which
+is what people do while trying colours out. If that also wrote to the settings, experimenting
+would quietly rewrite what the application opens with and there would be no way back to it.
+
+So the panel's value is the session's, the settings file's is what a session *starts* from, and
+they meet in exactly two places, both deliberate: **Take from the current drawing** copies the
+panel into the settings, and changing a default in the dialog carries into the open session -
+because changing the default fill and then finding the next shape ignores it would be a puzzle.
+
+The paper does not work that way. It is what the *next* drawing starts on; **Page setup**
+changes the one you have open. Silently resizing the open drawing would be a different promise.
 
 ### Display scale
 

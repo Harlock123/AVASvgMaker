@@ -548,6 +548,29 @@ Your choice is saved as soon as you make it, and is there the next time you open
 **The page itself never changes.** It is paper, and it is what your exports land on - a
 diagram has to look the same to whoever you send it to. Only the frame around it is themed.
 
+## Defaults for new shapes
+
+![The default formatting](Images/settings-defaults.png)
+
+The **Defaults** tab of the same dialog holds the formatting every new shape is given: fill,
+line colour, weight and style, then the font, its size and colour, and bold and italic.
+
+This is not quite the same as the formatting boxes on the right of the window. Those set what
+the *next* shape you draw will look like, which is handy while you are trying colours out - and
+because it is handy, it does not touch your settings. Otherwise a few minutes of experimenting
+would quietly change what the app opens with tomorrow.
+
+When you do want what you have been using to become the default, the button says so: **Take
+from the current drawing** copies whatever the properties panel is set to now into the
+settings. It only goes that way when you ask.
+
+Changing a default here does apply to the drawing you have open, so the next shape you draw
+uses it straight away.
+
+The **Grid** tab holds the grid size and whether snapping and the grid lines are on, and the
+paper a **new** drawing starts on. That last one does not touch the drawing you have open -
+use **File -> Page setup** for that.
+
 ## Fitting in
 
 If you change the display scale while the app is open it will say so in the status bar rather

@@ -17,6 +17,9 @@ namespace AVASvgMaker.Tests;
 /// </summary>
 public class ThemeTests : IDisposable
 {
+    // Every test here runs with the platform up, even the ones that only touch a file - see
+    // the note in DefaultsTests for why.
+
     private readonly string _settings = Path.Combine(
         Path.GetTempPath(), $"avasvgmaker-settings-{Guid.NewGuid():N}.json");
 
@@ -39,7 +42,7 @@ public class ThemeTests : IDisposable
 
     #region The catalogue
 
-    [Fact]
+    [AvaloniaFact]
     public void TheAppShipsWithThemesToChooseFrom()
     {
         Assert.True(ThemeCatalogue.All.Count >= 10);
@@ -49,7 +52,7 @@ public class ThemeTests : IDisposable
         Assert.Contains(ThemeCatalogue.All, theme => !theme.Palette.IsLight);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void EachOfThemIsNamedOnceAndCanBeFoundByName()
     {
         var names = ThemeCatalogue.All.Select(theme => theme.Name).ToList();
@@ -58,14 +61,14 @@ public class ThemeTests : IDisposable
         Assert.All(names, name => Assert.NotNull(ThemeCatalogue.Find(name)));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void AndTheLookupIsNotFussyAboutCase()
     {
         Assert.NotNull(ThemeCatalogue.Find("nord"));
         Assert.NotNull(ThemeCatalogue.Find("NORD"));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void FollowingTheDesktopIsNotItselfAPalette()
     {
         // "Desktop" is a choice about where the colours come from, not a set of colours.
@@ -74,7 +77,7 @@ public class ThemeTests : IDisposable
             string.Equals(theme.Name, Preferences.DesktopTheme, StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void EveryThemeIsLegibleAgainstItsOwnPanel()
     {
         // A theme whose text disappears into its panel is not a theme, it is a bug that ships.
@@ -98,33 +101,33 @@ public class ThemeTests : IDisposable
         PanelItem: Avalonia.Media.Colors.Red, Border: Avalonia.Media.Colors.Red,
         Text: Avalonia.Media.Colors.White, Accent: Avalonia.Media.Colors.Red, IsLight: false);
 
-    [Fact]
+    [AvaloniaFact]
     public void ANamedThemeBeatsTheDesktop()
     {
         Assert.Equal(ThemeCatalogue.Find("Nord"), ThemeChoice.Resolve("Nord", () => Desktop));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void WithNoneNamedTheDesktopIsUsed()
     {
         Assert.Equal(Desktop, ThemeChoice.Resolve(Preferences.DesktopTheme, () => Desktop));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void AndWithNoDesktopEitherTheAppFallsBackToWhatItShipsWith()
     {
         Assert.Equal(AppPalette.Fallback, ThemeChoice.Resolve(Preferences.DesktopTheme, () => null));
         Assert.Equal(AppPalette.Fallback, ThemeChoice.Resolve(null, () => null));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void AThemeThatIsNoLongerShippedFallsBackRatherThanFailing()
     {
         // A settings file written by a later version, opened by an earlier one.
         Assert.Equal(Desktop, ThemeChoice.Resolve("Some Theme From The Future", () => Desktop));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void ADesktopChangeDoesNotTakeAwayAThemeThatWasChosen()
     {
         // The report this guards: pick Nord, change the desktop, and Nord used to vanish.
@@ -139,7 +142,7 @@ public class ThemeTests : IDisposable
 
     #region Remembering it
 
-    [Fact]
+    [AvaloniaFact]
     public void ANamedThemeDoesNotEvenAskTheDesktop()
     {
         // Asking costs a subprocess on Omarchy, and the answer cannot change the outcome.
@@ -150,14 +153,14 @@ public class ThemeTests : IDisposable
         Assert.Equal(0, asked);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void AFreshInstallationFollowsTheDesktop()
     {
         Assert.True(Preferences.FollowsDesktop);
         Assert.Equal(Preferences.DesktopTheme, Preferences.Theme);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void AChosenThemeOutlastsTheSession()
     {
         Preferences.Theme = "Gruvbox Dark";
@@ -167,7 +170,7 @@ public class ThemeTests : IDisposable
         Assert.False(Preferences.FollowsDesktop);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void AndIsWrittenWhenItChangesRatherThanOnTheWayOut()
     {
         Preferences.Theme = "Dracula";
@@ -176,7 +179,7 @@ public class ThemeTests : IDisposable
         Assert.Contains("Dracula", File.ReadAllText(_settings));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void GoingBackToTheDesktopIsRemembered()
     {
         Preferences.Theme = "Nord";
@@ -186,7 +189,7 @@ public class ThemeTests : IDisposable
         Assert.True(Preferences.FollowsDesktop);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void ChangingItSaysSoOnce()
     {
         var told = 0;
@@ -208,7 +211,7 @@ public class ThemeTests : IDisposable
         Assert.Equal(1, told);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void SettingsThatWillNotParseAreNotWorthRefusingToStartOver()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_settings)!);

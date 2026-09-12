@@ -233,7 +233,15 @@ public class DrawingCanvas : Decorator
     public ConnectorRouting DefaultRouting { get; set; } = ConnectorRouting.Orthogonal;
 
     /// <summary>The formatting given to whatever is drawn next.</summary>
-    public ShapeStyle DefaultStyle { get; private set; } = ShapeStyle.Default;
+    public ShapeStyle DefaultStyle { get; private set; } = Preferences.Style;
+
+    /// <summary>
+    /// Starts the session over from a set of defaults. Used when they are changed in the
+    /// settings dialog: changing the default fill and then finding the next shape ignores it
+    /// would be a puzzle, so the live value follows the saved one when the saved one is set
+    /// deliberately. It does not go the other way - see <see cref="Preferences.Style"/>.
+    /// </summary>
+    public void UseDefaultStyle(ShapeStyle style) => DefaultStyle = style;
 
     /// <summary>Raised when the armed stencil is consumed or cleared by the canvas.</summary>
     public event Action<ShapeKind?>? ArmedKindChanged;

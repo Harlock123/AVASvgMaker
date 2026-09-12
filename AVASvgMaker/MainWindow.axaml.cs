@@ -103,6 +103,14 @@ public partial class MainWindow : Window
 
         FillFontList();
 
+        // The grid and the paper the last session settled on, before anything is drawn.
+        ApplyGridPreferences();
+
+        var paper = Preferences.Paper;
+        Canvas.Document.SetPageSize(paper.Width, paper.Height, allPages: true);
+        Canvas.Document.MarkSaved();
+        Canvas.SyncPageSize();
+
         TopRuler.Attach(Canvas, CanvasScroll);
         SideRuler.Attach(Canvas, CanvasScroll);
         RulersMenuItem.Icon = Tick(true);
@@ -899,13 +907,25 @@ public partial class MainWindow : Window
             return;
 
         Canvas.CommitEdit();
-        Canvas.Document.ReplaceWith(new DiagramDocument());
+        Canvas.Document.ReplaceWith(NewDocument());
         Canvas.SyncPageSize();
 
         _currentFile = null;
         _history.Reset();
         UpdateTitle();
         Canvas.ReportStatus();
+    }
+
+    /// <summary>An empty drawing on the paper the settings ask for.</summary>
+    private static DiagramDocument NewDocument()
+    {
+        var document = new DiagramDocument();
+        var paper = Preferences.Paper;
+
+        document.SetPageSize(paper.Width, paper.Height, allPages: true);
+        document.MarkSaved();
+
+        return document;
     }
 
     private async void OnOpenClick(object? sender, RoutedEventArgs e)
@@ -1181,6 +1201,22 @@ public partial class MainWindow : Window
         Canvas.InvalidateVisual();
     }
 
+    /// <summary>Shows what the grid is actually set to, without the boxes answering back.</summary>
+    private void SyncGridControls()
+    {
+        _syncing = true;
+
+        SnapCheck.IsChecked = Canvas.Grid.SnapToGrid;
+        ShowGridCheck.IsChecked = Canvas.Grid.ShowGrid;
+
+        GridSizeBox.SelectedItem = GridSizeBox.Items.OfType<ComboBoxItem>().FirstOrDefault(item =>
+            item.Tag is string tag &&
+            double.TryParse(tag, CultureInfo.InvariantCulture, out var size) &&
+            Math.Abs(size - Canvas.Grid.Size) < 1e-9) ?? GridSizeBox.SelectedItem;
+
+        _syncing = false;
+    }
+
     #endregion
 
     private async void OnDeleteClick(object? sender, RoutedEventArgs e) => await DeleteAsync();
@@ -1227,14 +1263,38 @@ public partial class MainWindow : Window
     {
         Canvas.CommitEdit();
 
-        var before = Preferences.Theme;
+        var theme = Preferences.Theme;
+        var style = Preferences.Style;
 
-        await SettingsDialog.ShowAsync(this);
+        if (!await SettingsDialog.ShowAsync(this, Canvas.DefaultStyle))
+            return;
 
-        if (!string.Equals(before, Preferences.Theme, StringComparison.Ordinal))
-            StatusText.Text = Preferences.FollowsDesktop
+        // Changing the default fill and then finding the next shape ignores it would be a
+        // puzzle, so a deliberate change here carries into the session.
+        if (Preferences.Style != style)
+            Canvas.UseDefaultStyle(Preferences.Style);
+
+        ApplyGridPreferences();
+
+        StatusText.Text = !string.Equals(theme, Preferences.Theme, StringComparison.Ordinal)
+            ? Preferences.FollowsDesktop
                 ? "Following the desktop theme"
-                : $"Theme: {Preferences.Theme}";
+                : $"Theme: {Preferences.Theme}"
+            : "Settings saved";
+    }
+
+    /// <summary>
+    /// Puts the saved grid on the window. The paper is not applied here: it is what the next
+    /// drawing starts on, and silently resizing the open one would be a different promise.
+    /// </summary>
+    private void ApplyGridPreferences()
+    {
+        Canvas.Grid.Size = Preferences.GridSize;
+        Canvas.Grid.SnapToGrid = Preferences.SnapToGrid;
+        Canvas.Grid.ShowGrid = Preferences.ShowGrid;
+
+        SyncGridControls();
+        Canvas.InvalidateVisual();
     }
 
     /// <summary>
