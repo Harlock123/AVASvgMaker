@@ -47,7 +47,13 @@ public sealed class PdfWriter(string folder, string version)
         {
             Title = "AVASvgMaker User Guide",
             Author = "AVASvgMaker",
-            Creator = "AVASvgMaker"
+            Creator = "AVASvgMaker",
+
+            // Said out loud because a fresh SKDocumentPdfMetadata leaves this at zero, and
+            // zero is a real JPEG quality rather than a "not set" - every screenshot in the
+            // guide came out as blotches with the colour boiled out of it. 90 is the usual
+            // photographic setting and costs the guide a couple of megabytes.
+            EncodingQuality = 90
         }) ?? throw new IOException("Skia would not open a PDF document.");
 
         Cover(blocks);
