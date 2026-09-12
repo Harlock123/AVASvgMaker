@@ -49,6 +49,7 @@ Once a shape is on the page:
 | Move it | Drag it |
 | Resize it | Drag one of the eight handles round it |
 | Turn it | Drag the round handle on the stalk above it |
+| Aim a callout | Drag the diamond on the tip of its tail |
 | Label it | Double-click it, or select it and press `F2`, then type |
 | Nudge it | The arrow keys, or `Alt` and the arrows |
 | Delete it | Select it and press `Delete` |
@@ -502,6 +503,7 @@ copy of Visio to try it with. If you have one, the result either way is worth re
 | `Ctrl+Z` `Ctrl+Y` | Undo, Redo |
 | `Ctrl+X` `Ctrl+C` `Ctrl+V` `Ctrl+D` | Cut, Copy, Paste, Duplicate |
 | `Ctrl+A` | Select all |
+| `Ctrl+,` | Preferences - theme, default formatting, grid and paper |
 | `F4` | The data the selected shape carries |
 | `Ctrl+G` `Ctrl+Shift+G` | Group, Ungroup |
 | `Ctrl+Shift+F` `Ctrl+Shift+B` | Bring to front, Send to back |

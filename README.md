@@ -95,7 +95,9 @@ Or [build it yourself](#building).
 
 - **Zoom and pan** - 25% to 400%, `Ctrl`+wheel about the pointer, fit-to-page, middle-drag or space-drag to pan
 - **Collapsible panels** - fold the shapes and properties panels out of the way to give the page the whole window
-- **Follows the desktop theme** - on Omarchy the app takes its colours from the current theme and re-colours the moment you switch, with the palette it ships with as the fallback everywhere else
+- **Thirteen themes** - Dark, Light, Solarized, Nord, Gruvbox, Dracula, Tokyo Night, Catppuccin and a high-contrast pair, chosen in **Edit -> Preferences**, previewed as you move down the list
+- **Or follows the desktop** - on Omarchy the app takes the whole palette from the current theme and re-colours the moment you switch; on Windows and macOS it follows light and dark. A bare Wayland or X11 session says nothing, which is what naming a theme is for
+- **Settings that outlast the session** - the theme, the formatting new shapes are given, the grid, and the paper a new drawing starts on
 
 ## Shapes of your own
 
@@ -847,6 +849,7 @@ nothing shows through and they read correctly whatever is behind them.
 | `Ctrl+X` / `Ctrl+C` / `Ctrl+V` | Cut, Copy, Paste |
 | `Ctrl+D` | Duplicate the selection |
 | `Ctrl+A` | Select all |
+| `Ctrl+,` | Preferences - theme, default formatting, grid and paper |
 | `Ctrl+G` / `Ctrl+Shift+G` | Group the selection, ungroup it |
 | `Ctrl+Shift+P` | Add a page |
 | `Ctrl+PageUp` / `Ctrl+PageDown` | Previous page, next page |
@@ -865,6 +868,7 @@ nothing shows through and they read correctly whatever is behind them.
 | Drag a handle | Resize, snapped to the grid. On a turned shape the handles ride round with it, and the corner you grab is the corner that moves |
 | Drag the round handle above a shape | Turn it about its middle; hold `Shift` to snap to 15° |
 | Drag the round handle beside a shape | Move its label, which can be taken clear of the shape altogether |
+| Drag the diamond on a callout's tail | Aim it. Dropped on another shape's connection point it pins there and follows that shape about |
 | Drag a corner of a moved label's block | Stretch the block the words are wrapped into |
 | Drag a handle on a multiple selection | Stretch the whole selection, each shape keeping its place and size in proportion |
 | Connector tool, drag between shapes | Draw a connector; each end snaps to the nearest connection point |
