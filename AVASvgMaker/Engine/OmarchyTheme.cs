@@ -32,8 +32,51 @@ public static class OmarchyTheme
     public static string? CurrentName =>
         IsPresent ? File.ReadAllText(MarkerFile).Trim() : null;
 
-    /// <summary>The desktop palette mapped onto the app's chrome, or null if there is none.</summary>
+    /// <summary>What was read last, and the stamp on the file that said so.</summary>
+    private static (DateTime Stamp, AppPalette? Palette)? _last;
+
+    /// <summary>
+    /// The desktop palette mapped onto the app's chrome, or null if there is none.
+    ///
+    /// Remembered against the marker file's timestamp, because reading is not free - it runs
+    /// the desktop's own resolver in a subprocess - and the answer cannot have changed unless
+    /// that file has. It is the same file the watcher keys on, so nothing can go stale that
+    /// would not also go unnoticed.
+    /// </summary>
     public static AppPalette? Read()
+    {
+        var stamp = Stamped();
+
+        if (_last is { } remembered && remembered.Stamp == stamp)
+            return remembered.Palette;
+
+        var palette = Sample();
+        _last = (stamp, palette);
+
+        return palette;
+    }
+
+    /// <summary>
+    /// What the current theme is stamped with. Both files, because the marker says which
+    /// theme is on and the colours file is what is actually read: a change that touched only
+    /// one of them would otherwise go unnoticed until the app was restarted.
+    /// </summary>
+    private static DateTime Stamped()
+    {
+        try
+        {
+            var marker = File.Exists(MarkerFile) ? File.GetLastWriteTimeUtc(MarkerFile) : DateTime.MinValue;
+            var colours = File.Exists(ColoursFile) ? File.GetLastWriteTimeUtc(ColoursFile) : DateTime.MinValue;
+
+            return marker > colours ? marker : colours;
+        }
+        catch
+        {
+            return DateTime.MinValue;
+        }
+    }
+
+    private static AppPalette? Sample()
     {
         var colours = Resolve();
 

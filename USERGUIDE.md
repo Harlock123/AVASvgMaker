@@ -518,11 +518,37 @@ copy of Visio to try it with. If you have one, the result either way is worth re
 | `Escape` | Back to the select tool |
 | Middle-drag, or space and drag | Pan the page |
 
-## Fitting in
+## Choosing a theme
 
-On Omarchy the app takes its colours from the current desktop theme and re-colours the moment
-you switch, falling back to the palette it ships with everywhere else. The page itself always
-stays white: it is paper, and it is what your exports land on.
+![The theme list](Images/settings-theme.png)
+
+**Edit -> Preferences**, or `Ctrl+,`, opens the app's own settings. The first thing there is
+the theme: the colours the toolbar, panels, rulers and status bar are drawn in.
+
+There are thirteen to choose from - Dark, Light, Solarized, Nord, Gruvbox, Dracula, Tokyo
+Night, Catppuccin and a high-contrast pair - and each row shows its own colours, because a
+name is not much to go on. Click one and the window behind changes at once, so you can go down
+the list and look. **Cancel** puts back whatever you had.
+
+At the top of the list is **Desktop**, which means "use whatever the desktop is using". How
+well that works is not up to the app:
+
+- **Omarchy** publishes its whole palette and says when it changes, so the app re-colours the
+  moment you switch themes.
+- **Windows and macOS** say whether the system is light or dark, and say so again when it
+  changes. You get the plain Light or Dark theme accordingly.
+- **A plain Wayland or X11 session** - Hyprland, sway, i3 and most others - has nothing to
+  say. The app cannot tell what you are running and will keep whatever it started with.
+
+If you are on that last one, name a theme rather than leaving it on Desktop. That is what the
+list is for.
+
+Your choice is saved as soon as you make it, and is there the next time you open the app.
+
+**The page itself never changes.** It is paper, and it is what your exports land on - a
+diagram has to look the same to whoever you send it to. Only the frame around it is themed.
+
+## Fitting in
 
 If you change the display scale while the app is open it will say so in the status bar rather
 than half-applying it. Restart it to draw at the new scale.

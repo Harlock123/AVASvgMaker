@@ -1217,6 +1217,26 @@ public partial class MainWindow : Window
 
     private void OnShapeDataClick(object? sender, RoutedEventArgs e) => _ = ShapeDataAsync();
 
+    private void OnSettingsClick(object? sender, RoutedEventArgs e) => _ = SettingsAsync();
+
+    /// <summary>
+    /// The application's settings. Nothing is handed back: the dialog writes the setting and
+    /// the application repaints itself, which is also what happens when the desktop changes.
+    /// </summary>
+    private async Task SettingsAsync()
+    {
+        Canvas.CommitEdit();
+
+        var before = Preferences.Theme;
+
+        await SettingsDialog.ShowAsync(this);
+
+        if (!string.Equals(before, Preferences.Theme, StringComparison.Ordinal))
+            StatusText.Text = Preferences.FollowsDesktop
+                ? "Following the desktop theme"
+                : $"Theme: {Preferences.Theme}";
+    }
+
     /// <summary>
     /// The data one shape carries. One rather than several: the fields are the shape's own,
     /// and a dialog offering to put the same set on everything selected would be offering

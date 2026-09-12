@@ -112,6 +112,8 @@
                 <MenuItem Header="Shape _data..." InputGesture="F4" Click="OnShapeDataClick" />
                 <Separator />
                 <MenuItem Header="Save selection as a _shape..." Click="OnSaveStencilClick" />
+                <Separator />
+                <MenuItem Header="_Preferences..." InputGesture="Ctrl+," Click="OnSettingsClick" />
             </MenuItem>
             <MenuItem Header="_Arrange">
                 <MenuItem Header="A_lign">

@@ -882,7 +882,47 @@ nothing shows through and they read correctly whatever is behind them.
 | `Delete` / `Backspace` | Delete the selection, along with any connectors glued to it |
 | `Escape` | Back to the select tool, clearing the selection and any armed stencil |
 
+## Themes
+
+![Choosing a theme](Images/settings-theme.png)
+
+**Edit -> Preferences** (`Ctrl+,`) chooses the colours the application's own chrome is drawn
+in: thirteen built-in themes - Dark, Light, Solarized, Nord, Gruvbox, Dracula, Tokyo Night,
+Catppuccin, and a high-contrast pair - or **Desktop**, which is to follow whatever the desktop
+is doing.
+
+Each theme is six colours, which is the whole of the app's chrome. They are the published
+palettes rather than approximations of them: someone who runs Nord everywhere notices when an
+application is nearly Nord.
+
+A named theme beats the desktop, always. Someone who has picked Nord has said what they want,
+and a desktop that changes underneath them is not new information - so with a theme named, the
+desktop is not even asked. That matters on Omarchy, where asking means running the desktop's
+own resolver in a subprocess; arrowing down the theme list should not start thirteen processes
+to ignore what they all say.
+
+The choice is applied as you move down the list, because a colour scheme cannot be judged from
+its name, and it is written to `settings.json` as soon as it changes rather than on the way
+out. Cancel puts back whatever was on when the dialog opened.
+
+**The page itself is never themed.** It is paper, and it is what the SVG and PNG exports land
+on; a diagram has to look the same to whoever it is sent to. Only the chrome around it
+follows.
+
 ## Following the desktop
+
+Choosing **Desktop** means taking the colours from the session, which works as well as the
+session allows. There are three cases and they are genuinely different:
+
+| | What the app can find out |
+|---|---|
+| **Omarchy** | A whole palette, and a file to watch, so a theme change lands while the app is running |
+| **Windows, macOS** | Light or dark, asked for and announced when it changes - mapped onto the plain Light and Dark themes |
+| **A bare Wayland or X11 session** | Nothing, usually. The app keeps the theme it started with |
+
+That last row is why naming a theme exists. A compositor like Hyprland has no notion of an
+application colour scheme to broadcast, so an app that only listens will never hear anything,
+and until there was a way to say so this one had exactly one palette and no light mode at all.
 
 On Omarchy the application's chrome - toolbar, panels, status bar, borders, and the selection
 accent - takes its colours from the current theme, and follows a `omarchy-theme-set` while
@@ -899,8 +939,13 @@ not on the path. A theme change is noticed by watching
 **The page itself stays white.** It is paper, and it is what the SVG and PNG exports land on; only the
 chrome around it follows the theme.
 
-Anywhere else - another Linux desktop, Windows, macOS - none of this runs and the app keeps
-the dark palette it ships with.
+Off Omarchy none of that runs, and the app falls back to asking Avalonia what the platform
+says - which Windows and macOS answer and a bare compositor does not. Failing even that, it
+keeps the dark palette it ships with.
+
+Settings live in `settings.json` beside the saved shapes, under `%AppData%\AVASvgMaker` on
+Windows and `~/.config/AVASvgMaker` elsewhere. A file that will not parse is ignored rather
+than being worth refusing to start over.
 
 ### Display scale
 
@@ -1110,6 +1155,7 @@ AVASvgMaker/
     UndoStack.cs         Snapshot history, and the modified flag that follows it
     GridSettings.cs      Grid visibility, size and snapping maths
     StencilLibrary.cs    The shapes you saved yourself, and the file they live in
+    Preferences.cs       The settings that outlast a session, and the file they live in
     SvgExporter.cs       Document -> SVG document
     SvgImporter.cs       SVG document -> a page of shapes, and what it could not take
     SvgPathData.cs       An SVG path made absolute, arcs and all, in the stencil language
@@ -1135,6 +1181,8 @@ AVASvgMaker/
     ShapeDataDialog.cs   The fields a shape carries, to fill in
     PageFurnitureDialog.cs  The watermark, header and footer for a page
     MermaidDialog.cs     The page as Mermaid, coloured, to read and copy
+    SettingsDialog.cs    The application's own settings, starting with the theme
+    ThemeCatalogue.cs    The themes the app ships with, and which palette wins
 
 packages/                SyntaxColorizer 1.1.0, until that version is on nuget.org
 nuget.config             Points at packages/ as well as nuget.org, for the same reason
