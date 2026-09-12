@@ -30,7 +30,7 @@ public static partial class DiagramFile
     /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand.
     /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 18;
+    public const int CurrentVersion = 19;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -207,6 +207,17 @@ public static partial class DiagramFile
         public FieldRecord[]? Fields { get; set; }
 
         /// <summary>
+        /// Where a callout's tail points, as fractions of its box. Version 19 onwards, and
+        /// written only for a callout - and only when its tail has been moved or pinned.
+        /// </summary>
+        public double[]? Tail { get; set; }
+
+        /// <summary>The shape the tail is pinned to, and which connection point on it.</summary>
+        public int? TailShapeId { get; set; }
+
+        public int? TailPort { get; set; }
+
+        /// <summary>
         /// A lane's share of its pool. Version 8 onwards, and only written for a lane that
         /// does not hold the standard single share - so an evenly divided pool, which is most
         /// of them, writes nothing at all.
@@ -375,6 +386,11 @@ public static partial class DiagramFile
                         : field.Label,
                     Value = string.IsNullOrEmpty(field.Value) ? null : field.Value
                 }).ToArray(),
+            Tail = shape is CalloutShape tailed ? [tailed.Tail.X, tailed.Tail.Y] : null,
+            TailShapeId = shape is CalloutShape pinned ? IdOf(pinned.TailShape, ids) : null,
+            TailPort = shape is CalloutShape { TailShape: not null, TailPort: >= 0 } port
+                ? port.TailPort
+                : null,
             LaneShare = shape is ContainerShape { Kind: ShapeKind.Lane } lane
                         && Math.Abs(lane.LaneShare - 1) > 1e-9
                 ? lane.LaneShare
@@ -488,7 +504,18 @@ public static partial class DiagramFile
             // Containment is resolved in the same second pass as glue, and for the same
             // reason: a shape can name a container that has not been built yet.
             for (var i = 0; i < pageRecord.Shapes.Count; i++)
+            {
                 page.Shapes[i].Container = Glued(pageRecord.Shapes[i].ContainerId, byId);
+
+                // A pinned tail names another shape, and is resolved here for the same reason
+                // containment is: the shape it names may not have been built yet.
+                if (page.Shapes[i] is CalloutShape callout
+                    && Glued(pageRecord.Shapes[i].TailShapeId, byId) is { } aimed)
+                {
+                    callout.TailShape = aimed;
+                    callout.TailPort = pageRecord.Shapes[i].TailPort ?? -1;
+                }
+            }
 
             for (var i = 0; i < pageRecord.Shapes.Count; i++)
             {
@@ -581,6 +608,10 @@ public static partial class DiagramFile
                     Label = field.Label ?? field.Name,
                     Value = field.Value ?? string.Empty
                 });
+
+        // Two numbers, and absent before version 19 - an older callout keeps the default tail.
+        if (shape is CalloutShape tailed && record.Tail is { Length: 2 } tail)
+            tailed.Tail = new Point(tail[0], tail[1]);
 
         // Absent before version 8, and absent since for any lane on the standard share.
         if (shape is ContainerShape { Kind: ShapeKind.Lane } lane && record.LaneShare is { } share && share > 0)

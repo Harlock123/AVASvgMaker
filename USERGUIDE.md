@@ -186,6 +186,35 @@ Where the selected shapes disagree, a control shows a dash rather than pretendin
 choosing something then applies it to all of them. With nothing selected the panel sets the
 formatting for the next shape you draw.
 
+## Aiming a callout
+
+![A callout's tail pinned to a shape](Images/callout-tail.png)
+
+A callout is a bubble with a tail, and the tail is the point of it - a callout that cannot be
+aimed is only a box with a spike on it.
+
+Select a speech bubble, oval callout, rectangular callout or thought bubble and a small
+**diamond** appears on the tip of its tail. Drag it and the tail follows, out to wherever you
+want the callout to be pointing. The bubble itself stays where it is and keeps its whole box
+for the words; only the tail moves.
+
+Drop the tip on another shape's **connection point** and the tail is pinned there. The diamond
+turns green to say so, and from then on the tail follows that shape: move it across the page,
+resize it, turn it, and the callout stays aimed at the same point on it. This is the same snap
+a connector uses, so you do not have to land exactly on the point - near enough will do.
+
+Dropped anywhere else, the tail simply stays where you put it. It is held as a position
+relative to the bubble, so it travels with the bubble as you move it and stretches with it as
+you resize it.
+
+Delete the shape a callout was pointing at and the callout is left pointing at the same spot
+rather than springing back.
+
+A thought bubble has no spike - it trails smaller bubbles instead - but its tail is aimed in
+exactly the same way, and the trail follows.
+
+Where a callout points is saved with your drawing, and aiming one is a single step to undo.
+
 ## Data behind a shape
 
 ![Two boxes with the same label, and the data behind one of them](Images/shape-data.png)

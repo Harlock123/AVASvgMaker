@@ -43,6 +43,7 @@ public class DrawingCanvas : Decorator
         Rotating,
         MovingLabel,
         SizingLabel,
+        MovingTail,
         DrawingConnector,
         Marquee
     }
@@ -102,6 +103,9 @@ public class DrawingCanvas : Decorator
     private static readonly IBrush LabelHandleBrush = new SolidColorBrush(Color.FromRgb(0xC0, 0x8A, 0xE8));
 
     /// <summary>A bend that letting go of would remove.</summary>
+    /// <summary>A callout's tail handle, in a colour of its own so it is not taken for a corner.</summary>
+    private static readonly IBrush TailHandleBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0xA8, 0xB0));
+
     private static readonly IBrush DoomedHandleBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0x5A, 0x4A));
 
     /// <summary>Handle order: NW, N, NE, E, SE, S, SW, W.</summary>
@@ -474,7 +478,7 @@ public class DrawingCanvas : Decorator
     /// <summary>True while a connector end is being placed, when ports are worth showing.</summary>
     private bool IsAttaching =>
         Tool == EditorTool.Connector || _dragMode == DragMode.DrawingConnector ||
-        _dragMode == DragMode.MovingEndpoint;
+        _dragMode == DragMode.MovingEndpoint || _dragMode == DragMode.MovingTail;
 
     /// <summary>Only the shape under the pointer offers its ports, to keep the page readable.</summary>
     private IEnumerable<DiagramShape> PortCandidates() =>
@@ -495,10 +499,10 @@ public class DrawingCanvas : Decorator
     /// within a grid step, which is what the pointer is already being snapped to, and never
     /// less than the radius a port has always snapped from.
     /// </summary>
-    private (DiagramShape? Shape, int Port) GlueAt(Point pagePoint)
+    private (DiagramShape? Shape, int Port) GlueAt(Point pagePoint, DiagramShape? skip = null)
     {
         var under = Document.Shapes
-            .Where(shape => shape is not ConnectorShape)
+            .Where(shape => shape is not ConnectorShape && !ReferenceEquals(shape, skip))
             .LastOrDefault(shape => shape.HitTest(pagePoint));
 
         if (under is not null)
@@ -512,7 +516,7 @@ public class DrawingCanvas : Decorator
 
         foreach (var shape in Document.Shapes)
         {
-            if (shape is ConnectorShape)
+            if (shape is ConnectorShape || ReferenceEquals(shape, skip))
                 continue;
 
             var points = shape.ConnectionPoints;
@@ -669,6 +673,7 @@ public class DrawingCanvas : Decorator
                     turn.Width / 2, turn.Height / 2);
             }
 
+            DrawTailHandle(context, selection[0], outline);
             DrawLabelGrip(context, selection[0], outline);
 
             return;
@@ -758,6 +763,52 @@ public class DrawingCanvas : Decorator
         return BoxPoints(shape.Bounds)
             .Select(point => HandleRect(Turned(shape, point)))
             .ToArray();
+    }
+
+    /// <summary>
+    /// Aims a callout's tail. Dropped on another shape's connection point the tail pins to it
+    /// and then follows that shape about; dropped anywhere else it simply stays where it was
+    /// put, as a fraction of the bubble, and so travels and stretches with the bubble.
+    ///
+    /// The bubble itself is left out of the search - a callout that pointed at itself would be
+    /// telling nobody anything.
+    /// </summary>
+    private void MoveTail(CalloutShape callout, Point pagePoint)
+    {
+        var (target, port) = GlueAt(pagePoint, skip: callout);
+
+        // Only a point will do here, not merely a shape: the tail has to land somewhere exact.
+        var pinned = target is not null && port >= 0;
+
+        _glueTarget = pinned ? target : null;
+        _portShape = pinned ? target : null;
+        _portIndex = pinned ? port : -1;
+
+        if (pinned)
+        {
+            callout.TailShape = target;
+            callout.TailPort = port;
+        }
+        else
+        {
+            callout.TailShape = null;
+            callout.TailPort = -1;
+
+            var box = callout.Bounds;
+
+            if (box.Width > 0 && box.Height > 0)
+            {
+                var local = callout.Unrotate(pagePoint);
+
+                callout.Tail = new Point(
+                    (local.X - box.X) / box.Width,
+                    (local.Y - box.Y) / box.Height);
+            }
+        }
+
+        _dragChanged = true;
+        InvalidateVisual();
+        ReportStatus();
     }
 
     /// <summary>
@@ -891,6 +942,44 @@ public class DrawingCanvas : Decorator
         3 => 6,
         _ => 0
     };
+
+    /// <summary>
+    /// The handle that aims a callout's tail, on a stalk back to the bubble so it is plain
+    /// what it belongs to. Green once the tail is pinned to another shape's connection point,
+    /// which is the difference between pointing near a thing and pointing at it.
+    /// </summary>
+    private void DrawTailHandle(DrawingContext context, DiagramShape shape, IPen outline)
+    {
+        if (shape is not CalloutShape callout || TailHandle(shape) is not { } grip)
+            return;
+
+        var brush = callout.TailShape is null ? TailHandleBrush : GlueBrush;
+        var centre = grip.Center;
+        var half = grip.Width / 2;
+
+        // Only where the shape itself does not already lead the eye out to the tip: a spike
+        // is its own stalk, and drawing another down the middle of it says nothing twice.
+        if (!callout.Spiked)
+            context.DrawLine(ScreenPen(brush, 1), Turned(shape, shape.Bounds.Center), centre);
+
+        // A diamond rather than a square, to say it aims rather than resizes.
+        var diamond = new StreamGeometry();
+
+        using (var sink = diamond.Open())
+        {
+            sink.BeginFigure(new Point(centre.X, centre.Y - half), true);
+            sink.LineTo(new Point(centre.X + half, centre.Y));
+            sink.LineTo(new Point(centre.X, centre.Y + half));
+            sink.LineTo(new Point(centre.X - half, centre.Y));
+            sink.EndFigure(true);
+        }
+
+        context.DrawGeometry(brush, outline, diamond);
+    }
+
+    /// <summary>Where that handle sits: on the tip of the tail, wherever the tail has got to.</summary>
+    private Rect? TailHandle(DiagramShape shape) =>
+        shape is CalloutShape callout ? HandleRect(Turned(shape, callout.TailTip)) : null;
 
     /// <summary>
     /// The grip that moves the label, and - once the label has been moved off the shape - the
@@ -1374,6 +1463,19 @@ public class DrawingCanvas : Decorator
             return;
         }
 
+        // A callout's tail is aimed by its own handle, and that is looked for early: it sits
+        // outside the bubble, where nothing else of the shape's is.
+        if (Document.Selection.Count == 1 && Document.Selected is CalloutShape aimed &&
+            TailHandle(aimed) is { } tip && tip.Inflate(Screen(2)).Contains(pagePoint))
+        {
+            _dragMode = DragMode.MovingTail;
+            _dragOrigin = pagePoint;
+
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+
         // A connector's label can be dragged clear of whatever it has landed on.
         if (Document.Selection.Count == 1 &&
             Document.Selected is ConnectorShape { Text.Length: > 0 } labelled &&
@@ -1749,6 +1851,10 @@ public class DrawingCanvas : Decorator
 
             case DragMode.SizingLabel when Document.Selected is { } stretching:
                 SizeLabel(stretching, pagePoint);
+                return;
+
+            case DragMode.MovingTail when Document.Selected is CalloutShape aiming:
+                MoveTail(aiming, pagePoint);
                 return;
 
             case DragMode.Rotating when Document.Selected is { } turning:
@@ -2183,6 +2289,13 @@ public class DrawingCanvas : Decorator
             RotateHandle(turnable) is { } spot && spot.Inflate(Screen(2)).Contains(pagePoint))
         {
             Cursor = new Cursor(StandardCursorType.Hand);
+            return;
+        }
+
+        if (Document.Selection.Count == 1 && Document.Selected is CalloutShape pointing &&
+            TailHandle(pointing) is { } aim && aim.Inflate(Screen(2)).Contains(pagePoint))
+        {
+            Cursor = new Cursor(StandardCursorType.Cross);
             return;
         }
 

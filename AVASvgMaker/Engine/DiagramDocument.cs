@@ -246,6 +246,12 @@ public class DiagramDocument
         // Nothing may point at a shape that is gone.
         foreach (var orphan in Shapes.Where(other => ReferenceEquals(other.Container, shape)))
             orphan.Container = null;
+
+        // A callout aimed at it is left pointing where it was pointing, rather than springing
+        // back to wherever its tail last sat under its own steam.
+        foreach (var callout in Shapes.OfType<CalloutShape>())
+            if (ReferenceEquals(callout.TailShape, shape))
+                callout.Unpin();
     }
 
     public void Clear()

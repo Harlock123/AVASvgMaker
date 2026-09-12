@@ -54,6 +54,7 @@ Or [build it yourself](#building).
 - **Text boxes and labels** - a text tool for standalone text, and double-click or `F2` to label any shape in place
 - **Rotation** - drag the handle above a shape to turn it, or turn a selection in right angles from the menu
 - **Labels that leave their shape** - a label sits top, middle or bottom, and can be dragged clear of the shape it belongs to, staying with it as it moves and resizes
+- **Callouts that point at something** - drag a callout's tail wherever you like, or onto another shape's connection point, and it stays aimed there as that shape is moved about
 
 **Connectors**
 
@@ -132,7 +133,7 @@ loose shapes.
 |---|---|
 | **Basic shapes** | Rectangle, rounded rectangle, ellipse, triangle, right triangle, diamond, parallelogram, trapezoid, pentagon, hexagon, octagon, star, cross, arrow, chevron, cloud |
 | **Arrows** | Left, right, up, down, double, double vertical, bent, curved, notched, chevron |
-| **Callouts** | Speech bubble, oval callout, thought bubble, rectangular callout, annotation bracket |
+| **Callouts** | Speech bubble, oval callout, thought bubble, rectangular callout, annotation bracket - the first four have a tail you can aim |
 | **Flowchart** | Process, terminator, decision, data, preparation, database, predefined process, manual input, manual operation, document, multi-document, off-page reference, on-page connector, delay, stored data, internal storage, merge, extract, summing junction, or, display, card, collate, sort |
 | **BPMN** | Start, intermediate, end, message and timer events; task, subprocess, user, service and script tasks; exclusive, parallel, inclusive and event gateways; data object, data store, group; pool, lane and container |
 | **UML** | Class, interface, package, note, actor, use case, component, node, state, initial state, final state |
@@ -461,7 +462,8 @@ heights, version 9 the font a label is in, version 10 grouping, version 11 the m
 version 12 rotation, version 13 shapes carrying an outline of their own, version 14 a
 connector label moved by hand, version 15 markings drawn over a path's face and not filled, and
 version 16 where a label sits in its shape - or outside it, and version 17 the data a shape
-carries, and version 18 fades and a page's own furniture. Older files still load: a version 5 file, which
+carries, version 18 fades and a page's own furniture, and version 19 where a callout's tail
+points. Older files still load: a version 5 file, which
 had no page record around its shapes, becomes a document of one page; a file up to version 6,
 which kept one size for the whole document, puts that size on every page it has; a file up to
 version 7 has no lane shares, so its pools come back evenly divided, which is how they were
@@ -474,7 +476,9 @@ labels, so they sit where the line puts them; and a file up to version 14 has no
 a path, because nothing could make those either; and a file up to version 15 puts every label
 in the middle of the shape it belongs to, which was the only place there was; and a file up to
 version 16 has no data on its shapes, there having been nowhere to put any; and a file up to
-version 17 has white paper, flat fills and bare pages, none of which could be said otherwise. The on-disk
+version 17 has white paper, flat fills and bare pages, none of which could be said otherwise; and a file
+up to version 18 has its callouts pointing where every callout used to point, there having been
+no way to aim one. The on-disk
 records live in `Engine/DiagramFile.cs`, separate from the shape classes, so shapes can be
 renamed or reorganised without invalidating files already saved.
 
@@ -1087,6 +1091,7 @@ AVASvgMaker/
     ContainerShape.cs    Pools, lanes and grouping boxes
     StencilPath.cs       The unit-square path language, to geometry and to SVG
     StencilShape.cs      Draws a shape from a catalogue outline
+    CalloutShape.cs      A bubble with a tail that can be aimed, and pinned to another shape
     ShapeStyle.cs        Fill, line and text formatting, and the defaults for new shapes
     StrokeStyle.cs       Solid, Dashed, Dotted
     TextVerticalAlign.cs Where a label sits down its shape
