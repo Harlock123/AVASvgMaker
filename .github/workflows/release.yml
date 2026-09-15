@@ -96,8 +96,37 @@ jobs:
           name: AVASvgMaker-native-${{ matrix.rid }}
           path: dist/AVASvgMaker-*
 
+  # The guide is rebuilt here rather than taken from the repository, so the version on its
+  # title page is always the version being released - not whatever it said the last time
+  # someone regenerated it by hand. It needs nothing but the SDK: the builder renders with
+  # Skia rather than shelling out to a browser or a TeX distribution.
+  guide:
+    name: guide
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Build the guide
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$version" == "$GITHUB_REF_NAME" ]] && version="0.0.0-dev"
+          mkdir -p dist
+          dotnet run --project Tools/GuideBuilder -v q -- \
+            USERGUIDE.md "dist/AVASvgMaker-$version-USERGUIDE.pdf" "$version"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AVASvgMaker-guide
+          path: dist/AVASvgMaker-*-USERGUIDE.pdf
+
   release:
-    needs: single-file
+    needs: [single-file, guide]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
