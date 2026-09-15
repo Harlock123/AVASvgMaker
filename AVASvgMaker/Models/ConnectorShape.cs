@@ -216,6 +216,108 @@ public class ConnectorShape : DiagramShape
         }
     }
 
+    private int _manualKey;
+
+    /// <summary>What a hand-placed route depends on: its own ends, and where the shapes are.</summary>
+    private int GeometryKey(IReadOnlyList<DiagramShape> obstacles)
+    {
+        var key = new HashCode();
+        key.Add(ResolvedStart);
+        key.Add(ResolvedEnd);
+        key.Add(StartPort);
+        key.Add(EndPort);
+
+        foreach (var obstacle in obstacles)
+        {
+            key.Add(obstacle.Bounds);
+            key.Add(obstacle.Rotation);
+        }
+
+        return key.ToHashCode();
+    }
+
+    /// <summary>
+    /// True when the line as drawn passes through a shape.
+    ///
+    /// Tested against the outlines rather than the boxes around them: a line leaving the east
+    /// point of a parallelogram crosses the box it sits in without going anywhere near the
+    /// shape, and dropping someone's bends over that would be a poor trade. Both ends of every
+    /// segment are pulled in slightly for the same reason - an end sitting on the outline of
+    /// the shape it is glued to is where it belongs, not a crossing.
+    /// </summary>
+    private const double Whisker = 0.75;
+
+    private bool CrossesAShape(IReadOnlyList<DiagramShape> obstacles)
+    {
+        const double margin = 1;
+        const int samples = 24;
+
+        var path = Path;
+
+        for (var i = 0; i + 1 < path.Count; i++)
+        {
+            var a = path[i];
+            var b = path[i + 1];
+            var length = Math.Sqrt(Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2));
+
+            if (length <= margin * 2)
+                continue;
+
+            var first = margin / length;
+            var last = 1 - first;
+
+            foreach (var shape in obstacles)
+            {
+                if (shape is ConnectorShape || !Overlaps(a, b, shape.Bounds))
+                    continue;
+
+                // Sampled a whisker to either side rather than on the line itself. A line
+                // running along a shape's edge - down the side of the shape it leaves, say -
+                // has one side in and one side out, and is not passing through anything. A
+                // line that really is through the shape has both sides in.
+                var across = new Vector(-(b.Y - a.Y) / length, (b.X - a.X) / length) * Whisker;
+
+                for (var step = 0; step <= samples; step++)
+                {
+                    var t = first + (last - first) * step / samples;
+                    var at = new Point(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t);
+
+                    if (shape.HitTest(at + across) && shape.HitTest(at - across))
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True when the line as drawn has a segment that runs neither across nor down.
+    ///
+    /// Bends are only ever placed at right angles - dragging one on an orthogonal connector
+    /// keeps the angles either side of it, and there is no way to ask for anything else - so
+    /// a slanted segment is never something anybody chose. It is what is left over when an
+    /// end has moved and the bends behind it have not.
+    /// </summary>
+    private bool Slants()
+    {
+        var path = Path;
+
+        for (var i = 0; i + 1 < path.Count; i++)
+        {
+            if (Math.Abs(path[i].X - path[i + 1].X) > 0.01 &&
+                Math.Abs(path[i].Y - path[i + 1].Y) > 0.01)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>A cheap first pass, so the outline is only sampled where it could matter.</summary>
+    private static bool Overlaps(Point a, Point b, Rect rect) =>
+        Math.Min(a.X, b.X) <= rect.Right && Math.Max(a.X, b.X) >= rect.Left &&
+        Math.Min(a.Y, b.Y) <= rect.Bottom && Math.Max(a.Y, b.Y) >= rect.Top;
+
     /// <summary>
     /// Recomputes the route if anything it depends on has moved. The key covers both ends and
     /// every obstacle, so a drag only pays for the search when the geometry actually changed.
@@ -224,14 +326,39 @@ public class ConnectorShape : DiagramShape
         IReadOnlyList<DiagramShape> obstacles, double clearance,
         IReadOnlyList<(Point A, Point B)>? taken = null)
     {
-        if (HasManualRoute)
-            return;
-
         if (Routing == ConnectorRouting.Straight)
         {
             _route = [];
             _routeKey = 0;
+            _manualKey = 0;
             return;
+        }
+
+        if (HasManualRoute)
+        {
+            // Bends placed by hand are left alone while they still make sense, so this only
+            // asks whether they do when something they depend on has actually moved.
+            var manual = GeometryKey(obstacles);
+
+            if (manual == _manualKey)
+                return;
+
+            _manualKey = manual;
+
+            if (!CrossesAShape(obstacles) && !Slants())
+                return;
+
+            // They have stopped making sense: a shape has moved out from under them, and the
+            // line either runs through something or no longer turns square corners. The bends
+            // go, and the route is found afresh.
+            Waypoints = [];
+            LabelOffset = default;
+            _route = [];
+            _routeKey = 0;
+        }
+        else
+        {
+            _manualKey = 0;
         }
 
         var start = ResolvedStart;
@@ -244,7 +371,10 @@ public class ConnectorShape : DiagramShape
         key.Add(EndPort);
 
         foreach (var obstacle in obstacles)
+        {
             key.Add(obstacle.Bounds);
+            key.Add(obstacle.Rotation);
+        }
 
         // The routes already laid down are part of what this one depends on, so they belong in
         // the key: move the connector above and this one has to think again.
@@ -269,8 +399,18 @@ public class ConnectorShape : DiagramShape
             .Select(shape => shape.Bounds)
             .ToList();
 
+        // The shapes at either end are handed over separately rather than left out: the route
+        // has to start and finish on them, but it must not come back across them on the way.
+        var ends = new List<Rect>();
+
+        if (StartShape is not null)
+            ends.Add(StartShape.Bounds);
+
+        if (EndShape is not null && !ReferenceEquals(EndShape, StartShape))
+            ends.Add(EndShape.Bounds);
+
         _route = ConnectorRouter.Route(
-            start, StartDirection, end, EndDirection, rects, clearance, taken);
+            start, StartDirection, end, EndDirection, rects, clearance, taken, ends);
     }
 
     public ConnectorShape(Point start, Point end) : base(new Rect(start, end))
@@ -293,40 +433,148 @@ public class ConnectorShape : DiagramShape
 
     public Vector EndDirection => Direction(EndShape, EffectiveEndPort, ResolvedEnd);
 
+    private int EffectiveStartPort => EffectivePorts.Start;
+
+    private int EffectiveEndPort => EffectivePorts.End;
+
     /// <summary>
-    /// The connection point actually used, which is the opposite of the chosen one when the
-    /// chosen one faces away from the other end.
+    /// The pair of connection points actually used, which is the chosen pair until the shapes
+    /// move somewhere that pair cannot sensibly serve.
     ///
     /// A connector pinned to the bottom of one shape and the top of another looks right until
     /// the shapes swap places - reordering a lane will do it - and then each line has to leave
-    /// its shape, doubling back across it, to reach the other. Flipping to the opposite point
-    /// keeps the line outside both shapes. Nothing is written back: the chosen point is still
-    /// the chosen one, so putting the shapes back the way they were restores the original.
+    /// its shape, doubling back across it, to reach the other. Once either end faces away from
+    /// the other, the four faces of each shape are weighed against each other and the cheapest
+    /// pair is used instead.
+    ///
+    /// The pair is weighed as a pair rather than an end at a time. Choosing each end by itself
+    /// is what leaves a line going out of one shape's left and into the other's right when the
+    /// two are sitting one above the other: both decisions are locally reasonable and together
+    /// they wrap the line around the outside of both shapes.
+    ///
+    /// Nothing is written back: the chosen points are still the chosen ones, so putting the
+    /// shapes back the way they were restores the original route.
     /// </summary>
-    private int EffectiveStartPort => FacingPort(StartShape, StartPort, AnchorOf(EndShape, EndPort, End));
+    private (int Start, int End) EffectivePorts
+    {
+        get
+        {
+            var startAnchor = AnchorOf(StartShape, StartPort, Start);
+            var endAnchor = AnchorOf(EndShape, EndPort, End);
 
-    private int EffectiveEndPort => FacingPort(EndShape, EndPort, AnchorOf(StartShape, StartPort, Start));
+            // The common case, and the cheap one: both ends already face the other, so the
+            // points that were chosen are the points used and there is nothing to weigh.
+            if (!FacesAway(StartShape, StartPort, endAnchor) &&
+                !FacesAway(EndShape, EndPort, startAnchor))
+                return (StartPort, EndPort);
 
-    private static int FacingPort(DiagramShape? glued, int port, Point toward)
+            // Bends placed by hand were placed against whichever points were in use at the
+            // time. Moving an end to a different face would strand them somewhere they were
+            // never meant to be, so a hand-placed route gets only the flip to the opposite
+            // point: the least that keeps both ends on the outside of their shapes.
+            if (HasManualRoute)
+                return (Opposite(StartShape, StartPort, endAnchor),
+                        Opposite(EndShape, EndPort, startAnchor));
+
+            Point PointAt(DiagramShape? glued, int port, Point fallback)
+            {
+                if (glued is null || port < 0)
+                    return fallback;
+
+                var points = glued.ConnectionPoints;
+                return port < points.Count ? points[port] : fallback;
+            }
+
+            // Manhattan, because the line is routed in right angles: the straight-line
+            // distance would rate a diagonal pair better than the route can ever be.
+            double Cost(int start, int end)
+            {
+                var a = PointAt(StartShape, start, startAnchor);
+                var b = PointAt(EndShape, end, endAnchor);
+
+                return Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y)
+                       + Backward(StartShape, start, b)
+                       + Backward(EndShape, end, a);
+            }
+
+            // The pair in hand is the one to beat, so a tie leaves the chosen points alone.
+            var bestStart = StartPort;
+            var bestEnd = EndPort;
+            var best = Cost(StartPort, EndPort);
+
+            foreach (var start in Choices(StartShape, StartPort))
+            foreach (var end in Choices(EndShape, EndPort))
+            {
+                var cost = Cost(start, end);
+
+                if (cost >= best - Tolerance)
+                    continue;
+
+                best = cost;
+                bestStart = start;
+                bestEnd = end;
+            }
+
+            return (bestStart, bestEnd);
+        }
+    }
+
+    private const double Tolerance = 0.0001;
+
+    /// <summary>The point across the shape from this one, when this one faces the wrong way.</summary>
+    private static int Opposite(DiagramShape? glued, int port, Point toward)
+    {
+        if (!FacesAway(glued, port, toward))
+            return port;
+
+        var count = glued!.ConnectionPoints.Count;
+        return (port + count / 2) % count;
+    }
+
+    /// <summary>The faces worth weighing: all four, or the one in hand when there is no choice.</summary>
+    private static int[] Choices(DiagramShape? glued, int port)
     {
         if (glued is null || port < 0)
-            return port;
+            return [port];
 
         var points = glued.ConnectionPoints;
 
-        // Only the plain four-point layout has a meaningful opposite.
+        // Only the plain four-point layout has faces that can stand in for one another.
+        return port < points.Count && points.Count == DiagramShape.ConnectionDirections.Length
+            ? [0, 1, 2, 3]
+            : [port];
+    }
+
+    /// <summary>True when a face points away from where the line has to go.</summary>
+    private static bool FacesAway(DiagramShape? glued, int port, Point toward)
+    {
+        if (glued is null || port < 0)
+            return false;
+
+        var points = glued.ConnectionPoints;
+
         if (port >= points.Count || points.Count != DiagramShape.ConnectionDirections.Length)
-            return port;
+            return false;
 
         var outward = glued.ConnectionDirection(port);
         var away = new Vector(toward.X - points[port].X, toward.Y - points[port].Y);
 
-        // Facing the other end, or square on to it: leave it alone.
-        if (outward.X * away.X + outward.Y * away.Y >= 0)
-            return port;
+        // Facing the other end, or square on to it, costs nothing.
+        return outward.X * away.X + outward.Y * away.Y < 0;
+    }
 
-        var opposite = (port + points.Count / 2) % points.Count;
-        return opposite;
+    /// <summary>
+    /// What leaving by a face that points the wrong way costs: the line has to come back
+    /// around the shape it just left, which is roughly half the shape's girth. Taken from the
+    /// shape rather than fixed, so a large shape is charged what it actually costs to round.
+    /// </summary>
+    private static double Backward(DiagramShape? glued, int port, Point toward)
+    {
+        if (!FacesAway(glued, port, toward))
+            return 0;
+
+        var bounds = glued!.Bounds;
+        return (bounds.Width + bounds.Height) / 2;
     }
 
     private static Point AnchorOf(DiagramShape? glued, int port, Point free)

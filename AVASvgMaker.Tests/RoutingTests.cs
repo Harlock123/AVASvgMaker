@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Headless.XUnit;
@@ -90,24 +91,110 @@ public class RoutingTests
         foreach (var connector in new[] { one, two })
         foreach (var (p, q) in Harness.Segments(connector))
         foreach (var shape in document.Shapes.Where(s => s is not ConnectorShape))
-        {
-            if (ReferenceEquals(shape, connector.StartShape) || ReferenceEquals(shape, connector.EndShape))
-                continue;
-
             Assert.False(Cuts(p, q, shape.Bounds), $"a route crosses {shape.Text}");
-        }
     }
 
+    /// <summary>Bends that still clear everything are the user's, and are left alone.</summary>
     [AvaloniaFact]
     public void AHandPlacedRouteIsLeftAlone()
     {
         var (document, _, two) = Crowded();
 
-        two.Waypoints = [new Point(400, 430)];
+        // Out to the side, down past the wall, across under it and back up: roundabout, which
+        // is the point - it is a route someone chose, square throughout, crossing nothing.
+        two.Waypoints =
+        [
+            new Point(240, 190), new Point(240, 430), new Point(500, 430), new Point(500, 190)
+        ];
         var placed = Harness.Path(two);
 
         document.RouteConnectors();
 
+        Assert.True(two.HasManualRoute);
+        Assert.Equal(placed, Harness.Path(two));
+    }
+
+    /// <summary>
+    /// Bends that have stopped clearing everything are not. A hand-placed route is a route
+    /// through a page that has since changed, and once it runs through a shape it is no
+    /// longer the route anybody asked for - so it goes, and the connector routes itself.
+    /// </summary>
+    [AvaloniaFact]
+    public void BendsGoOnceTheyCutThroughSomething()
+    {
+        var (document, _, two) = Crowded();
+
+        // Straight at the wall.
+        two.Waypoints = [new Point(400, 430)];
+
+        document.RouteConnectors();
+
+        Assert.False(two.HasManualRoute, "the bends should have gone");
+
+        foreach (var (p, q) in Harness.Segments(two))
+        foreach (var shape in document.Shapes.Where(s => s is not ConnectorShape))
+            Assert.False(Cuts(p, q, shape.Bounds), $"the route it found crosses {shape.Text}");
+    }
+
+    /// <summary>
+    /// The other way bends stop making sense. A route can end up clear of every shape and
+    /// still be wrong: an end moves, the bends behind it do not, and the segment joining them
+    /// comes out slanted. Nobody can draw that on purpose, so it is not left standing.
+    /// </summary>
+    [AvaloniaFact]
+    public void BendsGoOnceTheyStopTurningSquareCorners()
+    {
+        var document = Harness.Page(900, 700);
+        var a = Harness.Box(document, new Rect(60, 100, 110, 40), "A");
+        var b = Harness.Box(document, new Rect(600, 100, 110, 40), "B");
+
+        var connector = Harness.Join(document, a, 1, b, 3);
+
+        // Square corners, clear of both shapes, out to the side and over the top.
+        connector.Waypoints =
+        [
+            new Point(300, 120), new Point(300, 40), new Point(600, 40)
+        ];
+
+        document.RouteConnectors();
+
+        Assert.True(connector.HasManualRoute, "as placed the bends are square and clear");
+
+        // A drops away. It leaves by its own right-hand side still, so nothing is crossed -
+        // but the run from there to the first bend is now a slant.
+        a.Bounds = new Rect(60, 300, 110, 40);
+        document.RouteConnectors();
+
+        Assert.False(connector.HasManualRoute, "the bends should have gone");
+
+        foreach (var (p, q) in Harness.Segments(connector))
+        {
+            Assert.True(Math.Abs(p.X - q.X) < 0.01 || Math.Abs(p.Y - q.Y) < 0.01,
+                "the route it found still slants");
+        }
+    }
+
+    /// <summary>
+    /// The shape has to actually move first. Bends are not re-examined on every repaint, both
+    /// because it would cost something and because a route that was fine a moment ago and has
+    /// not been disturbed is still fine.
+    /// </summary>
+    [AvaloniaFact]
+    public void BendsSurviveARepaintThatChangesNothing()
+    {
+        var (document, _, two) = Crowded();
+
+        two.Waypoints =
+        [
+            new Point(240, 190), new Point(240, 430), new Point(500, 430), new Point(500, 190)
+        ];
+
+        var placed = Harness.Path(two);
+
+        for (var i = 0; i < 5; i++)
+            document.RouteConnectors();
+
+        Assert.True(two.HasManualRoute);
         Assert.Equal(placed, Harness.Path(two));
     }
 
@@ -139,6 +226,110 @@ public class RoutingTests
         again.Stop();
 
         Assert.True(again.ElapsedMilliseconds < 250, $"re-routing cost {again.ElapsedMilliseconds} ms");
+    }
+
+
+    /// <summary>
+    /// The shapes at either end are shapes too. A route used to be free to cross them - they
+    /// were left out of the obstacles altogether, on the grounds that the line has to start
+    /// and finish on them - and the centring step would then slide a segment off the stub and
+    /// straight back through the shape it had just left.
+    ///
+    /// Swept rather than staged, because the geometry that showed this up is not one anybody
+    /// would have sat down and written: it takes a particular arrangement of a particular
+    /// number of shapes before the centring has anywhere worth sliding to.
+    /// </summary>
+    [AvaloniaFact]
+    public void ARouteNeverCrossesTheShapesItJoins()
+    {
+        var random = new Random(20260915);
+        var crossings = 0;
+        var checkedPages = 0;
+
+        for (var trial = 0; trial < 120; trial++)
+        {
+            var document = Harness.Page(1200, 900);
+            var boxes = new List<DiagramShape>();
+
+            // Laid out clear of one another: two shapes closer together than the clearance
+            // cannot both be left square on, and that is a different problem.
+            void Place(DiagramShape? moving)
+            {
+                for (var attempt = 0; attempt < 200; attempt++)
+                {
+                    var at = new Rect(random.Next(60, 1000), random.Next(60, 760), 110, 44);
+
+                    if (boxes.Any(other => !ReferenceEquals(other, moving) &&
+                                           other.Bounds.Inflate(24).Intersects(at)))
+                        continue;
+
+                    if (moving is null)
+                        boxes.Add(Harness.Box(document, at, $"S{boxes.Count}"));
+                    else
+                        moving.Bounds = at;
+
+                    return;
+                }
+            }
+
+            for (var i = 0; i < 6; i++)
+                Place(null);
+
+            var joins = new List<ConnectorShape>();
+
+            for (var i = 0; i < 5; i++)
+            {
+                var from = boxes[random.Next(boxes.Count)];
+                var to = boxes[random.Next(boxes.Count)];
+
+                if (!ReferenceEquals(from, to))
+                    joins.Add(Harness.Join(document, from, random.Next(4), to, random.Next(4)));
+            }
+
+            document.RouteConnectors();
+
+            // The move is the point of the exercise: this is what a drag does.
+            Place(boxes[random.Next(boxes.Count)]);
+            document.RouteConnectors();
+            checkedPages++;
+
+            foreach (var connector in joins)
+            foreach (var (p, q) in Harness.Segments(connector))
+            foreach (var shape in boxes)
+            {
+                if (Cuts(p, q, shape.Bounds))
+                    crossings++;
+            }
+        }
+
+        Assert.Equal(120, checkedPages);
+        Assert.Equal(0, crossings);
+    }
+
+    /// <summary>
+    /// The smallest arrangement the sweep turned up, kept as itself so a failure says what
+    /// broke rather than only that something did. Two shapes, one above the other, joined
+    /// left to right - so both ends face away and both are re-faced.
+    ///
+    /// It used to come out as (759,471) (696,471) (696,234) (632,234): out of the right of
+    /// the lower shape, back across the whole width of it, up, and then back across the upper
+    /// one to reach its left side. Both shapes crossed end to end by the line attached to them.
+    /// </summary>
+    [AvaloniaFact]
+    public void ALineDoesNotTurnBackThroughTheShapeItLeft()
+    {
+        var document = Harness.Page(1200, 900);
+        var lower = Harness.Box(document, new Rect(649, 449, 110, 44), "lower");
+        var upper = Harness.Box(document, new Rect(632, 212, 110, 44), "upper");
+
+        var connector = Harness.Join(document, lower, 3, upper, 1);
+        document.RouteConnectors();
+
+        foreach (var (p, q) in Harness.Segments(connector))
+        {
+            Assert.False(Cuts(p, q, lower.Bounds), "the line goes back through the lower shape");
+            Assert.False(Cuts(p, q, upper.Bounds), "the line goes back through the upper shape");
+        }
     }
 
     /// <summary>True when a segment passes through a rectangle rather than touching its edge.</summary>

@@ -46,20 +46,52 @@ public static class ConnectorRouter
         Vector endDirection,
         IReadOnlyList<Rect> obstacles,
         double clearance,
-        IReadOnlyList<(Point A, Point B)>? taken = null)
+        IReadOnlyList<(Point A, Point B)>? taken = null,
+        IReadOnlyList<Rect>? terminals = null)
     {
-        var stub = Math.Max(clearance, 1);
-        var from = Step(start, startDirection, stub);
-        var to = Step(end, endDirection, stub);
+        var blocked = Inflate(obstacles, clearance);
 
-        var blocked = obstacles
-            .Select(rect => rect.Inflate(clearance))
-            .Where(rect => rect.Width > 0 && rect.Height > 0)
-            .ToList();
+        // The shapes this connector is attached to. They cannot be obstacles like the rest -
+        // the line has to begin and end on them - but everything between the two stubs must
+        // still keep out, or the line turns straight back across the shape it just left.
+        var ends = Inflate(terminals, clearance);
+        var bare = Inflate(terminals, 0);
+
+        // Shortened rather than left to land inside something. Two shapes closer together
+        // than the clearance cannot both be left square on, and a stub that starts inside a
+        // shape leaves the search nowhere to begin - which used to mean a route that ignored
+        // every shape on the page, including the two it was attached to.
+        var stub = Math.Max(clearance, 1);
+        var from = Stub(start, startDirection, stub, blocked, bare);
+        var to = Stub(end, endDirection, stub, blocked, bare);
 
         var lanes = taken is { Count: > 0 and <= CrowdedEnough } ? taken : null;
-        var middle = Search(from, startDirection, to, blocked, lanes, clearance)
-                     ?? Elbow(from, to, startDirection);
+
+        // Three sets, in order of how well the result reads. Keeping the clearance from its
+        // own shapes is best; touching them is acceptable and still never crosses them; and
+        // only when neither can be routed at all is the old free-for-all better than nothing.
+        List<List<Rect>> attempts =
+        [
+            Join(blocked, ends),
+            Join(blocked, bare),
+            blocked
+        ];
+
+        List<Point>? middle = null;
+        var guard = blocked;
+
+        foreach (var set in attempts)
+        {
+            middle = Search(from, startDirection, to, set, lanes, clearance);
+
+            if (middle is null)
+                continue;
+
+            guard = set;
+            break;
+        }
+
+        middle ??= Elbow(from, to, startDirection);
 
         var path = new List<Point> { start };
 
@@ -69,9 +101,43 @@ public static class ConnectorRouter
         path.Add(end);
 
         var simplified = Simplify(path).ToList();
-        Centre(simplified, blocked);
+        Centre(simplified, blocked, guard);
 
         return Simplify(simplified);
+    }
+
+    private static List<Rect> Inflate(IReadOnlyList<Rect>? rects, double clearance) =>
+        rects is null
+            ? []
+            : rects
+                .Select(rect => clearance > 0 ? rect.Inflate(clearance) : rect)
+                .Where(rect => rect.Width > 0 && rect.Height > 0)
+                .ToList();
+
+    private static List<Rect> Join(List<Rect> first, List<Rect> second) =>
+        second.Count == 0 ? first : first.Concat(second).ToList();
+
+    /// <summary>
+    /// Steps out from a connection point by the stub, or by as much of it as lands clear of
+    /// everything. Falls back to the point itself, which at least sits on its own outline.
+    /// </summary>
+    private static Point Stub(
+        Point point, Vector direction, double distance, List<Rect> blocked, List<Rect> bare)
+    {
+        if (IsZero(direction))
+            return point;
+
+        const int steps = 8;
+
+        for (var step = steps; step > 0; step--)
+        {
+            var candidate = Step(point, direction, distance * step / steps);
+
+            if (!Inside(candidate, blocked) && !Inside(candidate, bare))
+                return candidate;
+        }
+
+        return point;
     }
 
     private static Point Step(Point point, Vector direction, double distance) =>
@@ -268,7 +334,14 @@ public static class ConnectorRouter
     /// between its neighbours - as far as the obstacles allow - so the jog sits in the middle
     /// of the gap it crosses, which is what the eye expects.
     /// </summary>
-    private static void Centre(List<Point> path, List<Rect> blocked)
+    /// <param name="blocked">What the segments joining this one to its neighbours must clear.</param>
+    /// <param name="all">
+    /// The same, plus the shapes at either end. The segment being moved is held to the
+    /// stricter set: it is free to slide, so it is the one that can slide into a shape. The
+    /// joining segments are not, and are the stubs themselves at the two ends of the path -
+    /// they touch the shape by design, and holding them to it would stop any centring at all.
+    /// </param>
+    private static void Centre(List<Point> path, List<Rect> blocked, List<Rect> all)
     {
         for (var i = 1; i + 2 < path.Count; i++)
         {
@@ -281,7 +354,7 @@ public static class ConnectorRouter
             {
                 var ideal = (before.X + after.X) / 2;
                 var value = Slide(ideal, a.X, candidate =>
-                    Clear(new Point(candidate, a.Y), new Point(candidate, b.Y), blocked) &&
+                    Clear(new Point(candidate, a.Y), new Point(candidate, b.Y), all) &&
                     Clear(before, new Point(candidate, a.Y), blocked) &&
                     Clear(new Point(candidate, b.Y), after, blocked));
 
@@ -292,7 +365,7 @@ public static class ConnectorRouter
             {
                 var ideal = (before.Y + after.Y) / 2;
                 var value = Slide(ideal, a.Y, candidate =>
-                    Clear(new Point(a.X, candidate), new Point(b.X, candidate), blocked) &&
+                    Clear(new Point(a.X, candidate), new Point(b.X, candidate), all) &&
                     Clear(before, new Point(a.X, candidate), blocked) &&
                     Clear(new Point(b.X, candidate), after, blocked));
 
