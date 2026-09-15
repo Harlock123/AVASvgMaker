@@ -332,6 +332,148 @@ public class RoutingTests
         }
     }
 
+    /// <summary>
+    /// A shape that has been turned is still a shape to keep out of. Obstacles are described
+    /// by the upright rectangle a shape occupies, and used to be tested as though that were
+    /// where the shape was - so a turned shape was avoided in the wrong place, and the line
+    /// went through where it actually was.
+    ///
+    /// The one that showed it up, kept as itself: the line leaves a shape turned most of the
+    /// way round and cuts straight back across it.
+    /// </summary>
+    [AvaloniaFact]
+    public void ALineDoesNotCutTheTurnedShapeItLeaves()
+    {
+        var document = Harness.Page(1000, 800);
+        var turned = Harness.Box(document, new Rect(473, 187, 120, 60), "turned");
+        var upright = Harness.Box(document, new Rect(297, 543, 120, 60), "upright");
+
+        turned.Rotation = 238;
+
+        var connector = Harness.Join(document, turned, 3, upright, 0);
+        document.RouteConnectors();
+
+        foreach (var (p, q) in Harness.Segments(connector))
+        {
+            Assert.False(Pierces(p, q, turned), "the line cuts the shape it leaves");
+            Assert.False(Pierces(p, q, upright), "the line cuts the shape it arrives at");
+        }
+    }
+
+    /// <summary>
+    /// The same, swept. Shapes are turned to every sort of angle, laid out so that what they
+    /// actually cover does not overlap, and then one of them is turned again - which is the
+    /// move that used to leave lines lying across them.
+    /// </summary>
+    [AvaloniaFact]
+    public void ARouteKeepsOutOfShapesThatHaveBeenTurned()
+    {
+        var random = new Random(4242);
+        var crossings = 0;
+
+        for (var trial = 0; trial < 80; trial++)
+        {
+            var document = Harness.Page(1200, 900);
+            var boxes = new List<DiagramShape>();
+
+            for (var i = 0; i < 5; i++)
+            for (var attempt = 0; attempt < 400; attempt++)
+            {
+                var at = new Rect(random.Next(80, 980), random.Next(80, 720), 120, 60);
+                var turn = random.Next(0, 4) == 0 ? 0 : random.Next(1, 360);
+
+                // Kept apart by what they cover once turned, not by the upright box: two shapes
+                // that overlap have no clean route between them, which is a different question.
+                if (boxes.Any(other => Covers(other.Bounds, other.Rotation).Inflate(30)
+                                           .Intersects(Covers(at, turn))))
+                    continue;
+
+                var shape = Harness.Box(document, at, $"S{boxes.Count}");
+                shape.Rotation = turn;
+                boxes.Add(shape);
+                break;
+            }
+
+            var joins = new List<ConnectorShape>();
+
+            for (var i = 0; i < 4; i++)
+            {
+                var from = boxes[random.Next(boxes.Count)];
+                var to = boxes[random.Next(boxes.Count)];
+
+                if (!ReferenceEquals(from, to))
+                    joins.Add(Harness.Join(document, from, random.Next(4), to, random.Next(4)));
+            }
+
+            document.RouteConnectors();
+
+            var moved = boxes[random.Next(boxes.Count)];
+
+            for (var attempt = 0; attempt < 400; attempt++)
+            {
+                var turn = random.Next(0, 360);
+
+                if (boxes.Any(other => !ReferenceEquals(other, moved) &&
+                                       Covers(other.Bounds, other.Rotation).Inflate(30)
+                                           .Intersects(Covers(moved.Bounds, turn))))
+                    continue;
+
+                moved.Rotation = turn;
+                break;
+            }
+
+            document.RouteConnectors();
+
+            foreach (var connector in joins)
+            foreach (var (p, q) in Harness.Segments(connector))
+            foreach (var shape in boxes)
+            {
+                if (Pierces(p, q, shape))
+                    crossings++;
+            }
+        }
+
+        Assert.Equal(0, crossings);
+    }
+
+    /// <summary>What a shape covers once turned, as an upright box: for keeping fixtures apart.</summary>
+    private static Rect Covers(Rect box, double degrees)
+    {
+        var radians = degrees * Math.PI / 180;
+        var across = Math.Abs(Math.Cos(radians));
+        var down = Math.Abs(Math.Sin(radians));
+        var width = box.Width * across + box.Height * down;
+        var height = box.Width * down + box.Height * across;
+
+        return new Rect(box.Center.X - width / 2, box.Center.Y - height / 2, width, height);
+    }
+
+    /// <summary>
+    /// Through the shape's own outline, turn and all, rather than the box it is described by.
+    /// Sampled a whisker to either side of the line, so one running along an edge - which is
+    /// where a line leaving a shape belongs - is not counted as passing through it.
+    /// </summary>
+    private static bool Pierces(Point a, Point b, DiagramShape shape)
+    {
+        var length = Math.Sqrt(Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2));
+
+        if (length < 2)
+            return false;
+
+        var across = new Vector(-(b.Y - a.Y) / length, (b.X - a.X) / length) * 0.75;
+
+        for (var step = 1; step < 40; step++)
+        {
+            var t = step / 40.0;
+            var at = new Point(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t);
+
+            if (shape.HitTest(at + across) && shape.HitTest(at - across))
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>True when a segment passes through a rectangle rather than touching its edge.</summary>
     private static bool Cuts(Point a, Point b, Rect rect)
     {

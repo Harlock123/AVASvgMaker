@@ -18,6 +18,152 @@ public static class ConnectorRouter
 {
     private const double Epsilon = 0.01;
 
+    /// <summary>
+    /// Something in the way: the rectangle it occupies, and the angle it has been turned
+    /// through about that rectangle's middle.
+    /// </summary>
+    public readonly record struct Obstruction(Rect Box, double Degrees);
+
+    /// <summary>
+    /// An obstruction ready to be tested against, with its turn worked out once.
+    ///
+    /// A turned rectangle is not an awkward shape to test against so much as an ordinary one
+    /// asked about in the wrong frame. Rather than work out where its corners have gone, the
+    /// question is turned back the other way: the point or the segment is brought into the
+    /// rectangle's own upright frame, where it is the plain axis-aligned question it always
+    /// was. The same turn the shape itself uses, so the two cannot disagree.
+    /// </summary>
+    private readonly struct Blocker
+    {
+        private readonly double _cos;
+        private readonly double _sin;
+        private readonly Point _centre;
+
+        public Rect Box { get; }
+        public bool Turned { get; }
+
+        public Blocker(Rect box, double degrees)
+        {
+            Box = box;
+            Turned = Math.Abs(degrees) > 0.01;
+            _centre = box.Center;
+
+            var radians = -degrees * Math.PI / 180;
+            _cos = Math.Cos(radians);
+            _sin = Math.Sin(radians);
+        }
+
+        /// <summary>The page point, brought into the rectangle's upright frame.</summary>
+        public Point Upright(Point point)
+        {
+            if (!Turned)
+                return point;
+
+            var dx = point.X - _centre.X;
+            var dy = point.Y - _centre.Y;
+
+            return new Point(
+                _centre.X + dx * _cos - dy * _sin,
+                _centre.Y + dx * _sin + dy * _cos);
+        }
+
+        /// <summary>The upright box that contains the turned one, for laying out candidate lanes.</summary>
+        public Rect Extent
+        {
+            get
+            {
+                if (!Turned)
+                    return Box;
+
+                var across = Math.Abs(_cos);
+                var down = Math.Abs(_sin);
+                var width = Box.Width * across + Box.Height * down;
+                var height = Box.Width * down + Box.Height * across;
+
+                return new Rect(
+                    _centre.X - width / 2, _centre.Y - height / 2, width, height);
+            }
+        }
+
+        public bool Contains(Point point)
+        {
+            var at = Upright(point);
+
+            return at.X > Box.Left + Epsilon && at.X < Box.Right - Epsilon &&
+                   at.Y > Box.Top + Epsilon && at.Y < Box.Bottom - Epsilon;
+        }
+
+        /// <summary>
+        /// True when the segment passes through the inside of the rectangle rather than along
+        /// its edge or past a corner. Upright, this was a comparison of two boxes, because
+        /// every segment the router lays down is either across or down and its box is itself.
+        /// Turned, it is a slanted segment against an upright box, which wants clipping.
+        /// </summary>
+        public bool Crosses(Point a, Point b)
+        {
+            var from = Upright(a);
+            var to = Upright(b);
+
+            if (!Turned)
+            {
+                return Math.Min(from.X, to.X) < Box.Right - Epsilon &&
+                       Math.Max(from.X, to.X) > Box.Left + Epsilon &&
+                       Math.Min(from.Y, to.Y) < Box.Bottom - Epsilon &&
+                       Math.Max(from.Y, to.Y) > Box.Top + Epsilon;
+            }
+
+            // The inside of the box, so a segment lying along an edge is not a crossing - the
+            // same latitude the upright comparison above allows.
+            var left = Box.Left + Epsilon;
+            var right = Box.Right - Epsilon;
+            var top = Box.Top + Epsilon;
+            var bottom = Box.Bottom - Epsilon;
+
+            if (right <= left || bottom <= top)
+                return false;
+
+            var dx = to.X - from.X;
+            var dy = to.Y - from.Y;
+            double entry = 0, exit = 1;
+
+            Span<(double Edge, double Room)> slabs =
+            [
+                (-dx, from.X - left), (dx, right - from.X),
+                (-dy, from.Y - top), (dy, bottom - from.Y)
+            ];
+
+            foreach (var (edge, room) in slabs)
+            {
+                if (Math.Abs(edge) < 1e-9)
+                {
+                    if (room < 0)
+                        return false;
+
+                    continue;
+                }
+
+                var at = room / edge;
+
+                if (edge < 0)
+                {
+                    if (at > exit)
+                        return false;
+
+                    entry = Math.Max(entry, at);
+                }
+                else
+                {
+                    if (at < entry)
+                        return false;
+
+                    exit = Math.Min(exit, at);
+                }
+            }
+
+            return entry < exit;
+        }
+    }
+
     /// <summary>What a corner costs, in page units, relative to distance travelled.</summary>
     private const double BendPenalty = 40;
 
@@ -44,10 +190,10 @@ public static class ConnectorRouter
         Vector startDirection,
         Point end,
         Vector endDirection,
-        IReadOnlyList<Rect> obstacles,
+        IReadOnlyList<Obstruction> obstacles,
         double clearance,
         IReadOnlyList<(Point A, Point B)>? taken = null,
-        IReadOnlyList<Rect>? terminals = null)
+        IReadOnlyList<Obstruction>? terminals = null)
     {
         var blocked = Inflate(obstacles, clearance);
 
@@ -70,7 +216,7 @@ public static class ConnectorRouter
         // Three sets, in order of how well the result reads. Keeping the clearance from its
         // own shapes is best; touching them is acceptable and still never crosses them; and
         // only when neither can be routed at all is the old free-for-all better than nothing.
-        List<List<Rect>> attempts =
+        List<List<Blocker>> attempts =
         [
             Join(blocked, ends),
             Join(blocked, bare),
@@ -101,20 +247,24 @@ public static class ConnectorRouter
         path.Add(end);
 
         var simplified = Simplify(path).ToList();
-        Centre(simplified, blocked, guard);
+        // The joining segments are held to the shapes at either end as they actually are,
+        // rather than to the clearance around them: the stub touches its own shape by design,
+        // and holding it to the clearance would stop any centring at all - but a stub stretched
+        // sideways until it sweeps across the shape is a different thing, and is refused.
+        Centre(simplified, Join(blocked, bare), guard);
 
         return Simplify(simplified);
     }
 
-    private static List<Rect> Inflate(IReadOnlyList<Rect>? rects, double clearance) =>
-        rects is null
+    private static List<Blocker> Inflate(IReadOnlyList<Obstruction>? obstacles, double clearance) =>
+        obstacles is null
             ? []
-            : rects
-                .Select(rect => clearance > 0 ? rect.Inflate(clearance) : rect)
-                .Where(rect => rect.Width > 0 && rect.Height > 0)
+            : obstacles
+                .Select(o => new Blocker(clearance > 0 ? o.Box.Inflate(clearance) : o.Box, o.Degrees))
+                .Where(blocker => blocker.Box.Width > 0 && blocker.Box.Height > 0)
                 .ToList();
 
-    private static List<Rect> Join(List<Rect> first, List<Rect> second) =>
+    private static List<Blocker> Join(List<Blocker> first, List<Blocker> second) =>
         second.Count == 0 ? first : first.Concat(second).ToList();
 
     /// <summary>
@@ -122,7 +272,7 @@ public static class ConnectorRouter
     /// everything. Falls back to the point itself, which at least sits on its own outline.
     /// </summary>
     private static Point Stub(
-        Point point, Vector direction, double distance, List<Rect> blocked, List<Rect> bare)
+        Point point, Vector direction, double distance, List<Blocker> blocked, List<Blocker> bare)
     {
         if (IsZero(direction))
             return point;
@@ -148,14 +298,15 @@ public static class ConnectorRouter
     #region Lattice
 
     /// <summary>Candidate lines: the terminals, each obstacle edge, and a lane down every gap.</summary>
-    private static double[] Axis(double a, double b, List<Rect> blocked, bool horizontal)
+    private static double[] Axis(double a, double b, List<Blocker> blocked, bool horizontal)
     {
         var values = new List<double> { a, b };
 
-        foreach (var rect in blocked)
+        foreach (var blocker in blocked)
         {
-            values.Add(horizontal ? rect.Left : rect.Top);
-            values.Add(horizontal ? rect.Right : rect.Bottom);
+            var extent = blocker.Extent;
+            values.Add(horizontal ? extent.Left : extent.Top);
+            values.Add(horizontal ? extent.Right : extent.Bottom);
         }
 
         values.Sort();
@@ -183,29 +334,19 @@ public static class ConnectorRouter
         return withLanes.ToArray();
     }
 
-    private static bool Inside(Point point, List<Rect> blocked) => blocked.Any(rect =>
-        point.X > rect.Left + Epsilon && point.X < rect.Right - Epsilon &&
-        point.Y > rect.Top + Epsilon && point.Y < rect.Bottom - Epsilon);
+    private static bool Inside(Point point, List<Blocker> blocked) =>
+        blocked.Any(blocker => blocker.Contains(point));
 
-    /// <summary>True when an axis-aligned segment passes through any obstacle's interior.</summary>
-    private static bool Crosses(Point a, Point b, List<Rect> blocked)
-    {
-        var minX = Math.Min(a.X, b.X);
-        var maxX = Math.Max(a.X, b.X);
-        var minY = Math.Min(a.Y, b.Y);
-        var maxY = Math.Max(a.Y, b.Y);
-
-        return blocked.Any(rect =>
-            minX < rect.Right - Epsilon && maxX > rect.Left + Epsilon &&
-            minY < rect.Bottom - Epsilon && maxY > rect.Top + Epsilon);
-    }
+    /// <summary>True when a segment passes through any obstacle's interior.</summary>
+    private static bool Crosses(Point a, Point b, List<Blocker> blocked) =>
+        blocked.Any(blocker => blocker.Crosses(a, b));
 
     #endregion
 
     #region Search
 
     private static List<Point>? Search(
-        Point from, Vector startDirection, Point to, List<Rect> blocked,
+        Point from, Vector startDirection, Point to, List<Blocker> blocked,
         IReadOnlyList<(Point A, Point B)>? taken, double spacing)
     {
         var xs = Axis(from.X, to.X, blocked, horizontal: true);
@@ -334,14 +475,18 @@ public static class ConnectorRouter
     /// between its neighbours - as far as the obstacles allow - so the jog sits in the middle
     /// of the gap it crosses, which is what the eye expects.
     /// </summary>
-    /// <param name="blocked">What the segments joining this one to its neighbours must clear.</param>
-    /// <param name="all">
-    /// The same, plus the shapes at either end. The segment being moved is held to the
-    /// stricter set: it is free to slide, so it is the one that can slide into a shape. The
-    /// joining segments are not, and are the stubs themselves at the two ends of the path -
-    /// they touch the shape by design, and holding them to it would stop any centring at all.
+    /// <param name="blocked">
+    /// What the segments joining this one to its neighbours must clear: everything in the way,
+    /// and the shapes at either end as they actually are. Those two are not taken with their
+    /// clearance here, because the joining segments at the ends of a path are the stubs, which
+    /// sit within that clearance by design.
     /// </param>
-    private static void Centre(List<Point> path, List<Rect> blocked, List<Rect> all)
+    /// <param name="all">
+    /// The same, with the shapes at either end taken with their clearance. The segment being
+    /// moved is held to this stricter set: it is the one free to slide, so it is the one that
+    /// can slide into a shape.
+    /// </param>
+    private static void Centre(List<Point> path, List<Blocker> blocked, List<Blocker> all)
     {
         for (var i = 1; i + 2 < path.Count; i++)
         {
@@ -397,7 +542,7 @@ public static class ConnectorRouter
         return current;
     }
 
-    private static bool Clear(Point a, Point b, List<Rect> blocked) => !Crosses(a, b, blocked);
+    private static bool Clear(Point a, Point b, List<Blocker> blocked) => !Crosses(a, b, blocked);
 
     /// <summary>
     /// How far a candidate run keeps company with the connectors already on the page: the

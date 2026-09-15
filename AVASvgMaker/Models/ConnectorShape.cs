@@ -268,7 +268,12 @@ public class ConnectorShape : DiagramShape
 
             foreach (var shape in obstacles)
             {
-                if (shape is ConnectorShape || !Overlaps(a, b, shape.Bounds))
+                // A turned shape reaches outside the upright box it is described by, so the
+                // cheap first pass is only trusted for shapes that are not turned.
+                if (shape is ConnectorShape)
+                    continue;
+
+                if (!shape.IsRotated && !Overlaps(a, b, shape.Bounds))
                     continue;
 
                 // Sampled a whisker to either side rather than on the line itself. A line
@@ -396,18 +401,18 @@ public class ConnectorShape : DiagramShape
 
         var rects = obstacles
             .Where(shape => !ReferenceEquals(shape, StartShape) && !ReferenceEquals(shape, EndShape))
-            .Select(shape => shape.Bounds)
+            .Select(shape => new ConnectorRouter.Obstruction(shape.Bounds, shape.Rotation))
             .ToList();
 
         // The shapes at either end are handed over separately rather than left out: the route
         // has to start and finish on them, but it must not come back across them on the way.
-        var ends = new List<Rect>();
+        var ends = new List<ConnectorRouter.Obstruction>();
 
         if (StartShape is not null)
-            ends.Add(StartShape.Bounds);
+            ends.Add(new ConnectorRouter.Obstruction(StartShape.Bounds, StartShape.Rotation));
 
         if (EndShape is not null && !ReferenceEquals(EndShape, StartShape))
-            ends.Add(EndShape.Bounds);
+            ends.Add(new ConnectorRouter.Obstruction(EndShape.Bounds, EndShape.Rotation));
 
         _route = ConnectorRouter.Route(
             start, StartDirection, end, EndDirection, rects, clearance, taken, ends);
