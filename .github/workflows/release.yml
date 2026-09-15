@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 
@@ -41,9 +41,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 
@@ -53,7 +53,7 @@ jobs:
           [[ "$version" == "$GITHUB_REF_NAME" ]] && version="0.0.0-dev"
           ./build.sh --version "$version"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: AVASvgMaker
           path: dist/AVASvgMaker-*
@@ -76,9 +76,9 @@ jobs:
           - { rid: osx-arm64,   os: macos-14 }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 
@@ -91,7 +91,7 @@ jobs:
         shell: bash
         run: ./build.sh --mode aot --targets "${{ matrix.rid }}" --version "0.0.0-native"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: AVASvgMaker-native-${{ matrix.rid }}
           path: dist/AVASvgMaker-*
@@ -106,9 +106,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '9.0.x'
 
@@ -120,7 +120,7 @@ jobs:
           dotnet run --project Tools/GuideBuilder -v q -- \
             USERGUIDE.md "dist/AVASvgMaker-$version-USERGUIDE.pdf" "$version"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: AVASvgMaker-guide
           path: dist/AVASvgMaker-*-USERGUIDE.pdf
@@ -133,12 +133,12 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
           generate_release_notes: true
