@@ -60,8 +60,10 @@ Or [build it yourself](#building).
 
 - **Connection points** - every shape offers four attachment points, sitting on the shape's own outline rather than the box around it; they light up while a connector is being drawn and the end snaps to the nearest one
 - **Glue** - an end dropped on a shape, or within a grid step of one of its connection points, sticks to it and tracks the shape as it moves and resizes
-- **Right-angle routing** - routed connectors keep clear of the shapes in their way and of each other, put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved or resized
+- **Right-angle routing** - routed connectors keep clear of the shapes in their way, of the two they join, and of each other; they put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved, resized or turned
+- **Sides that suit** - the points a connector was drawn with are kept until they stop facing each other, and it then takes whichever of the four sides do, weighed as a pair rather than an end at a time - so shapes that end up stacked are joined top to bottom rather than around the outside of both
 - **Adjustable bends** - a selected connector offers a grab point on each end, on every bend, and on the middle of every segment; dragging a middle point adds bends, and dropping one back on the line takes it away again
+- **Bends that make way** - bends placed by hand are kept while they still serve, and let go once the line has come to run through a shape or to turn a corner that is not square; the connector then routes itself again
 - **Twelve line ends** - including the hollow arrow and diamond that UML needs, and the entity-relationship crow's foot family
 - **Connector labels** - words on a line, in a gap cut out of it, that follow the line as it re-routes
 
