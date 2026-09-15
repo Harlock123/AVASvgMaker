@@ -126,6 +126,37 @@ every straight run:
 Double-clicking a bend also removes it. **Edit -> Reset connector route** hands a connector
 back to the router and forgets everything you placed by hand.
 
+### When bends are let go
+
+Bends you place by hand are yours, and the router leaves them alone - even where its own route
+would be shorter. A line taken the long way round is a line somebody meant to take the long way
+round.
+
+It cannot leave them alone for ever, because the page moves on around them. A bend sits at a
+place on the page rather than at a place on a shape, so moving a shape, or turning one, pulls
+the end of the line away from bends that have stayed where they were. What is left is a route
+nobody chose.
+
+So a hand-placed route is let go once either of these has become true of it:
+
+- **It runs through a shape.** The line now crosses something it used to pass beside.
+- **It has stopped turning square corners.** A right-angled connector is drawn in runs across
+  and down, and dragging a bend keeps the angles either side of it square - there is no way to
+  ask for a slanted run. One that appears is the distance between an end that has moved and the
+  bends that have not.
+
+The bends then go, and the connector routes itself again around whatever is now in the way.
+What is lost is a route that had already stopped being the one you drew.
+
+It is the direction a shape moves that decides this, not how far it goes. Moved along the line
+it leaves by, it keeps its corners square however far it travels, and the bends stay. Moved
+across that line, they go - a few units is enough, because the run that met the end square on
+no longer does. Turning a shape swings its connection points round with it, which is enough on
+its own.
+
+This is for right-angled connectors. A straight connector keeps whatever bends you give it,
+since there is no route for it to fall back on.
+
 ### Labelling a connector
 
 ![Labelled connectors](Images/connector-labels.png)
