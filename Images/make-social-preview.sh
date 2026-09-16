@@ -15,7 +15,7 @@ S="$(cd "$(dirname "$0")" && pwd)"
 SHOT="$S/shot.png"
 
 # The flowchart out of the middle of the overview screenshot, at the panel's shape.
-magick "$S/overview.png" -crop 1170x1130+700+345 +repage \
+magick "$S/overview.png" -crop 640x585+330+150 +repage \
   -resize 700x640^ -gravity center -extent 700x640 "$SHOT"
 
 trap 'rm -f "$SHOT"' EXIT

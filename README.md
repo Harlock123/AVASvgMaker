@@ -813,6 +813,14 @@ from where the other has just been; an order that only looks backwards cannot co
 itself. Drawing order is the order used, so the same page always routes the same way, and a
 file reopened routes exactly as it did when it was saved.
 
+![A connector selected, and the settings for it](Images/connector-properties.png)
+
+**A connector is formatted from one place.** Its route, its line ends, its colour, weight and
+style, and the font of its label are all in the properties panel, and the panel shows the
+sections that apply to what is in hand: a connector has no fill, so there is no FILL section
+sitting there doing nothing. Picking up the **Connector** tool brings the same settings up
+before there is a connector to select, which is what they were in the toolbar for.
+
 ### Labelling a connector
 
 ![Labelled connectors](Images/connector-labels.png)

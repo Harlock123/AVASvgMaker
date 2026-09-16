@@ -116,6 +116,13 @@ one end to the other, and each connector is set on its own:
 | Right-angle | Runs across and down that keep clear of the shapes in their way and of the other connectors, re-routing whenever anything they depend on moves |
 | Curved | The same route, drawn with its corners rounded off |
 
+![A connector selected, and the settings for it](Images/connector-properties.png)
+
+The panel shows what is in hand. Select a connector and it offers CONNECTOR, LINE and TEXT; a
+connector has no fill, so there is no FILL section to ignore. Select a shape and FILL comes
+back and CONNECTOR goes. Pick up the **Connector** tool with nothing selected and the connector
+settings appear anyway, so the next connector can be set up before it is drawn.
+
 **Curved is a way of drawing a route, not a way of finding one.** A curved connector is routed
 exactly as a right-angled one is - the same clearances, the same glue, the same bends if you
 have placed any - and only the turns between the runs are drawn differently. Anything a
