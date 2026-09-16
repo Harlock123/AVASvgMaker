@@ -8,6 +8,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using AVASvgMaker.Models;
 using Xunit;
 
@@ -168,5 +169,62 @@ public class Screenshots
 
         canvas.Document.SetSelection([]);
         Save(window, "swimlanes");
+    }
+
+    /// <summary>A shape part-way through a drag, with the guides it has caught on showing.</summary>
+    [AvaloniaFact]
+    public void SmartGuides()
+    {
+        if (!Asked) return;
+
+        var (window, canvas) = Window();
+        canvas.Grid.SnapToGrid = false;
+
+        var anchor = Put(canvas, ShapeKind.Rectangle, new Rect(260, 100, 170, 70), "Anchor");
+        var moving = Put(canvas, ShapeKind.Rectangle, new Rect(180, 260, 170, 70), "Dragging");
+
+        canvas.Document.SetSelection([moving]);
+
+        // Left short of where it lines up, then on to it - and caught there, undropped, because
+        // the guides are only drawn while a drag is in hand.
+        var from = moving.Bounds.Center;
+        Harness.Press(canvas, from);
+        Harness.MoveTo(canvas, new Point(from.X + 40, from.Y - 10));
+        Harness.MoveTo(canvas, new Point(from.X + 80, from.Y));
+
+        Save(window, "smart-guides");
+
+        Harness.Release(canvas, new Point(from.X + 80, from.Y));
+    }
+
+    /// <summary>The File menu, open on the list of things a page can be exported as.</summary>
+    [AvaloniaFact]
+    public void ExportMenu()
+    {
+        if (!Asked) return;
+
+        var (window, canvas) = Window();
+
+        var placed = Put(canvas, ShapeKind.RoundedRectangle, new Rect(300, 60, 180, 60), "Order placed");
+        var stock = Put(canvas, ShapeKind.Diamond, new Rect(290, 190, 200, 100), "In stock?");
+        var pick = Put(canvas, ShapeKind.Rectangle, new Rect(140, 360, 150, 60), "Pick and pack");
+
+        Join(canvas, placed, 2, stock, 0);
+        Join(canvas, stock, 3, pick, 0);
+        canvas.Document.SetSelection([]);
+
+        var menu = window.GetVisualDescendants().OfType<Menu>().First();
+        var file = menu.Items.OfType<MenuItem>().First(m => (m.Header as string)?.Contains("File") == true);
+
+        file.Open();
+        Harness.Settle(window);
+
+        var export = file.Items.OfType<MenuItem>()
+            .First(m => (m.Header as string)?.Contains("Export") == true);
+
+        export.Open();
+        Harness.Settle(window);
+
+        Save(window, "export-menu");
     }
 }
