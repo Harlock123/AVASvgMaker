@@ -27,7 +27,7 @@ magick -size 1280x640 xc:'#0A0E18' \
   -font Adwaita-Sans -pointsize 30 -fill '#9BB0CC' -annotate +72+234 'A Visio-style diagram editor' \
   -fill '#0078D7' -draw "rectangle 72,272 152,276" \
   -font Adwaita-Sans -pointsize 21 -fill '#7B8FAC' \
-    -annotate +72+332 'Reads Visio .vsdx' \
+    -annotate +72+332 'Reads Visio .vsdx and Mermaid' \
     -annotate +72+366 'Exports SVG, PNG, PDF and Mermaid' \
     -annotate +72+400 '96 stencils, self-routing connectors, swimlanes' \
   -font Adwaita-Sans-Bold -pointsize 20 -fill '#0078D7' \

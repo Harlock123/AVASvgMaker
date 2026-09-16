@@ -15,6 +15,12 @@ writes has only ever been opened by our own importer. When someone confirms an e
 opens in Visio proper, this and the repository description both want strengthening - the
 README's "Not yet implemented" list carries the same note.
 
+**Mermaid goes both ways.** Say the app *reads* Mermaid as well as writing it, and say why it
+is unusual: Mermaid carries no positions, so reading one means working out the arrangement, not
+just parsing it. The pairing with `.vsdx` is the point - a diagram somebody else made, in
+either format, is one you can edit. This is newer than most of the claims here and is the one
+most likely to be left out of a blurb copied from an older release.
+
 **Numbers that are checked, not rounded.** 96 stencils. Six builds: Windows, macOS and Linux,
 x64 and arm64 each. MIT. Avalonia UI and .NET 9.
 
@@ -28,9 +34,12 @@ say.
 |---|---|---|
 | GitHub repository | Description, homepage, 19 topics, social preview card | v1.11.0 |
 | winget | Manifest written and validated - see [manifests/README.md](manifests/README.md) | v1.11.0 |
+| winget | First submission opened as [winget-pkgs#436000](https://github.com/microsoft/winget-pkgs/pull/436000) | v1.15.0 |
 
-The winget manifest still has to be opened as a pull request against `microsoft/winget-pkgs`
-by hand. Writing it and submitting it are different steps.
+Writing the manifest and submitting it are different steps, and the table above keeps them
+apart on purpose. The manifest has been written and kept current since v1.11.0; nothing was
+opened against `microsoft/winget-pkgs` until v1.15.0. A first submission is reviewed by a
+person as well as by their pipeline, and the CLA has to be signed on the pull request itself.
 
 ## Still to do
 
@@ -57,8 +66,8 @@ so say so - developer submissions are accepted, undeclared ones get pulled.
 
 **Short description**
 
-    An open source, offline diagram editor that opens Visio .vsdx files and exports SVG,
-    PNG, PDF and Mermaid.
+    An open source, offline diagram editor that opens Visio .vsdx files and Mermaid
+    flowcharts, and exports SVG, PNG, PDF and Mermaid.
 
 **Full description**
 
@@ -66,11 +75,12 @@ so say so - developer submissions are accepted, undeclared ones get pulled.
     from a toolbox of 96 stencils onto a page, label them, and join them with connectors
     that route themselves around whatever is in the way.
 
-    It opens Visio .vsdx drawings, and saves out as SVG, PNG, BMP, PDF, Mermaid and .vsdx.
-    Its own .avadiag format holds the things an exported picture cannot. Pages behave like
-    paper: several per document, each with its own size, margin, colour, watermark, header
-    and footer. Shapes can be grouped, rotated, gradient-filled, carry data fields, and be
-    arranged with smart guides, rulers, containers and swimlanes.
+    It opens Visio .vsdx drawings and Mermaid flowcharts, and saves out as SVG, PNG, BMP,
+    PDF, Mermaid and .vsdx. Its own .avadiag format holds the things an exported picture
+    cannot. Pages behave like paper: several per document, each with its own size, margin,
+    colour, watermark, header and footer. Shapes can be grouped, rotated, gradient-filled,
+    carry data fields, and be arranged with smart guides, rulers, containers, swimlanes, and
+    a layout pass that puts a tangle of connected shapes in order.
 
     It ships as a single self-contained executable - the runtime is inside the one file, so
     there is nothing to install and nothing to uninstall. It runs entirely offline, with no
@@ -100,20 +110,22 @@ alternatives do. If anything gets trimmed, not that.
 **Relation to the app** - Developer.
 
 **Screenshots to upload** - `Images/overview.png`, `Images/swimlanes.png`,
-`Images/mermaid-before-after.png`, `Images/visio-roundtrip.png`. Those four cover the
-distinctive claims rather than repeating the same view.
+`Images/mermaid-before-after.png`, `Images/mermaid-import.png`, `Images/visio-roundtrip.png`.
+Those five cover the distinctive claims rather than repeating the same view - the two Mermaid
+pictures are deliberately one each way round.
 
 ## Announcement blurb
 
-For an email, a forum post or a release note. Written for v1.11.0; the version number and the
-last paragraph are the parts that go stale.
+For an email, a forum post or a release note. Kept current to v1.15.0; the version number and
+the last paragraph are the parts that go stale.
 
 > **AVASvgMaker** is a Visio-style diagram editor I have been building - open source, MIT, and
 > running on Windows, macOS and Linux.
 >
 > You drag shapes from a toolbox of 96 stencils onto a page, label them, and join them with
 > connectors that route themselves around whatever is in the way. It opens Visio `.vsdx`
-> drawings, and exports SVG, PNG, BMP, PDF and Mermaid. Pages behave like paper - several per
+> drawings and Mermaid flowcharts, and exports SVG, PNG, BMP, PDF and Mermaid. Pages behave
+> like paper - several per
 > document, each with its own size, margin, colour, watermark, header and footer - and shapes
 > can be grouped, rotated, gradient-filled, given data fields, and arranged with smart guides,
 > containers and swimlanes.
