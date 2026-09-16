@@ -36,6 +36,11 @@ public static class GraphLayout
     private sealed class Node
     {
         public DiagramShape? Shape;
+
+        /// <summary>The container this belongs to, or null. Two nodes in the same one are
+        /// kept side by side, because a box has to be drawn round them afterwards.</summary>
+        public DiagramShape? Group;
+
         public int Layer;
         public int Order;
         public double Centre;
@@ -67,9 +72,10 @@ public static class GraphLayout
         LayoutFlow flow,
         Rect? within = null,
         double layerGap = 70,
-        double nodeGap = 40)
+        double nodeGap = 40,
+        double groupGap = 100)
     {
-        var laid = shapes.Where(shape => shape is not ConnectorShape).ToList();
+        var laid = shapes.Where(shape => shape is not ConnectorShape && !shape.IsContainer).ToList();
 
         if (laid.Count < 2)
             return false;
@@ -79,7 +85,7 @@ public static class GraphLayout
         for (var i = 0; i < laid.Count; i++)
             index[laid[i]] = i;
 
-        var nodes = laid.Select(shape => new Node { Shape = shape }).ToList();
+        var nodes = laid.Select(shape => new Node { Shape = shape, Group = shape.Container }).ToList();
 
         // Only the lines that join two shapes being laid out. A connector with a loose end, or
         // one reaching a shape that is staying put, has no say in the order of anything.
@@ -101,7 +107,7 @@ public static class GraphLayout
         var grid = Fill(nodes, edges, layers, flow, nodeGap);
 
         Order(nodes, grid);
-        Place(nodes, grid, flow, nodeGap);
+        Place(nodes, grid, flow, nodeGap, groupGap);
 
         return Move(laid, nodes, flow, layerGap, within);
     }
@@ -204,7 +210,11 @@ public static class GraphLayout
 
             while (step < nodes[to].Layer)
             {
-                var ghost = new Node { Layer = step };
+                var ghost = new Node
+                {
+                    Layer = step,
+                    Group = ReferenceEquals(nodes[from].Group, nodes[to].Group) ? nodes[from].Group : null
+                };
                 nodes.Add(ghost);
 
                 var id = nodes.Count - 1;
@@ -236,6 +246,14 @@ public static class GraphLayout
 
             for (var i = 0; i < layer.Count; i++)
                 nodes[layer[i]].Order = i;
+
+            // Clustered here as well as in the sweeps, because a drawing with nothing crossing
+            // in it never reaches the sweeps at all - and its containers still want drawing
+            // round something tidy.
+            Cluster(nodes, layer, id => nodes[id].Order);
+
+            for (var i = 0; i < layer.Count; i++)
+                nodes[layer[i]].Order = i;
         }
 
         return grid;
@@ -252,6 +270,13 @@ public static class GraphLayout
 
         return at + length > low + room ? low + room - length - at : 0;
     }
+
+    /// <summary>
+    /// How much room two neighbours want between them. More when they are not in the same
+    /// container, since a box will be drawn round each and the boxes need room of their own.
+    /// </summary>
+    private static double Gap(Node a, Node b, double nodeGap, double groupGap) =>
+        ReferenceEquals(a.Group, b.Group) ? nodeGap : groupGap;
 
     private static double Seed(Node node, LayoutFlow flow) =>
         node.Shape is null
@@ -315,11 +340,59 @@ public static class GraphLayout
                 : neighbours.Average(other => (double)nodes[other].Order);
         }
 
-        layer.Sort((a, b) =>
+        Cluster(nodes, layer, id => middle[id]);
+    }
+
+    /// <summary>
+    /// Puts a layer in the order of some measure, with the members of one container kept
+    /// together: each container is ordered as a block rather than a node at a time. Left to
+    /// sort themselves they scatter along the layer by whatever they happen to be joined to,
+    /// and the box drawn round them afterwards has to reach across everything in between.
+    /// </summary>
+    private static void Cluster(List<Node> nodes, List<int> layer, Func<int, double> measure)
+    {
+        var blocks = new List<(DiagramShape? Group, List<int> Members)>();
+        var byGroup = new Dictionary<DiagramShape, int>();
+
+        foreach (var id in layer)
         {
-            var by = middle[a].CompareTo(middle[b]);
-            return by != 0 ? by : nodes[a].Order.CompareTo(nodes[b].Order);
+            if (nodes[id].Group is not { } group)
+            {
+                blocks.Add((null, [id]));
+                continue;
+            }
+
+            if (byGroup.TryGetValue(group, out var at))
+            {
+                blocks[at].Members.Add(id);
+                continue;
+            }
+
+            byGroup[group] = blocks.Count;
+            blocks.Add((group, [id]));
+        }
+
+        foreach (var (_, members) in blocks)
+        {
+            members.Sort((a, b) =>
+            {
+                var by = measure(a).CompareTo(measure(b));
+                return by != 0 ? by : a.CompareTo(b);
+            });
+        }
+
+        var centre = blocks.ToDictionary(block => block, block => block.Members.Average(measure));
+
+        blocks.Sort((a, b) =>
+        {
+            var by = centre[a].CompareTo(centre[b]);
+            return by != 0 ? by : a.Members[0].CompareTo(b.Members[0]);
         });
+
+        layer.Clear();
+
+        foreach (var (_, members) in blocks)
+            layer.AddRange(members);
     }
 
     private static void Renumber(List<Node> nodes, List<List<int>> grid)
@@ -371,19 +444,26 @@ public static class GraphLayout
     /// clears the deepest shape in the one before it.
     /// </summary>
     private static void Place(
-        List<Node> nodes, List<List<int>> grid, LayoutFlow flow, double nodeGap)
+        List<Node> nodes, List<List<int>> grid, LayoutFlow flow, double nodeGap, double groupGap)
     {
         var lane = nodeGap / 2;
 
         foreach (var layer in grid)
         {
             var at = 0.0;
+            Node? behind = null;
 
             foreach (var id in layer)
             {
-                var half = nodes[id].Across(flow, lane) / 2;
-                nodes[id].Centre = at + half;
-                at += half * 2 + nodeGap;
+                var here = nodes[id];
+                var half = here.Across(flow, lane) / 2;
+
+                if (behind is not null)
+                    at += Gap(behind, here, nodeGap, groupGap);
+
+                here.Centre = at + half;
+                at += half * 2;
+                behind = here;
             }
         }
 
@@ -394,13 +474,14 @@ public static class GraphLayout
             for (var i = 0; i < grid.Count; i++)
             {
                 var at = down ? i : grid.Count - 1 - i;
-                Pull(nodes, grid[at], down, flow, nodeGap, lane);
+                Pull(nodes, grid[at], down, flow, nodeGap, groupGap, lane);
             }
         }
     }
 
     private static void Pull(
-        List<Node> nodes, List<int> layer, bool down, LayoutFlow flow, double nodeGap, double lane)
+        List<Node> nodes, List<int> layer, bool down, LayoutFlow flow,
+        double nodeGap, double groupGap, double lane)
     {
         foreach (var id in layer)
         {
@@ -418,7 +499,8 @@ public static class GraphLayout
         {
             var behind = nodes[layer[i - 1]];
             var here = nodes[layer[i]];
-            var least = behind.Centre + behind.Across(flow, lane) / 2 + nodeGap + here.Across(flow, lane) / 2;
+            var least = behind.Centre + behind.Across(flow, lane) / 2 +
+                        Gap(behind, here, nodeGap, groupGap) + here.Across(flow, lane) / 2;
 
             if (here.Centre < least)
                 here.Centre = least;

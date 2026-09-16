@@ -376,6 +376,9 @@ A few things worth knowing:
   do better than a layout pass could tell them to.
 - **A drawing that loops is still laid out.** The line that closes the loop is the one drawn
   against the flow, which is what a reader expects of a loop anyway.
+- **Shapes in a container are kept together.** Each container's members are laid out side by
+  side rather than scattered along a layer by whatever they happen to be joined to, so the box
+  drawn round them stays a box and not a band reaching across the page.
 - **Pools and lanes are left alone**, and so is anything inside one. Which lane a shape sits in
   is part of what the drawing says, and moving it to another lane would change the meaning
   rather than the look.
@@ -557,8 +560,8 @@ What comes across:
 - **The arrow says how the line is drawn.** `-->` gets an arrow, `---` gets none, `<-->` gets
   one at each end, `-.->` comes back dashed and `==>` comes back thick.
 - **Words on a line**, written either `-->|like this|` or `-- like this -->`.
-- **A subgraph becomes a container** drawn round whatever it holds, once the layout has
-  decided where that is.
+- **A subgraph becomes a container.** Its members are kept side by side while the page is
+  being laid out, and the box is drawn round them once they have places.
 - **`style` lines** set a shape's fill, line colour and line weight.
 
 Fences and `%%` comments are ignored, so a block copied whole out of a README works. A

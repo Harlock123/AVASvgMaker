@@ -64,6 +64,7 @@ public static class MermaidImporter
         var started = false;
 
         var shapes = new Dictionary<string, DiagramShape>();
+        var told = new HashSet<string>();
         var order = new List<DiagramShape>();
         var groups = new List<(string Label, List<DiagramShape> Inside)>();
         var open = new Stack<int>();
@@ -117,19 +118,24 @@ public static class MermaidImporter
                 continue;
             }
 
-            Wire(line, page, shapes, order, groups, open, Leave);
+            Wire(line, page, shapes, told, order, groups, open, Leave);
         }
 
         if (!started)
             Leave("everything - no \"flowchart\" or \"graph\" line was found");
 
-        // Nothing has a position yet, which is the whole difficulty with Mermaid, so the
-        // layout pass decides. Containers are sized round what they hold once that is done.
+        // The containers are made before the layout runs and sized after it. Made first
+        // because the layout keeps the members of one container together and has to be told
+        // which those are; sized after because a subgraph says which shapes belong together
+        // and nothing about where they are, so there is nothing to draw round until then.
+        var boxes = Make(page, groups);
+
         GraphLayout.Apply(
             order, page.Shapes.OfType<ConnectorShape>().ToList(), flow,
             new Rect(0, 0, width, height));
 
-        Enclose(page, groups);
+        Fit(boxes);
+        Centre(page, width, height);
 
         return new Result(page, notes
             .OrderByDescending(entry => entry.Value)
@@ -155,7 +161,7 @@ public static class MermaidImporter
     /// </summary>
     private static void Wire(
         string line, DiagramPage page,
-        Dictionary<string, DiagramShape> shapes, List<DiagramShape> order,
+        Dictionary<string, DiagramShape> shapes, HashSet<string> told, List<DiagramShape> order,
         List<(string Label, List<DiagramShape> Inside)> groups, Stack<int> open,
         Action<string> leave)
     {
@@ -168,7 +174,7 @@ public static class MermaidImporter
 
             if (at < 0)
             {
-                var last = Shape(rest, page, shapes, order, groups, open, leave);
+                var last = Shape(rest, page, shapes, told, order, groups, open, leave);
 
                 if (previous is not null && last is not null)
                     Join(page, previous, last, string.Empty, "--");
@@ -193,7 +199,7 @@ public static class MermaidImporter
                 }
             }
 
-            var from = previous ?? Shape(near, page, shapes, order, groups, open, leave);
+            var from = previous ?? Shape(near, page, shapes, told, order, groups, open, leave);
 
             // "a -- yes --> b": the words sit inside the arrow, so the near side of what looks
             // like a second arrow is really the label of the first.
@@ -209,7 +215,7 @@ public static class MermaidImporter
             }
 
             var (far, onward) = Split(after);
-            var shape = Shape(far, page, shapes, order, groups, open, leave);
+            var shape = Shape(far, page, shapes, told, order, groups, open, leave);
 
             if (shape is null)
                 return;
@@ -269,14 +275,19 @@ public static class MermaidImporter
     #region Nodes
 
     /// <summary>
-    /// The shape a name stands for, making it the first time the name is seen. A name used
-    /// again with no brackets is the same shape; used again with brackets it keeps the first
-    /// description, because Mermaid does the same and a drawing should not change under you
-    /// depending on which line is read last.
+    /// The shape a name stands for, making it the first time the name is seen.
+    ///
+    /// A name with no brackets after it is a reference and not a description: "a --> b" says
+    /// those two are joined and nothing about what they look like or say. So the first time a
+    /// name turns up *with* brackets is what describes it, whether that is where it was first
+    /// mentioned or five lines further down - which is how Mermaid is written, the lines
+    /// first and the nodes spelled out after being as common as the other way round. A second
+    /// description is ignored, so a drawing does not change under you depending on which line
+    /// is read last.
     /// </summary>
     private static DiagramShape? Shape(
         string text, DiagramPage page,
-        Dictionary<string, DiagramShape> shapes, List<DiagramShape> order,
+        Dictionary<string, DiagramShape> shapes, HashSet<string> told, List<DiagramShape> order,
         List<(string Label, List<DiagramShape> Inside)> groups, Stack<int> open,
         Action<string> leave)
     {
@@ -297,11 +308,31 @@ public static class MermaidImporter
         var body = named.Groups["body"].Value.Trim();
 
         if (shapes.TryGetValue(id, out var known))
+        {
+            // Named before, and now named again inside a subgraph. Mermaid is written both
+            // ways round - the lines first and the grouping after, or the other way - so a
+            // shape joins the subgraph it is listed in whenever that listing turns up.
+            if (open.Count > 0 && known.Container is null && !Grouped(groups, known))
+                groups[open.Peek()].Inside.Add(known);
+
+            // Mentioned before but never described, and described now.
+            if (body.Length > 0 && told.Add(id))
+            {
+                var (later, said) = Describe(body);
+
+                known.Text = said.Length == 0 ? id : said;
+                Redescribe(page, order, groups, known, later);
+            }
+
             return known;
+        }
 
         var (kind, words) = Describe(body);
         var shape = ShapeFactory.Create(kind, Room(words.Length == 0 ? id : words));
         shape.Text = words.Length == 0 ? id : words;
+
+        if (body.Length > 0)
+            told.Add(id);
 
         shapes[id] = shape;
         order.Add(shape);
@@ -312,6 +343,56 @@ public static class MermaidImporter
 
         return shape;
     }
+
+    /// <summary>
+    /// Gives a shape the outline its description asks for. A shape's kind is settled when it
+    /// is made, so this is a new shape wearing the old one's text and taking its place in
+    /// everything that refers to it - which at this point is the page, the running order, any
+    /// subgraph it is in, and the ends of the lines already drawn to it.
+    /// </summary>
+    private static void Redescribe(
+        DiagramPage page, List<DiagramShape> order,
+        List<(string Label, List<DiagramShape> Inside)> groups,
+        DiagramShape old, ShapeKind kind)
+    {
+        if (old.Kind == kind)
+        {
+            old.Bounds = Room(old.Text);
+            return;
+        }
+
+        var fresh = ShapeFactory.Create(kind, Room(old.Text));
+        fresh.Text = old.Text;
+        fresh.Fill = old.Fill;
+        fresh.Stroke = old.Stroke;
+        fresh.StrokeThickness = old.StrokeThickness;
+        fresh.Container = old.Container;
+
+        page.Shapes[page.Shapes.IndexOf(old)] = fresh;
+        order[order.IndexOf(old)] = fresh;
+
+        foreach (var group in groups)
+        {
+            var at = group.Inside.IndexOf(old);
+
+            if (at >= 0)
+                group.Inside[at] = fresh;
+        }
+
+        foreach (var line in page.Shapes.OfType<ConnectorShape>())
+        {
+            if (ReferenceEquals(line.StartShape, old))
+                line.StartShape = fresh;
+
+            if (ReferenceEquals(line.EndShape, old))
+                line.EndShape = fresh;
+        }
+    }
+
+    /// <summary>Whether a shape has already been listed in some subgraph.</summary>
+    private static bool Grouped(
+        List<(string Label, List<DiagramShape> Inside)> groups, DiagramShape shape) =>
+        groups.Any(group => group.Inside.Contains(shape));
 
     /// <summary>Room enough for the words, within reason.</summary>
     private static Rect Room(string text)
@@ -459,40 +540,76 @@ public static class MermaidImporter
 
     #region Containers
 
+    private const double Padding = 26;
+    private const double Band = 22;
+
     /// <summary>
-    /// Draws a box round each subgraph's members, once they have been given places. A subgraph
-    /// says which shapes belong together and nothing about where they are, so there is nothing
-    /// to draw until the layout has spoken.
+    /// Makes a box for each subgraph and tells its members they are in it, before anything has
+    /// a position. The box is put behind them, or it would be drawn over the top of them.
     /// </summary>
-    private static void Enclose(
+    private static List<(DiagramShape Box, List<DiagramShape> Inside)> Make(
         DiagramPage page, List<(string Label, List<DiagramShape> Inside)> groups)
     {
-        const double padding = 26;
-        const double title = 22;
+        var boxes = new List<(DiagramShape, List<DiagramShape>)>();
 
         foreach (var (label, inside) in groups)
         {
             if (inside.Count == 0)
                 continue;
 
-            var bounds = inside[0].Bounds;
-
-            foreach (var shape in inside)
-                bounds = bounds.Union(shape.Bounds);
-
-            var box = ShapeFactory.Create(ShapeKind.ContainerBox, new Rect(
-                bounds.X - padding,
-                bounds.Y - padding - title,
-                bounds.Width + padding * 2,
-                bounds.Height + padding * 2 + title));
-
+            var box = ShapeFactory.Create(ShapeKind.ContainerBox, new Rect(0, 0, 10, 10));
             box.Text = label;
 
             foreach (var shape in inside)
                 shape.Container = box;
 
-            // Behind what it holds, or it would be drawn over the top of it.
             page.Shapes.Insert(0, box);
+            boxes.Add((box, inside));
+        }
+
+        return boxes;
+    }
+
+    /// <summary>
+    /// Middles the drawing on the paper. Everything arrived without a position, so the layout
+    /// had nothing to put it back where it came from - it came from nowhere - and left it in
+    /// the top corner. A drawing that was pasted in should look placed, not dropped.
+    /// </summary>
+    private static void Centre(DiagramPage page, double width, double height)
+    {
+        if (page.Shapes.Count == 0)
+            return;
+
+        var all = page.Shapes[0].Bounds;
+
+        foreach (var shape in page.Shapes)
+            all = all.Union(shape.Bounds);
+
+        var shift = new Vector(
+            all.Width < width ? (width - all.Width) / 2 - all.X : Padding - all.X,
+            all.Height < height ? (height - all.Height) / 2 - all.Y : Padding - all.Y);
+
+        foreach (var shape in page.Shapes.Where(shape => shape is not ConnectorShape))
+            shape.Bounds = new Rect(
+                shape.Bounds.X + shift.X, shape.Bounds.Y + shift.Y,
+                shape.Bounds.Width, shape.Bounds.Height);
+    }
+
+    /// <summary>Draws each box round what it holds, now that its members have places.</summary>
+    private static void Fit(List<(DiagramShape Box, List<DiagramShape> Inside)> boxes)
+    {
+        foreach (var (box, inside) in boxes)
+        {
+            var bounds = inside[0].Bounds;
+
+            foreach (var shape in inside)
+                bounds = bounds.Union(shape.Bounds);
+
+            box.Bounds = new Rect(
+                bounds.X - Padding,
+                bounds.Y - Padding - Band,
+                bounds.Width + Padding * 2,
+                bounds.Height + Padding * 2 + Band);
         }
     }
 

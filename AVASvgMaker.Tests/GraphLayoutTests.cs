@@ -248,6 +248,76 @@ public class GraphLayoutTests
         Assert.True(block.Bottom <= 600.01, $"the bottom runs to {block.Bottom:0.0}");
     }
 
+    /// <summary>
+    /// Shapes in one container come out side by side, even when what they are joined to would
+    /// have interleaved them with another container's. A box has to be drawn round each
+    /// afterwards, and members scattered along the layer would need one reaching across
+    /// everything in between.
+    /// </summary>
+    [AvaloniaFact]
+    public void ContainersAreKeptTogether()
+    {
+        var document = Harness.Page(1400, 900);
+
+        var hub = Box(document, 600, 60, "hub");
+
+        var one = Harness.Box(document, new Rect(0, 0, 200, 80), "one", ShapeKind.ContainerBox);
+        var two = Harness.Box(document, new Rect(0, 0, 200, 80), "two", ShapeKind.ContainerBox);
+
+        // Laid out interleaved, so the starting order alone would mix them up.
+        var a1 = Box(document, 100, 300, "a1");
+        var b1 = Box(document, 300, 300, "b1");
+        var a2 = Box(document, 500, 300, "a2");
+        var b2 = Box(document, 700, 300, "b2");
+
+        a1.Container = one;
+        a2.Container = one;
+        b1.Container = two;
+        b2.Container = two;
+
+        foreach (var shape in new[] { a1, b1, a2, b2 })
+            Harness.Join(document, hub, 2, shape, 0);
+
+        Assert.True(Lay(document));
+
+        var ones = new[] { a1, a2 }.Select(s => s.Bounds.Center.X).ToList();
+        var twos = new[] { b1, b2 }.Select(s => s.Bounds.Center.X).ToList();
+
+        // The two runs do not interleave: one is wholly to one side of the other.
+        var apart = ones.Max() < twos.Min() || twos.Max() < ones.Min();
+
+        Assert.True(apart,
+            $"one at [{string.Join(", ", ones.Select(x => x.ToString("0")))}] " +
+            $"and two at [{string.Join(", ", twos.Select(x => x.ToString("0")))}] are mixed up");
+
+        // And there is more room between the groups than within either, so a box will fit.
+        var within = Math.Abs(ones[0] - ones[1]);
+        var between = Math.Min(
+            Math.Abs(ones.Max() - twos.Min()),
+            Math.Abs(twos.Max() - ones.Min()));
+
+        Assert.True(between > within, $"between {between:0} is no more than within {within:0}");
+    }
+
+    /// <summary>The containers themselves are drawn round the result, not laid out as shapes.</summary>
+    [AvaloniaFact]
+    public void AContainerIsNotItselfLaidOut()
+    {
+        var document = Harness.Page(1000, 800);
+
+        var box = Harness.Box(document, new Rect(11, 13, 200, 80), "box", ShapeKind.ContainerBox);
+        var a = Box(document, 100, 300, "a");
+        var b = Box(document, 300, 300, "b");
+
+        a.Container = box;
+        b.Container = box;
+
+        Harness.Join(document, a, 2, b, 0);
+
+        Assert.True(Lay(document));
+        Assert.Equal(new Rect(11, 13, 200, 80), box.Bounds);
+    }
+
     [AvaloniaFact]
     public void OneShapeIsNothingToArrange()
     {

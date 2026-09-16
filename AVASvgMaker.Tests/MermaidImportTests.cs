@@ -239,6 +239,43 @@ public class MermaidImportTests
         Assert.Equal(3, painted.StrokeThickness);
     }
 
+    /// <summary>Two subgraphs come back as two boxes that do not sit on top of one another.</summary>
+    [AvaloniaFact]
+    public void TwoSubgraphsGetTwoBoxesThatDoNotOverlap()
+    {
+        var page = MermaidImporter.Read("""
+            flowchart TD
+                hub[Hub] --> a1
+                hub --> b1
+                hub --> a2
+                hub --> b2
+                subgraph one["One"]
+                    a1[A1]
+                    a2[A2]
+                end
+                subgraph two["Two"]
+                    b1[B1]
+                    b2[B2]
+                end
+            """, 1200, 800).Page;
+
+        var boxes = page.Shapes.Where(shape => shape.IsContainer).ToList();
+
+        Assert.Equal(2, boxes.Count);
+        Assert.False(boxes[0].Bounds.Intersects(boxes[1].Bounds),
+            $"{boxes[0].Text} at {boxes[0].Bounds} overlaps {boxes[1].Text} at {boxes[1].Bounds}");
+
+        // Each holds its own and nobody else's.
+        foreach (var box in boxes)
+        {
+            foreach (var shape in Boxes(page).Where(s => ReferenceEquals(s.Container, box)))
+                Assert.True(box.Bounds.Contains(shape.Bounds), $"{box.Text} does not hold {shape.Text}");
+
+            foreach (var shape in Boxes(page).Where(s => !ReferenceEquals(s.Container, box)))
+                Assert.False(box.Bounds.Intersects(shape.Bounds), $"{box.Text} covers {shape.Text}");
+        }
+    }
+
     [AvaloniaFact]
     public void SomethingThatIsNotAFlowchartSaysSo()
     {

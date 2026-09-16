@@ -76,7 +76,7 @@ Or [build it yourself](#building).
 - **Undo and redo** - 100 steps, restoring the selection along with the page
 - **Copy, paste and duplicate** - copies carry as the same JSON the file format uses, so shapes paste into another instance of the app
 - **Align, distribute and match size** - line a selection up on any edge, space it evenly, or size it to the shape selected last
-- **Lay out** - arranges shapes in layers by the connectors between them, down the page or across it: everything a shape points at moves one layer on, and the shapes in each layer are shuffled to pull crossing lines apart. One undo step, and the connectors route themselves over the result
+- **Lay out** - arranges shapes in layers by the connectors between them, down the page or across it: everything a shape points at moves one layer on, and the shapes in each layer are shuffled to pull crossing lines apart. Shapes in a container are kept side by side, so the box round them stays a box. One undo step, and the connectors route themselves over the result
 - **Drawing order** - bring to front, forward, backward, send to back, for one shape or a group
 - **Shape formatting** - fill and line colour, line style and weight, and for text the colour, size, font, bold, italic and alignment, applied to the whole selection from a properties panel
 - **Fades** - any shape, and the paper itself, can run from one colour to another in any of five directions
@@ -276,8 +276,8 @@ flowchart TD
 Mermaid carries no positions at all, so the shapes are laid out on arrival by the same pass
 **Arrange -> Lay out** uses - which is why this could not be written until there was one. The
 brackets round a label choose the shape, the arrow says how the line is drawn, words on a line
-come across either way of writing them, a subgraph becomes a container drawn round what it
-holds, and `style` lines set the paint. Fences and `%%` comments are ignored, so a block copied
+come across either way of writing them, a subgraph becomes a container - its members kept together while the page is laid
+out - and `style` lines set the paint. Fences and `%%` comments are ignored, so a block copied
 whole out of a README works.
 
 ## Importing SVG
