@@ -106,9 +106,24 @@ connection points sticks to it just the same, which matters for shapes whose out
 inside the box around them - a diamond, an ellipse, a triangle. Drop an end well clear of
 everything and it stays loose, as it should.
 
-**Route** in the toolbar chooses between a straight line and a right-angled one. A right-angled
-connector keeps clear of the shapes in its way, and of the other connectors, and re-routes
-itself whenever anything it depends on moves.
+**Route** in the toolbar chooses how a connector gets from one end to the other, and each
+connector is set on its own:
+
+| Route | What you get |
+|---|---|
+| Straight | A single line from one end to the other, whatever is in the way |
+| Right-angle | Runs across and down that keep clear of the shapes in their way and of the other connectors, re-routing whenever anything they depend on moves |
+| Curved | The same route, drawn with its corners rounded off |
+
+**Curved is a way of drawing a route, not a way of finding one.** A curved connector is routed
+exactly as a right-angled one is - the same clearances, the same glue, the same bends if you
+have placed any - and only the turns between the runs are drawn differently. Anything a
+right-angled connector would keep out of, a curved one keeps out of too.
+
+A corner takes up to ten units of each run it joins, or half the run where the run is shorter
+than that, so a tight staircase of short runs stays legible instead of curling up into itself.
+The curves are curves in the exported file as well, not a lot of short straight lines: SVG gets
+a quadratic, and so do PDF, the pictures and Visio.
 
 ![Connectors going different ways round](Images/routing.png)
 
@@ -154,8 +169,8 @@ across that line, they go - a few units is enough, because the run that met the 
 no longer does. Turning a shape swings its connection points round with it, which is enough on
 its own.
 
-This is for right-angled connectors. A straight connector keeps whatever bends you give it,
-since there is no route for it to fall back on.
+This is for connectors that are routed - right-angle and curved alike. A straight connector
+keeps whatever bends you give it, since there is no route for it to fall back on.
 
 ### Labelling a connector
 

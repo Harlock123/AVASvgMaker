@@ -7,5 +7,12 @@ public enum ConnectorRouting
     Straight,
 
     /// <summary>Right-angled segments that keep clear of the shapes on the page.</summary>
-    Orthogonal
+    Orthogonal,
+
+    /// <summary>
+    /// The same route, drawn with its corners rounded off. Routed exactly as an orthogonal
+    /// connector is - it keeps the same clearances, glue and hand-placed bends - and differs
+    /// only in how the turns between its runs are drawn.
+    /// </summary>
+    Curved
 }

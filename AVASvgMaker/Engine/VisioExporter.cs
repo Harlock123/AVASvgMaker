@@ -338,12 +338,24 @@ public static class VisioExporter
 
         var outline = new StringBuilder();
 
-        for (var i = 0; i < route.Count; i++)
+        string Fraction(Point at)
         {
-            var u = box.Width <= 0 ? 0 : (route[i].X - box.X) / box.Width;
-            var v = box.Height <= 0 ? 0 : (route[i].Y - box.Y) / box.Height;
+            var u = box.Width <= 0 ? 0 : (at.X - box.X) / box.Width;
+            var v = box.Height <= 0 ? 0 : (at.Y - box.Y) / box.Height;
 
-            outline.Append($"{(i == 0 ? 'M' : 'L')} {Number(u)},{Number(v)} ");
+            return $"{Number(u)},{Number(v)}";
+        }
+
+        var pieces = line.Pieces().ToList();
+        outline.Append($"M {Fraction(pieces.Count > 0 ? pieces[0].From : first)} ");
+
+        // A curved connector's turns go out as quadratics, which the geometry writer below
+        // turns into the cubic rows Visio wants. A right-angled one has no turns and is all L.
+        foreach (var piece in pieces)
+        {
+            outline.Append(piece.Control is { } through
+                ? $"Q {Fraction(through)} {Fraction(piece.To)} "
+                : $"L {Fraction(piece.To)} ");
         }
 
         var cells =

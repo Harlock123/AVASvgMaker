@@ -244,6 +244,7 @@
                                   SelectionChanged="OnConnectorStyleChanged">
                             <ComboBoxItem Tag="Straight">Straight</ComboBoxItem>
                             <ComboBoxItem Tag="Orthogonal">Right-angle</ComboBoxItem>
+                            <ComboBoxItem Tag="Curved">Curved</ComboBoxItem>
                         </ComboBox>
 
                         <TextBlock Classes="label" Text="Weight" Margin="6,0,4,0" />

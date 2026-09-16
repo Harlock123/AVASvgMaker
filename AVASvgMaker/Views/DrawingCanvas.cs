@@ -2097,8 +2097,7 @@ public class DrawingCanvas : Decorator
         if (ActiveConnectorHandle(connector) is not { Kind: HandleKind.Corner } handle)
             return;
 
-        connector.MoveBend(handle.Index, Grid.Snap(pagePoint),
-            connector.Routing == ConnectorRouting.Orthogonal);
+        connector.MoveBend(handle.Index, Grid.Snap(pagePoint), connector.IsRightAngled);
 
         _bendDoomed = IsRedundantBend(connector);
         _dragChanged = true;

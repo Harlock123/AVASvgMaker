@@ -12,9 +12,18 @@ namespace AVASvgMaker.Models;
 /// tracks the shape's centre and is clipped to its edge, so the line follows the shape as
 /// it is moved or resized.
 /// </summary>
+/// <summary>
+/// A piece of a connector as it is drawn: a straight run, or a turn between two of them.
+/// <paramref name="Control"/> is the corner the turn was cut from, and is null for a run.
+/// </summary>
+public readonly record struct ConnectorPiece(Point From, Point To, Point? Control);
+
 public class ConnectorShape : DiagramShape
 {
     private const double CapLength = 12;
+
+    /// <summary>How much of each run a rounded corner takes, before it is clamped to fit.</summary>
+    private const double CornerRadius = 10;
     private const double CapHalfWidth = 5;
     private const double DotRadius = 4;
 
@@ -46,6 +55,12 @@ public class ConnectorShape : DiagramShape
 
     /// <summary>Straight by default, so documents written before routing existed look the same.</summary>
     public ConnectorRouting Routing { get; set; } = ConnectorRouting.Straight;
+
+    /// <summary>
+    /// Whether the line is made of runs across and down. True of a curved connector as well as
+    /// a right-angled one: the route is the same, and only the turns are drawn differently.
+    /// </summary>
+    public bool IsRightAngled => Routing != ConnectorRouting.Straight;
 
     /// <summary>The routed polyline, refreshed by <see cref="UpdateRoute"/>.</summary>
     private IReadOnlyList<Point> _route = [];
@@ -756,8 +771,13 @@ public class ConnectorShape : DiagramShape
         if (pen is Pen concrete)
             concrete.LineJoin = PenLineJoin.Round;
 
-        foreach (var (from, to) in VisibleSegments(path))
-            context.DrawLine(pen, from, to);
+        foreach (var piece in VisiblePieces(path))
+        {
+            if (piece.Control is { } through)
+                context.DrawGeometry(null, pen, Turn(piece.From, through, piece.To));
+            else
+                context.DrawLine(pen, piece.From, piece.To);
+        }
 
         RenderCap(context, StartCap, ResolvedStart, -sx, -sy, pen);
         RenderCap(context, EndCap, ResolvedEnd, ex, ey, pen);
@@ -847,19 +867,104 @@ public class ConnectorShape : DiagramShape
     }
 
     /// <summary>
-    /// The line as drawn: the route, with a gap cut out of it where the label sits. Cutting a
-    /// gap rather than painting a panel behind the words means the label reads over whatever
-    /// is behind it - a coloured lane, another shape - instead of punching a white hole in it.
+    /// The route broken into the pieces it is drawn from. A straight or right-angled connector
+    /// is all runs and turns square; a curved one has the end of each run pulled back and a
+    /// turn put in the gap.
+    ///
+    /// The turn is a quadratic through the corner it replaces, which is what every one of the
+    /// four places this is drawn already knows how to write - the screen, the PDF and pictures
+    /// behind it, SVG, and Visio, whose exporter turns a quadratic into the cubic it wants.
     /// </summary>
-    private IEnumerable<(Point From, Point To)> VisibleSegments(IReadOnlyList<Point> path)
+    public IEnumerable<ConnectorPiece> Pieces() => Pieces(Path);
+
+    private IEnumerable<ConnectorPiece> Pieces(IReadOnlyList<Point> path)
+    {
+        if (Routing != ConnectorRouting.Curved || path.Count < 3)
+        {
+            for (var i = 0; i + 1 < path.Count; i++)
+                yield return new ConnectorPiece(path[i], path[i + 1], null);
+
+            yield break;
+        }
+
+        var cursor = path[0];
+
+        for (var i = 1; i + 1 < path.Count; i++)
+        {
+            var corner = path[i];
+            var next = path[i + 1];
+
+            // Half of each run at most, so two corners sharing one run meet in the middle
+            // rather than overrunning each other and doubling the line back.
+            var radius = Math.Min(
+                CornerRadius,
+                Math.Min(Distance(cursor, corner), Distance(corner, next)) / 2);
+
+            if (radius < 0.5)
+            {
+                yield return new ConnectorPiece(cursor, corner, null);
+                cursor = corner;
+                continue;
+            }
+
+            var entry = Along(corner, cursor, radius);
+            var exit = Along(corner, next, radius);
+
+            if (Distance(cursor, entry) > 0.01)
+                yield return new ConnectorPiece(cursor, entry, null);
+
+            yield return new ConnectorPiece(entry, exit, corner);
+            cursor = exit;
+        }
+
+        yield return new ConnectorPiece(cursor, path[^1], null);
+    }
+
+    /// <summary>The point the given distance from <paramref name="from"/> along the way to another.</summary>
+    private static Point Along(Point from, Point toward, double distance)
+    {
+        var length = Distance(from, toward);
+
+        if (length < 1e-9)
+            return from;
+
+        var t = distance / length;
+        return new Point(from.X + (toward.X - from.X) * t, from.Y + (toward.Y - from.Y) * t);
+    }
+
+    /// <summary>
+    /// The pieces with the label's gap taken out of the runs. A turn is drawn whole: the label
+    /// sits in the middle of the longest run, which is by definition not where a turn is.
+    /// </summary>
+    private IEnumerable<ConnectorPiece> VisiblePieces(IReadOnlyList<Point> path)
     {
         var gap = string.IsNullOrWhiteSpace(Text) ? default : TextArea;
 
-        for (var i = 0; i < path.Count - 1; i++)
+        foreach (var piece in Pieces(path))
         {
-            foreach (var piece in Outside(path[i], path[i + 1], gap))
+            if (piece.Control is not null)
+            {
                 yield return piece;
+                continue;
+            }
+
+            foreach (var (from, to) in Outside(piece.From, piece.To, gap))
+                yield return new ConnectorPiece(from, to, null);
         }
+    }
+
+    private static Geometry Turn(Point from, Point through, Point to)
+    {
+        var geometry = new StreamGeometry();
+
+        using (var context = geometry.Open())
+        {
+            context.BeginFigure(from, false);
+            context.QuadraticBezierTo(through, to);
+            context.EndFigure(false);
+        }
+
+        return geometry;
     }
 
     /// <summary>The parts of a segment that lie outside the rectangle, in order along it.</summary>
@@ -1123,9 +1228,17 @@ public class ConnectorShape : DiagramShape
 
         // Written as the same pieces the editor draws, so the gap the label sits in is in the
         // exported file too rather than only on screen.
-        foreach (var (from, to) in VisibleSegments(path))
-            sb.Append($"<line x1=\"{Num(from.X)}\" y1=\"{Num(from.Y)}\" " +
-                      $"x2=\"{Num(to.X)}\" y2=\"{Num(to.Y)}\" {stroke} stroke-linecap=\"butt\" />");
+        foreach (var piece in VisiblePieces(path))
+        {
+            var (from, to) = (piece.From, piece.To);
+
+            sb.Append(piece.Control is { } through
+                ? $"<path d=\"M {Num(from.X)},{Num(from.Y)} " +
+                  $"Q {Num(through.X)},{Num(through.Y)} {Num(to.X)},{Num(to.Y)}\" " +
+                  $"fill=\"none\" {stroke} stroke-linecap=\"butt\" />"
+                : $"<line x1=\"{Num(from.X)}\" y1=\"{Num(from.Y)}\" " +
+                  $"x2=\"{Num(to.X)}\" y2=\"{Num(to.Y)}\" {stroke} stroke-linecap=\"butt\" />");
+        }
 
         sb.Append(SvgCap(StartCap, ResolvedStart, -sx, -sy, stroke));
         sb.Append(SvgCap(EndCap, ResolvedEnd, ex, ey, stroke));
