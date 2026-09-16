@@ -371,6 +371,15 @@ public partial class MainWindow : Window
             StatusText.Text = "Select two or more shapes to line up";
     }
 
+    private void OnLayOutClick(object? sender, RoutedEventArgs e)
+    {
+        if (TagOf<LayoutFlow>(sender) is not { } flow)
+            return;
+
+        if (!Canvas.LayOut(flow))
+            StatusText.Text = "Nothing to lay out - join some shapes up with connectors first";
+    }
+
     private void OnDistributeClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: string tag })

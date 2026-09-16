@@ -9,6 +9,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using AVASvgMaker.Engine;
 using AVASvgMaker.Models;
 using Xunit;
 
@@ -70,11 +71,15 @@ public class Screenshots
     }
 
     private static DiagramShape Put(
-        Views.DrawingCanvas canvas, ShapeKind kind, Rect at, string text = "")
+        Views.DrawingCanvas canvas, ShapeKind kind, Rect at, string text = "") =>
+        Put(canvas.Document, kind, at, text);
+
+    private static DiagramShape Put(
+        DiagramDocument document, ShapeKind kind, Rect at, string text = "")
     {
         var shape = ShapeFactory.Create(kind, at);
         shape.Text = text;
-        canvas.Document.Add(shape);
+        document.Add(shape);
         return shape;
     }
 
@@ -226,5 +231,54 @@ public class Screenshots
         Harness.Settle(window);
 
         Save(window, "export-menu");
+    }
+
+    /// <summary>A drawing before and after it is laid out, as two pictures of the page.</summary>
+    [AvaloniaFact]
+    public void LayOut()
+    {
+        if (!Asked) return;
+
+        DiagramDocument Tangle()
+        {
+            var page = Harness.Page(700, 700);
+
+            var start = Put(page, ShapeKind.RoundedRectangle, new Rect(470, 60, 130, 50), "Ticket in");
+            var triage = Put(page, ShapeKind.Rectangle, new Rect(80, 420, 130, 60), "Triage");
+            var bug = Put(page, ShapeKind.Diamond, new Rect(500, 290, 140, 70), "Bug?");
+            var fix = Put(page, ShapeKind.Rectangle, new Rect(50, 110, 120, 50), "Fix it");
+            var doc = Put(page, ShapeKind.Rectangle, new Rect(300, 460, 130, 50), "Document");
+            var test = Put(page, ShapeKind.Rectangle, new Rect(530, 175, 120, 50), "Test");
+            var close = Put(page, ShapeKind.RoundedRectangle, new Rect(230, 230, 120, 50), "Close");
+
+            foreach (var (from, to) in new[]
+                     { (start, triage), (triage, bug), (bug, fix), (bug, doc),
+                       (fix, test), (doc, test), (test, close) })
+            {
+                var line = Harness.Join(page, from, 2, to, 0);
+                line.EndCap = EndCapStyle.Arrow;
+            }
+
+            return page;
+        }
+
+        void Paper(DiagramDocument page, string name)
+        {
+            page.RouteConnectors();
+
+            using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, name + ".png")));
+            RasterExporter.Export(page, file, 2, RasterFormat.Png);
+        }
+
+        Paper(Tangle(), "lay-out-before");
+
+        var tidy = Tangle();
+        GraphLayout.Apply(
+            tidy.Shapes.Where(shape => shape is not ConnectorShape).ToList(),
+            tidy.Shapes.OfType<ConnectorShape>().ToList(),
+            LayoutFlow.Down,
+            new Rect(0, 0, tidy.PageWidth, tidy.PageHeight));
+
+        Paper(tidy, "lay-out-after");
     }
 }

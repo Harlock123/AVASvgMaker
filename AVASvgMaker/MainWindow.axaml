@@ -135,6 +135,11 @@
                     <MenuItem Header="_Both" Tag="Both" Click="OnMatchSizeClick" />
                 </MenuItem>
                 <Separator />
+                <MenuItem Header="Lay _out">
+                    <MenuItem Header="_Down the page" Tag="Down" Click="OnLayOutClick" />
+                    <MenuItem Header="_Across the page" Tag="Right" Click="OnLayOutClick" />
+                </MenuItem>
+                <Separator />
                 <MenuItem Header="Bring to _front" InputGesture="Ctrl+Shift+F" Tag="Front"
                           Click="OnOrderClick" />
                 <MenuItem Header="Bring f_orward" InputGesture="Ctrl+OemCloseBrackets" Tag="Forward"

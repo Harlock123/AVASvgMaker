@@ -2931,6 +2931,31 @@ public class DrawingCanvas : Decorator
                Edit(() => ShapeArranger.MatchSize(Arrangeable(), reference, match));
     }
 
+    /// <summary>
+    /// Lays the drawing out in layers by the connectors between its shapes. The selection if
+    /// there is one to speak of, otherwise the whole page - tidying one drawing is the usual
+    /// want, and selecting all of it first would be a chore.
+    ///
+    /// Shapes in a pool or a lane are left where they are, and so are the pools and lanes
+    /// themselves: which lane a shape sits in is what the drawing says about it, and a layout
+    /// pass that moved it to another lane would be changing the meaning rather than the look.
+    /// </summary>
+    public bool LayOut(LayoutFlow flow)
+    {
+        var chosen = Arrangeable();
+
+        var shapes = (chosen.Count >= 2 ? chosen : Document.Shapes.ToList())
+            .Where(shape => shape is not ConnectorShape and not ContainerShape)
+            .Where(shape => Document.ContainerFor(shape) is null)
+            .ToList();
+
+        var links = Document.Shapes.OfType<ConnectorShape>().ToList();
+
+        var page = new Rect(0, 0, Document.PageWidth, Document.PageHeight);
+
+        return Edit(() => GraphLayout.Apply(shapes, links, flow, page));
+    }
+
     public bool ChangeOrder(ZOrder order) =>
         Edit(() => ShapeArranger.Reorder(Document.Shapes, Document.Selection.ToList(), order));
 

@@ -352,6 +352,35 @@ The **Arrange** menu works on a selection:
 - **Bring to front**, **Bring forward**, **Send backward** and **Send to back** change what is
   drawn over what.
 - **Rotate left**, **Rotate right** and **Straighten** turn shapes in right angles.
+- **Lay out** arranges shapes in layers by the connectors between them, down the page or
+  across it.
+
+### Laying a drawing out
+
+**Arrange -> Lay out** takes a drawing that has grown in whatever order you thought of things
+and puts it in order. Everything a shape points at moves one layer further along, the layers
+are spread out along the flow, and the shapes within each layer are shuffled to pull crossing
+lines apart.
+
+![A drawing before it is laid out](Images/lay-out-before.png)
+
+![The same drawing after](Images/lay-out-after.png)
+
+It works on the selection when there is one worth speaking of, and on the whole page when
+there is not - tidying one drawing is the usual want, and selecting all of it first would be a
+chore. It is one step on the undo history, so `Ctrl+Z` puts the sprawl back if you preferred it.
+
+A few things worth knowing:
+
+- **Only the shapes move.** The connectors are left to route themselves afterwards, which they
+  do better than a layout pass could tell them to.
+- **A drawing that loops is still laid out.** The line that closes the loop is the one drawn
+  against the flow, which is what a reader expects of a loop anyway.
+- **Pools and lanes are left alone**, and so is anything inside one. Which lane a shape sits in
+  is part of what the drawing says, and moving it to another lane would change the meaning
+  rather than the look.
+- **The drawing stays where it was**, as near as it can. Laid out, a drawing is usually taller
+  than the sprawl it came from, so it is slid back onto the paper where there is room for it.
 
 ![Turned shapes](Images/rotation.png)
 
