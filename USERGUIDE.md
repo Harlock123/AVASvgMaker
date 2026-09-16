@@ -23,7 +23,8 @@ drawing to someone else.
 
 Down the left is the **toolbox**, holding every shape you can draw, in categories that fold
 away, with a search box at the top. Down the right is the **properties panel**, which formats
-whatever is selected. In the middle is the **page**, floating on a workspace, with **rulers**
+whatever is selected and shows the settings that apply to it - a shape gets FILL, a connector
+gets CONNECTOR with its route and its line ends, and both get LINE and TEXT. In the middle is the **page**, floating on a workspace, with **rulers**
 along the top and left edge and **page tabs** along the bottom once a document has more than
 one page. The **status bar** at the foot tells you what is selected and what a drag is about
 to do.
@@ -106,8 +107,8 @@ connection points sticks to it just the same, which matters for shapes whose out
 inside the box around them - a diamond, an ellipse, a triangle. Drop an end well clear of
 everything and it stays loose, as it should.
 
-**Route** in the toolbar chooses how a connector gets from one end to the other, and each
-connector is set on its own:
+**Route**, in the CONNECTOR section of the properties panel, chooses how a connector gets from
+one end to the other, and each connector is set on its own:
 
 | Route | What you get |
 |---|---|
@@ -186,7 +187,8 @@ route** puts it back.
 
 ### Line ends
 
-The **Start** and **End** pickers in the toolbar set what each end of a connector looks like:
+The **Start** and **End** pickers, in the CONNECTOR section of the properties panel, set what
+each end of a connector looks like:
 none, an arrow, an open arrow or a dot for ordinary use; a diamond, hollow diamond or hollow
 arrow for UML; and the crow's foot family for entity-relationship diagrams. What you choose
 becomes the default for the next connector you draw.

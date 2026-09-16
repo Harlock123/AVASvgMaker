@@ -97,6 +97,7 @@ Or [build it yourself](#building).
 **Fitting in**
 
 - **Zoom and pan** - 25% to 400%, `Ctrl`+wheel about the pointer, fit-to-page, middle-drag or space-drag to pan
+- **A properties panel that follows the work** - the settings on show are the ones that apply to what is selected, or to what the tool in hand is about to draw: a shape gets fill, a connector gets its route and its line ends, and both get line and text
 - **Collapsible panels** - fold the shapes and properties panels out of the way to give the page the whole window
 - **Thirteen themes** - Dark, Light, Solarized, Nord, Gruvbox, Dracula, Tokyo Night, Catppuccin and a high-contrast pair, chosen in **Edit -> Preferences**, previewed as you move down the list
 - **Or follows the desktop** - on Omarchy the app takes the whole palette from the current theme and re-colours the moment you switch; on Windows and macOS it follows light and dark. A bare Wayland or X11 session says nothing, which is what naming a theme is for

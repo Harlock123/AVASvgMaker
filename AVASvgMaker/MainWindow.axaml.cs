@@ -522,7 +522,12 @@ public partial class MainWindow : Window
         if (Canvas is null || _syncing)
             return;
 
-        Canvas.SetStrokeThickness(SelectedNumber(LineWeightBox, 2));
+        var weight = SelectedNumber(LineWeightBox, 2);
+
+        // The same number in both places: it is this shape's weight, and the weight the next
+        // connector will be drawn with. The toolbar used to carry a second box for the latter.
+        Canvas.DefaultLineWidth = weight;
+        Canvas.SetStrokeThickness(weight);
     }
 
     private void OnTextPicked(Color colour) => Canvas.SetTextColor(colour);
@@ -621,12 +626,17 @@ public partial class MainWindow : Window
         var wasSyncing = _syncing;
         _syncing = true;
 
+        var arming = selection.Count == 0 && Canvas.Tool == EditorTool.Connector;
+
         PropertiesHint.Text = selection.Count switch
         {
+            0 when arming => "Connector tool - changes set the style for the next connector.",
             0 => "Nothing selected - changes set the formatting for the next shape.",
             1 => $"{ShapeFactory.DisplayName(Canvas.Document.Selected!.Kind)} selected.",
             _ => $"{selection.Count} shapes selected."
         };
+
+        ShowSections(selection, arming);
 
         var fillMixed = Differs(selection, s => s.Fill);
         FillPicker.IsMixed = fillMixed;
@@ -682,6 +692,22 @@ public partial class MainWindow : Window
         AlignBottomToggle.IsChecked = !downMixed && down == TextVerticalAlign.Bottom;
 
         _syncing = wasSyncing;
+    }
+
+    /// <summary>
+    /// Which parts of the panel are on show. A connector has no fill and a shape has no line
+    /// ends, so the panel offers what is actually in hand rather than everything at once - and
+    /// with the connector tool up it offers the connector settings before there is one to
+    /// select, which is when they are wanted.
+    ///
+    /// A selection holding both gets both, because both are being formatted.
+    /// </summary>
+    private void ShowSections(IReadOnlyList<DiagramShape> selection, bool arming)
+    {
+        var connectors = selection.Count(shape => shape is ConnectorShape);
+
+        ConnectorSection.IsVisible = connectors > 0 || arming;
+        FillSection.IsVisible = selection.Count - connectors > 0 || (selection.Count == 0 && !arming);
     }
 
     /// <summary>True when the selected shapes do not all share one value.</summary>
@@ -1092,6 +1118,7 @@ public partial class MainWindow : Window
             Toolbox.Arm(null);
 
         SyncToolButtons(tool);
+        SyncProperties();
         Canvas.ReportStatus();
         Canvas.Focus();
     }
@@ -1114,14 +1141,9 @@ public partial class MainWindow : Window
 
         Canvas.DefaultStartCap = SelectedCap(StartCapBox);
         Canvas.DefaultEndCap = SelectedCap(EndCapBox);
-        Canvas.DefaultLineWidth = SelectedNumber(WeightBox, 2);
         Canvas.DefaultRouting = SelectedRouting(RoutingBox);
 
         Canvas.ApplyConnectorStyle();
-
-        // Weight is shape formatting; both this box and the panel's go through one path.
-        Canvas.SetStrokeThickness(Canvas.DefaultLineWidth);
-
         Canvas.ReportStatus();
     }
 
@@ -1137,7 +1159,6 @@ public partial class MainWindow : Window
 
         SelectByTag(StartCapBox, connector.StartCap.ToString());
         SelectByTag(EndCapBox, connector.EndCap.ToString());
-        SelectByTag(WeightBox, ((int)connector.StrokeThickness).ToString(CultureInfo.InvariantCulture));
         SelectByTag(RoutingBox, connector.Routing.ToString());
 
         Canvas.DefaultStartCap = connector.StartCap;
