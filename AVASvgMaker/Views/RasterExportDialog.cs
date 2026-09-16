@@ -41,7 +41,6 @@ public class RasterExportDialog : Window
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         foreach (var scale in Scales)
         {
@@ -142,6 +141,6 @@ public class RasterExportDialog : Window
         Window owner, DiagramDocument document, RasterFormat format)
     {
         var dialog = new RasterExportDialog(document, format);
-        return await dialog.ShowDialog<RasterExportOptions?>(owner);
+        return await dialog.ShowCentred<RasterExportOptions?>(owner);
     }
 }

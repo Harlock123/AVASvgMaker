@@ -32,7 +32,6 @@ public class MermaidDialog : Window
         Width = 720;
         Height = 560;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = AppTheme.Panel;
 
         var editor = new SyntaxHighlightingTextBox
@@ -143,7 +142,7 @@ public class MermaidDialog : Window
     }
 
     public static async Task ShowAsync(Window owner, string code, string caption) =>
-        await new MermaidDialog(code, caption).ShowDialog(owner);
+        await new MermaidDialog(code, caption).ShowCentred(owner);
 
     /// <summary>
     /// The same window the other way about: somewhere to paste a flowchart in and have it
@@ -155,7 +154,7 @@ public class MermaidDialog : Window
     public static async Task<string?> PasteAsync(Window owner, string caption, string start = "")
     {
         var dialog = new MermaidDialog(start, caption, paste: true);
-        await dialog.ShowDialog(owner);
+        await dialog.ShowCentred(owner);
 
         return dialog._taken;
     }

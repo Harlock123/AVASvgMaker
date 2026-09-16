@@ -55,7 +55,6 @@ public class PageSetupDialog : Window
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         foreach (var preset in PageSize.Presets)
             _preset.Items.Add(new ComboBoxItem { Content = preset.Name, Tag = preset });
@@ -271,6 +270,6 @@ public class PageSetupDialog : Window
         var dialog = new PageSetupDialog(
             width, height, margin, drawing, pageCount, background, backgroundTo, backgroundAngle);
 
-        return await dialog.ShowDialog<PageSetup?>(owner);
+        return await dialog.ShowCentred<PageSetup?>(owner);
     }
 }

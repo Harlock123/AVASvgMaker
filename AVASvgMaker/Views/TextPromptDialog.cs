@@ -17,7 +17,6 @@ public class TextPromptDialog : Window
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         _entry = new TextBox { Text = initial };
 
@@ -59,6 +58,6 @@ public class TextPromptDialog : Window
     public static async Task<string?> ShowAsync(Window owner, string title, string caption, string initial)
     {
         var dialog = new TextPromptDialog(title, caption, initial);
-        return await dialog.ShowDialog<string?>(owner);
+        return await dialog.ShowCentred<string?>(owner);
     }
 }

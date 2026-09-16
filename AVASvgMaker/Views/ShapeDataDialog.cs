@@ -31,7 +31,6 @@ public class ShapeDataDialog : Window
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         // Without this the window is only as opaque as what is drawn on it, and the page
         // shows through the gaps between the controls.
@@ -214,5 +213,5 @@ public class ShapeDataDialog : Window
 
     public static async Task<List<ShapeField>?> ShowAsync(
         Window owner, string caption, IEnumerable<ShapeField> fields) =>
-        await new ShapeDataDialog(caption, fields).ShowDialog<List<ShapeField>?>(owner);
+        await new ShapeDataDialog(caption, fields).ShowCentred<List<ShapeField>?>(owner);
 }

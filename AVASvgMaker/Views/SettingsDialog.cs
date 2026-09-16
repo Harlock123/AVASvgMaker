@@ -66,7 +66,6 @@ public class SettingsDialog : Window
         Height = 600;
         CanResize = false;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         _themes.Items.Add(Entry(Preferences.DesktopTheme, null));
 
@@ -411,5 +410,5 @@ public class SettingsDialog : Window
     /// current drawing" has something to take.
     /// </summary>
     public static async Task<bool> ShowAsync(Window owner, ShapeStyle session) =>
-        await new SettingsDialog(session).ShowDialog<bool>(owner);
+        await new SettingsDialog(session).ShowCentred<bool>(owner);
 }

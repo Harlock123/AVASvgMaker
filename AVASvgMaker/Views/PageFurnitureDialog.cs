@@ -44,7 +44,6 @@ public class PageFurnitureDialog : Window
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = AppTheme.Panel;
 
         _watermark.Text = watermark;
@@ -160,6 +159,6 @@ public class PageFurnitureDialog : Window
         var dialog = new PageFurnitureDialog(
             watermark, watermarkColour, angle, header, footer, size, headFootColour, pageCount);
 
-        return await dialog.ShowDialog<PageFurnitureChoice?>(owner);
+        return await dialog.ShowCentred<PageFurnitureChoice?>(owner);
     }
 }

@@ -23,7 +23,6 @@ public class ConfirmDialog : Window
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         ShowInTaskbar = false;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         var buttons = new StackPanel
         {
@@ -66,6 +65,6 @@ public class ConfirmDialog : Window
         Window owner, string message, string primary = "Save", string secondary = "Discard")
     {
         var dialog = new ConfirmDialog(message, primary, secondary);
-        return await dialog.ShowDialog<ConfirmResult>(owner);
+        return await dialog.ShowCentred<ConfirmResult>(owner);
     }
 }
