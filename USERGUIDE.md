@@ -517,6 +517,53 @@ That last one is worth reading. A connector reported as joined to nothing was ne
 to the shapes it appears to touch, and would have come adrift as soon as one of them moved - so
 the message is a way of checking a drawing as well as exporting it.
 
+## Reading Mermaid in
+
+**File -> Import -> Mermaid** takes a flowchart written as text and turns it into a drawing on
+a page of its own. Paste it into the box - the clipboard is offered if it already looks like
+one - and it arrives as shapes you can move about.
+
+This, pasted in:
+
+```mermaid
+flowchart TD
+    a([Idea]) --> b{Worth doing?}
+    b -->|no| z[/Drop it/]
+    b -- yes --> c[Write it]
+    subgraph review["Review"]
+        d[Read it]
+        e{Happy?}
+    end
+    c --> d
+    d --> e
+    e -->|no| c
+    e -->|yes| f[(Merge)]
+    f ==> g([Shipped])
+```
+
+comes back as this:
+
+![A Mermaid flowchart read in as a drawing](Images/mermaid-import.png)
+
+Mermaid says what connects to what and nothing at all about where anything is, so the shapes
+are laid out on arrival by the same pass **Arrange -> Lay out** uses. Run that again afterwards
+if you would rather have it across the page than down it.
+
+What comes across:
+
+- **The brackets round a label choose the shape** - `[box]`, `(rounded)`, `((circle))`,
+  `{decision}`, `{{hexagon}}`, `[/leaning/]`, `[(barrel)]`, `[[twice]]`, `>a note]` and
+  the stadium `([both ends])`.
+- **The arrow says how the line is drawn.** `-->` gets an arrow, `---` gets none, `<-->` gets
+  one at each end, `-.->` comes back dashed and `==>` comes back thick.
+- **Words on a line**, written either `-->|like this|` or `-- like this -->`.
+- **A subgraph becomes a container** drawn round whatever it holds, once the layout has
+  decided where that is.
+- **`style` lines** set a shape's fill, line colour and line weight.
+
+Fences and `%%` comments are ignored, so a block copied whole out of a README works. A
+`sequenceDiagram` or anything else that is not a flowchart is left alone and says so.
+
 ## Importing SVG
 
 ![An SVG and the same file imported](Images/svg-import.png)

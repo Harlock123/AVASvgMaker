@@ -22,8 +22,9 @@ namespace AVASvgMaker.Views;
 public class MermaidDialog : Window
 {
     private readonly string _code;
+    private string? _taken;
 
-    private MermaidDialog(string code, string caption)
+    private MermaidDialog(string code, string caption, bool paste = false)
     {
         _code = code;
 
@@ -40,7 +41,7 @@ public class MermaidDialog : Window
             // when it is told what it is, and told the other way round it has nothing yet.
             Text = code,
             Language = SyntaxLanguage.Mermaid,
-            IsReadOnly = true,
+            IsReadOnly = !paste,
             ShowLineNumbers = true,
             FontFamily = new FontFamily("Cascadia Mono,Consolas,DejaVu Sans Mono,Menlo,monospace"),
             FontSize = 13
@@ -75,16 +76,35 @@ public class MermaidDialog : Window
         AppTheme.Changed += Redress;
         Closed += (_, _) => AppTheme.Changed -= Redress;
 
-        var copy = new Button { Content = "Copy", MinWidth = 88, IsDefault = true };
+        var copy = new Button
+        {
+            Content = paste ? "Read it" : "Copy",
+            MinWidth = 88,
+            IsDefault = true
+        };
+
         copy.Click += async (_, _) =>
         {
+            if (paste)
+            {
+                _taken = editor.Text ?? string.Empty;
+                Close();
+                return;
+            }
+
             if (Clipboard is { } board)
                 await board.SetTextAsync(_code);
 
             copy.Content = "Copied";
         };
 
-        var close = new Button { Content = "Close", MinWidth = 88, IsCancel = true };
+        var close = new Button
+        {
+            Content = paste ? "Cancel" : "Close",
+            MinWidth = 88,
+            IsCancel = true
+        };
+
         close.Click += (_, _) => Close();
 
         Content = new DockPanel
@@ -124,4 +144,19 @@ public class MermaidDialog : Window
 
     public static async Task ShowAsync(Window owner, string code, string caption) =>
         await new MermaidDialog(code, caption).ShowDialog(owner);
+
+    /// <summary>
+    /// The same window the other way about: somewhere to paste a flowchart in and have it
+    /// read. Answers with the text, or null if the dialog was dismissed.
+    ///
+    /// Editable here, where the read-only rule does not apply: there is no drawing behind this
+    /// one for an edit to fail to reach, and what is typed is the whole of what happens next.
+    /// </summary>
+    public static async Task<string?> PasteAsync(Window owner, string caption, string start = "")
+    {
+        var dialog = new MermaidDialog(start, caption, paste: true);
+        await dialog.ShowDialog(owner);
+
+        return dialog._taken;
+    }
 }

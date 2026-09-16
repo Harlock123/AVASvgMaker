@@ -73,6 +73,7 @@
                 <MenuItem Header="Page _furniture..." Click="OnPageFurnitureClick" />
                 <Separator />
                 <MenuItem Header="_Import">
+                    <MenuItem Header="_Mermaid..." Click="OnImportMermaidClick" />
                     <MenuItem Header="_SVG..." Click="OnImportSvgClick" />
                     <MenuItem Header="_Visio drawing..." Click="OnImportVisioClick" />
                 </MenuItem>

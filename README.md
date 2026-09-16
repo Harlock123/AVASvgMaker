@@ -249,6 +249,37 @@ a quality setting, because they are the two that throw detail away.
 | **WebP** | Smaller than PNG at moderate quality, larger than PNG at maximum. Worth it only if the thing receiving it asks for WebP |
 | **BMP** | For the tools that will take nothing else: some older Windows software, a few embedded and print workflows. 24-bit uncompressed, the variant everything that reads BMP can open. Its exact file size is worked out and shown before you commit to it, because it is a large one |
 
+### Reading Mermaid in
+
+Mermaid goes the other way too. **File -> Import -> Mermaid** reads a flowchart written as text
+onto a page of its own, which is the thing a picture in a README is worst at: you can paste the
+diagram out of a pull request, move it about, and send it back as a picture or as Mermaid again.
+
+```mermaid
+flowchart TD
+    a([Idea]) --> b{Worth doing?}
+    b -->|no| z[/Drop it/]
+    b -- yes --> c[Write it]
+    subgraph review["Review"]
+        d[Read it]
+        e{Happy?}
+    end
+    c --> d
+    d --> e
+    e -->|no| c
+    e -->|yes| f[(Merge)]
+    f ==> g([Shipped])
+```
+
+![A Mermaid flowchart read in as a drawing](Images/mermaid-import.png)
+
+Mermaid carries no positions at all, so the shapes are laid out on arrival by the same pass
+**Arrange -> Lay out** uses - which is why this could not be written until there was one. The
+brackets round a label choose the shape, the arrow says how the line is drawn, words on a line
+come across either way of writing them, a subgraph becomes a container drawn round what it
+holds, and `style` lines set the paint. Fences and `%%` comments are ignored, so a block copied
+whole out of a README works.
+
 ## Importing SVG
 
 ![An SVG and the same file imported](Images/svg-import.png)

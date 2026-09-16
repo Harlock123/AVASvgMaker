@@ -281,4 +281,46 @@ public class Screenshots
 
         Paper(tidy, "lay-out-after");
     }
+
+    /// <summary>
+    /// The drawing that comes back from a Mermaid flowchart. The source is not shown as a
+    /// picture - it is text, and the guide prints it as text, which reads better than a
+    /// photograph of it would.
+    /// </summary>
+    [AvaloniaFact]
+    public void MermaidImport()
+    {
+        if (!Asked) return;
+
+        const string code = """
+            flowchart TD
+                a([Idea]) --> b{Worth doing?}
+                b -->|no| z[/Drop it/]
+                b -- yes --> c[Write it]
+                subgraph review["Review"]
+                    d[Read it]
+                    e{Happy?}
+                end
+                c --> d
+                d --> e
+                e -->|no| c
+                e -->|yes| f[(Merge)]
+                f ==> g([Shipped])
+                style z fill:#f4c7c3,stroke:#c0392b
+                style g fill:#b7e1cd,stroke:#1e8449
+            """;
+
+        var read = MermaidImporter.Read(code, 700, 880);
+        var page = new DiagramDocument();
+        page.SetPageSize(700, 880);
+
+        foreach (var shape in read.Page.Shapes)
+            page.Shapes.Add(shape);
+
+        page.NormaliseOrder();
+        page.RouteConnectors();
+
+        using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "mermaid-import.png")));
+        RasterExporter.Export(page, file, 2, RasterFormat.Png);
+    }
 }

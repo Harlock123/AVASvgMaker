@@ -1598,6 +1598,66 @@ public partial class MainWindow : Window
         StatusText.Text = $"{what} is now {setup.Size.Width:0} x {setup.Size.Height:0}";
     }
 
+    private void OnImportMermaidClick(object? sender, RoutedEventArgs e) => _ = ImportMermaidAsync();
+
+    /// <summary>
+    /// Reads a Mermaid flowchart onto a page of its own. Pasted rather than opened: the text
+    /// this is for lives in a README, a ticket or a pull request, and is on the clipboard far
+    /// more often than it is in a file.
+    /// </summary>
+    private async Task ImportMermaidAsync()
+    {
+        Canvas.CommitEdit();
+
+        try
+        {
+            // The clipboard offered as a starting point, since it is usually what was meant.
+            var waiting = Clipboard is { } board ? await board.GetTextAsync() ?? string.Empty : string.Empty;
+
+            if (!waiting.Contains("flowchart", StringComparison.OrdinalIgnoreCase) &&
+                !waiting.Contains("graph ", StringComparison.OrdinalIgnoreCase))
+                waiting = string.Empty;
+
+            var text = await MermaidDialog.PasteAsync(this,
+                "Paste a Mermaid flowchart. Mermaid does not carry positions, so the shapes " +
+                "are laid out on arrival - Arrange -> Lay out does the same thing again.",
+                waiting);
+
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            var document = Canvas.Document;
+            var result = MermaidImporter.Read(text, document.PageWidth, document.PageHeight);
+
+            if (result.Count == 0)
+            {
+                StatusText.Text = result.Summary;
+                return;
+            }
+
+            using (document.BeginBatch())
+            {
+                document.AddPage();
+                document.RenamePage(document.PageIndex, "Mermaid");
+
+                foreach (var shape in result.Page.Shapes)
+                    document.Shapes.Add(shape);
+
+                document.NormaliseOrder();
+                document.MarkModified();
+            }
+
+            Canvas.SyncPageSize();
+            Canvas.InvalidateVisual();
+
+            StatusText.Text = result.Summary;
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Could not read the Mermaid: {ex.Message}";
+        }
+    }
+
     private void OnImportSvgClick(object? sender, RoutedEventArgs e) => _ = ImportSvgAsync();
 
     /// <summary>

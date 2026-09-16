@@ -333,6 +333,18 @@ public class ConnectorShape : DiagramShape
         return false;
     }
 
+    /// <summary>True when one shape is the container of another, however many deep.</summary>
+    private static bool Holds(DiagramShape maybe, DiagramShape? inside)
+    {
+        for (var at = inside?.Container; at is not null; at = at.Container)
+        {
+            if (ReferenceEquals(at, maybe))
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>A cheap first pass, so the outline is only sampled where it could matter.</summary>
     private static bool Overlaps(Point a, Point b, Rect rect) =>
         Math.Min(a.X, b.X) <= rect.Right && Math.Max(a.X, b.X) >= rect.Left &&
@@ -416,6 +428,11 @@ public class ConnectorShape : DiagramShape
 
         var rects = obstacles
             .Where(shape => !ReferenceEquals(shape, StartShape) && !ReferenceEquals(shape, EndShape))
+            // A container holding one of the ends is not in the way either. The line starts
+            // inside it and has to get out, so treating it as an obstacle asks the route to
+            // avoid a box it is already within - which it can only do by going the long way
+            // round the inside of it.
+            .Where(shape => !Holds(shape, StartShape) && !Holds(shape, EndShape))
             .Select(shape => new ConnectorRouter.Obstruction(shape.Bounds, shape.Rotation))
             .ToList();
 
