@@ -4,7 +4,8 @@ A Visio-style diagram editor built with **Avalonia UI** and **.NET 9**. Drag sha
 stencil toolbox onto a page-like canvas, label them, wire them together with connectors that
 route themselves around whatever is in the way - and around each other - and spread the work
 over as many pages as it needs. Export it as SVG or PDF for a printer, or as a picture for
-anything else.
+anything else - and read Visio drawings, SVG and Mermaid flowcharts back in, so a diagram
+somebody else made is one you can edit.
 
 ![AVASvgMaker](Images/overview.png)
 
@@ -88,7 +89,7 @@ Or [build it yourself](#building).
 
 - **Save and load** - a native `.avadiag` document that keeps what SVG export cannot: glue, ports, hand-placed bends, containment and z-order
 - **Seven export formats** - SVG, PDF and Visio as vectors, PNG, JPEG, WebP and BMP as pictures
-- **Mermaid** - the page as a `flowchart` code block, for pasting into a README, a wiki or a pull request
+- **Mermaid, both ways** - the page as a `flowchart` code block for pasting into a README, a wiki or a pull request, and read back the same way: paste a flowchart in and it arrives as shapes, laid out on the page, because Mermaid carries no positions of its own
 - **SVG import** - reads a drawing back in as editable shapes, and says what it could not take
 - **Visio import and export** - reads and writes modern `.vsdx` drawings, masters and glue included
 - **Vector export** - SVG writes real SVG primitives, not a bitmap trace; PDF comes out the size the page says it is, with the text still selectable, and carries every page of a document in one file
