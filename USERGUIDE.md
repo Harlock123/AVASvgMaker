@@ -453,6 +453,12 @@ one of the six presets - Letter, Legal, Tabloid, A3, A4 or A5 - or type a width 
 **Margin** draws a dashed inset to line work up against. It is a guide only: nothing is stopped
 from being placed outside it, and nothing is clipped by it. Set it to 0 for none.
 
+**Paper** is the colour the page is drawn on, and **Fade to** runs it into a second one - down,
+up, across, back or diagonally, the same five directions a shape's own fill offers. Each page
+carries its own paper, so one document can hold a white page, a tinted one and a page that
+fades; **Apply to every page** sets them all at once. The colour goes out with the drawing in
+every export that has somewhere to put it.
+
 ## Shapes of your own
 
 ![Saved shapes in the toolbox](Images/custom-shapes.png)

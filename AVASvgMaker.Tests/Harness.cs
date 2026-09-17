@@ -95,7 +95,7 @@ internal static class Harness
         _ => PhysicalKey.None
     };
 
-    public static void Settle(MainWindow window)
+    public static void Settle(Window window)
     {
         window.UpdateLayout();
         Dispatcher.UIThread.RunJobs();

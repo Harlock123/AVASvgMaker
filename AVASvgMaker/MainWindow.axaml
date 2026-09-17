@@ -434,7 +434,7 @@
         </Border>
 
         <!-- Shapes, collapsible to the left -->
-        <Border x:Name="ShapesPanel" DockPanel.Dock="Left" Width="228"
+        <Border x:Name="ShapesPanel" DockPanel.Dock="Left" Width="210"
                 Background="{x:Static views:AppTheme.Panel}" BorderBrush="{x:Static views:AppTheme.Border}" BorderThickness="0,0,1,0">
             <views:ToolboxPanel x:Name="Toolbox" />
         </Border>

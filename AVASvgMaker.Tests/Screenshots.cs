@@ -387,4 +387,29 @@ public class Screenshots
 
         return ShapeClipboard.Copy(page, page.Shapes.ToList())!;
     }
+
+    /// <summary>
+    /// The page setup dialog, shown with a fade set so the paper rows are on display - they
+    /// are the part of it people do not know is there.
+    /// </summary>
+    [AvaloniaFact]
+    public void PageSetup()
+    {
+        if (!Asked) return;
+
+        var dialog = new Views.PageSetupDialog(
+            816, 1056, 32, null, 1,
+            Color.Parse("#FFFFFF"), Color.Parse("#DCE9FB"), 90);
+
+        dialog.Show();
+
+        Harness.Settle(dialog);
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Harness.Settle(dialog);
+
+        using (var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "page-setup.png"))))
+            dialog.CaptureRenderedFrame()!.Save(file);
+
+        dialog.Close();
+    }
 }

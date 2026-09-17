@@ -44,7 +44,7 @@ public class PageSetupDialog : Window
     /// <summary>Guards the boxes against reacting while they are being filled in.</summary>
     private bool _syncing;
 
-    private PageSetupDialog(
+    internal PageSetupDialog(
         double width, double height, double margin, Rect? drawing, int pageCount,
         Color background, Color? backgroundTo, double backgroundAngle)
     {
