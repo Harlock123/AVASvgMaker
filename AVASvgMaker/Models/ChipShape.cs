@@ -42,15 +42,15 @@ public class ChipShape : DiagramShape
     }
 
     /// <summary>Legs out of the bottom, rather than down both sides.</summary>
-    private bool Upright => _chip.Package == ChipPackage.To220;
+    private bool Tabbed => _chip.Package == ChipPackage.To220;
 
     /// <summary>How far the legs stick out of the package.</summary>
-    private double Lead => Upright
+    private double Lead => Tabbed
         ? Math.Clamp(Bounds.Height * 0.2, 6, 24)
         : Math.Clamp(Bounds.Width * 0.14, 4, 20);
 
     /// <summary>The package itself, inside the legs.</summary>
-    private Rect Package => Upright
+    private Rect Package => Tabbed
         ? new(Bounds.X, Bounds.Y, Math.Max(1, Bounds.Width), Math.Max(1, Bounds.Height - Lead))
         : new(Bounds.X + Lead, Bounds.Y, Math.Max(1, Bounds.Width - Lead * 2), Math.Max(1, Bounds.Height));
 
@@ -75,7 +75,7 @@ public class ChipShape : DiagramShape
         {
             var package = Package;
 
-            if (!Upright)
+            if (!Tabbed)
                 return package;
 
             var top = package.Y + Tabbing().Tab.Height;
@@ -92,7 +92,7 @@ public class ChipShape : DiagramShape
     {
         var body = Body;
 
-        if (Upright)
+        if (Tabbed)
         {
             var across = body.Width / Math.Max(1, _chip.Count);
 
@@ -139,7 +139,7 @@ public class ChipShape : DiagramShape
     /// <summary>A leg faces out of the side of the package it is on, and no other way.</summary>
     protected override Vector OutwardDirection(int index) =>
         index < 0 || index >= _chip.Count ? default
-        : Upright ? new Vector(0, 1)
+        : Tabbed ? new Vector(0, 1)
         : new Vector(Seat(index).Left ? -1 : 1, 0);
 
     /// <summary>The package, not the legs: a wire should meet a pin, not the empty air by it.</summary>
@@ -155,7 +155,7 @@ public class ChipShape : DiagramShape
         {
             var body = Body;
 
-            if (Upright)
+            if (Tabbed)
             {
                 var foot = ShowNames ? PinSize(body) * 1.7 : 0;
 
@@ -173,7 +173,7 @@ public class ChipShape : DiagramShape
     }
 
     /// <summary>A font small enough that a pin name fits in the room its own leg has.</summary>
-    private double PinSize(Rect body) => Upright
+    private double PinSize(Rect body) => Tabbed
         ? Math.Clamp(body.Width / Math.Max(1, _chip.Count) * 0.28, 5, 10)
         : Math.Clamp(body.Height / Math.Max(1, _chip.PerSide) * 0.55, 5, 10);
 
@@ -200,7 +200,7 @@ public class ChipShape : DiagramShape
             if (size < 6)
                 return false;
 
-            return Upright
+            return Tabbed
                 ? Names(size) + 4 <= body.Width / Math.Max(1, _chip.Count)
                 : Names(size) * 2 + 10 <= body.Width;
         }
@@ -211,7 +211,7 @@ public class ChipShape : DiagramShape
     /// that does not fit is drawn over them, and on a chip the names are the part that has to
     /// stay readable.
     /// </summary>
-    protected override double LabelSize
+    protected override double TextSize
     {
         get
         {
@@ -234,7 +234,7 @@ public class ChipShape : DiagramShape
         var size = PinSize(body);
         var names = ShowNames;
 
-        if (Upright)
+        if (Tabbed)
         {
             var (tab, hole, radius) = Tabbing();
 
@@ -248,7 +248,7 @@ public class ChipShape : DiagramShape
         {
             var tip = Leg(pin);
 
-            if (Upright)
+            if (Tabbed)
             {
                 context.DrawLine(pen, new Point(tip.X, body.Bottom), tip);
 
@@ -279,7 +279,7 @@ public class ChipShape : DiagramShape
         // The notch that says which end pin 1 is, without which the pinout is a guess. It is
         // on the top edge, away from the names, because a dot in the corner sat on pin 1's own.
         // A TO-220 needs none: it has a tab, and three named legs in one order.
-        if (!Upright)
+        if (!Tabbed)
             context.DrawGeometry(
                 null, new Pen(new SolidColorBrush(StrokeColour()), StrokeThickness), Notch());
 
@@ -343,7 +343,7 @@ public class ChipShape : DiagramShape
 
         sb.Append("<g>");
 
-        if (Upright)
+        if (Tabbed)
         {
             var (tab, hole, radius) = Tabbing();
 
@@ -362,7 +362,7 @@ public class ChipShape : DiagramShape
             var tip = Leg(pin);
             var name = Escape(_chip.Pins[pin]);
 
-            if (Upright)
+            if (Tabbed)
             {
                 sb.Append($"<line x1=\"{Num(tip.X)}\" y1=\"{Num(body.Bottom)}\" " +
                           $"x2=\"{Num(tip.X)}\" y2=\"{Num(tip.Y)}\" {stroke} />");
@@ -393,7 +393,7 @@ public class ChipShape : DiagramShape
                       $"text-anchor=\"{(left ? "start" : "end")}\">{name}</text>");
         }
 
-        if (!Upright)
+        if (!Tabbed)
         {
             var radius = NotchRadius;
             var package = Package;
@@ -406,9 +406,4 @@ public class ChipShape : DiagramShape
         sb.Append("</g>");
         return sb.ToString();
     }
-
-    private static string Escape(string text) => text
-        .Replace("&", "&amp;")
-        .Replace("<", "&lt;")
-        .Replace(">", "&gt;");
 }

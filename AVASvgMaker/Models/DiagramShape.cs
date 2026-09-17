@@ -441,14 +441,14 @@ public abstract class DiagramShape
 
     #region Text
 
-    protected double LineHeight => LabelSize * 1.3;
+    protected double LineHeight => TextSize * 1.3;
 
     /// <summary>
     /// The size a label is actually drawn at. The same as <see cref="FontSize"/> for all but a
     /// shape that has somewhere narrower than itself to fit its text into - see
     /// <see cref="ChipShape"/>, whose part number shares the package with the pin names.
     /// </summary>
-    protected virtual double LabelSize => FontSize;
+    protected virtual double TextSize => FontSize;
 
     /// <summary>
     /// The face a label is drawn with. A font that is not installed falls back to the default
@@ -464,7 +464,7 @@ public abstract class DiagramShape
         CultureInfo.CurrentCulture,
         FlowDirection.LeftToRight,
         Face,
-        LabelSize,
+        TextSize,
         new SolidColorBrush(TextColor));
 
     /// <summary>
@@ -664,7 +664,7 @@ public abstract class DiagramShape
 
         var sb = new StringBuilder();
         sb.AppendLine(
-            $"  <text font-family=\"{SvgFontFamily()}\" font-size=\"{Num(LabelSize)}\" " +
+            $"  <text font-family=\"{SvgFontFamily()}\" font-size=\"{Num(TextSize)}\" " +
             $"fill=\"{ToHex(TextColor)}\"" +
             (Bold ? " font-weight=\"bold\"" : string.Empty) +
             (Italic ? " font-style=\"italic\"" : string.Empty) +
