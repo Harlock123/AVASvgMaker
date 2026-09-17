@@ -21,7 +21,7 @@ just parsing it. The pairing with `.vsdx` is the point - a diagram somebody else
 either format, is one you can edit. This is newer than most of the claims here and is the one
 most likely to be left out of a blurb copied from an older release.
 
-**Numbers that are checked, not rounded.** 96 stencils. Six builds: Windows, macOS and Linux,
+**Numbers that are checked, not rounded.** 116 stencils. Six builds: Windows, macOS and Linux,
 x64 and arm64 each. MIT. Avalonia UI and .NET 9.
 
 **Nothing to install** is worth saying plainly - a single self-contained executable, no
@@ -72,7 +72,7 @@ so say so - developer submissions are accepted, undeclared ones get pulled.
 **Full description**
 
     AVASvgMaker is a desktop diagram editor for Windows, macOS and Linux. You drag shapes
-    from a toolbox of 96 stencils onto a page, label them, and join them with connectors
+    from a toolbox of 116 stencils onto a page, label them, and join them with connectors
     that route themselves around whatever is in the way.
 
     It opens Visio .vsdx drawings and Mermaid flowcharts, and saves out as SVG, PNG, BMP,
@@ -122,7 +122,7 @@ the last paragraph are the parts that go stale.
 > **AVASvgMaker** is a Visio-style diagram editor I have been building - open source, MIT, and
 > running on Windows, macOS and Linux.
 >
-> You drag shapes from a toolbox of 96 stencils onto a page, label them, and join them with
+> You drag shapes from a toolbox of 116 stencils onto a page, label them, and join them with
 > connectors that route themselves around whatever is in the way. It opens Visio `.vsdx`
 > drawings and Mermaid flowcharts, and exports SVG, PNG, BMP, PDF and Mermaid. Pages behave
 > like paper - several per

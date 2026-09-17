@@ -45,6 +45,12 @@ There are two ways to put a shape on the page, and both start in the toolbox:
 - **Click** the shape in the toolbox, then click the page where you want it. The toolbox item
   stays lit until you place it, so it is clear what a click is about to do.
 
+The **Electrical** set is different from the rest in one way worth knowing. Most of its
+symbols are line work with no body at all - a resistor is a zigzag, and filling one in would
+make it mean something else - so setting a fill colour does nothing you can see on them. The
+few that do have a body, like a fuse or an amplifier, arrive hollow on purpose. The line
+colour, weight and style work on all of them as usual.
+
 Once a shape is on the page:
 
 | To do this | Do that |

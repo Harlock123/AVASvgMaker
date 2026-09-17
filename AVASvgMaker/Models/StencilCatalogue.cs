@@ -376,7 +376,132 @@ public static class StencilCatalogue
             "M 0.5,0.66 L 0.5,0.4 " +
             "M 0.32,0.36 C 0.4,0.24 0.6,0.24 0.68,0.36 " +
             "M 0.2,0.22 C 0.34,0.02 0.66,0.02 0.8,0.22",
-            "wifi antenna radio")
+            "wifi antenna radio"),
+
+        // ---- Electrical -----------------------------------------------------------
+        // Almost all of these are line work with no body at all: a resistor is a zigzag and
+        // filling it in would mean something else entirely. So they are written as Detail,
+        // which is stroked and never filled, and the few that do have a body - a diode's
+        // triangle, an op-amp's - carry it as an Outline with the leads in Detail beside it.
+        //
+        // Two terminals enter at the left and leave at the right, halfway down, so a row of
+        // them wired together sits on one line without anything being nudged.
+        new(ShapeKind.Resistor, StencilCategory.Electrical, "Resistor",
+            Detail: "M 0,0.5 L 0.14,0.5 L 0.21,0.24 L 0.35,0.76 L 0.49,0.24 " +
+                    "L 0.63,0.76 L 0.77,0.24 L 0.84,0.5 L 1,0.5",
+            Keywords: "electrical electronic resistance ohm zigzag component"),
+
+        new(ShapeKind.Capacitor, StencilCategory.Electrical, "Capacitor",
+            Detail: "M 0,0.5 L 0.43,0.5 M 0.43,0.2 L 0.43,0.8 " +
+                    "M 0.57,0.2 L 0.57,0.8 M 0.57,0.5 L 1,0.5",
+            Keywords: "electrical electronic capacitance farad plates component"),
+
+        new(ShapeKind.PolarisedCapacitor, StencilCategory.Electrical, "Polarised capacitor",
+            Detail: "M 0,0.5 L 0.4,0.5 M 0.4,0.2 L 0.4,0.8 " +
+                    "M 0.56,0.2 Q 0.7,0.5 0.56,0.8 M 0.64,0.5 L 1,0.5",
+            Keywords: "electrical electronic electrolytic capacitance polarized component"),
+
+        new(ShapeKind.Inductor, StencilCategory.Electrical, "Inductor",
+            Detail: "M 0,0.5 L 0.16,0.5 Q 0.24,0.16 0.32,0.5 Q 0.4,0.16 0.48,0.5 " +
+                    "Q 0.56,0.16 0.64,0.5 Q 0.72,0.16 0.8,0.5 L 1,0.5",
+            Keywords: "electrical electronic coil choke henry inductance component"),
+
+        new(ShapeKind.Diode, StencilCategory.Electrical, "Diode",
+            "M 0.34,0.22 L 0.62,0.5 L 0.34,0.78 Z",
+            Detail: "M 0,0.5 L 0.34,0.5 M 0.62,0.2 L 0.62,0.8 M 0.62,0.5 L 1,0.5",
+            Keywords: "electrical electronic rectifier anode cathode component"),
+
+        new(ShapeKind.LightEmittingDiode, StencilCategory.Electrical, "LED",
+            "M 0.3,0.28 L 0.56,0.52 L 0.3,0.76 Z",
+            Detail: "M 0,0.52 L 0.3,0.52 M 0.56,0.26 L 0.56,0.78 M 0.56,0.52 L 1,0.52 " +
+                    "M 0.4,0.22 L 0.56,0.04 M 0.5,0.06 L 0.56,0.04 L 0.55,0.11 " +
+                    "M 0.56,0.2 L 0.72,0.02 M 0.66,0.04 L 0.72,0.02 L 0.71,0.09",
+            Keywords: "electrical electronic led lamp indicator light diode component"),
+
+        new(ShapeKind.ZenerDiode, StencilCategory.Electrical, "Zener diode",
+            "M 0.34,0.22 L 0.62,0.5 L 0.34,0.78 Z",
+            Detail: "M 0,0.5 L 0.34,0.5 M 0.62,0.2 L 0.62,0.8 M 0.62,0.5 L 1,0.5 " +
+                    "M 0.62,0.2 L 0.53,0.14 M 0.62,0.8 L 0.71,0.86",
+            Keywords: "electrical electronic zener reference breakdown diode component"),
+
+        new(ShapeKind.Battery, StencilCategory.Electrical, "Battery",
+            Detail: "M 0,0.5 L 0.26,0.5 M 0.26,0.16 L 0.26,0.84 M 0.4,0.32 L 0.4,0.68 " +
+                    "M 0.54,0.16 L 0.54,0.84 M 0.68,0.32 L 0.68,0.68 M 0.68,0.5 L 1,0.5",
+            Keywords: "electrical electronic cell supply volt power component"),
+
+        new(ShapeKind.DcSource, StencilCategory.Electrical, "DC source",
+            Circle,
+            Detail: "M 0.24,0.36 L 0.42,0.36 M 0.33,0.27 L 0.33,0.45 M 0.58,0.64 L 0.76,0.64",
+            Keywords: "electrical electronic direct current supply voltage source",
+            Defaults: new StencilDefaults(Hollow: true)),
+
+        new(ShapeKind.AcSource, StencilCategory.Electrical, "AC source",
+            Circle,
+            Detail: "M 0.24,0.5 Q 0.37,0.22 0.5,0.5 Q 0.63,0.78 0.76,0.5",
+            Keywords: "electrical electronic alternating current mains sine source",
+            Defaults: new StencilDefaults(Hollow: true)),
+
+        new(ShapeKind.Ground, StencilCategory.Electrical, "Ground",
+            Detail: "M 0.5,0 L 0.5,0.44 M 0.18,0.44 L 0.82,0.44 " +
+                    "M 0.3,0.64 L 0.7,0.64 M 0.41,0.84 L 0.59,0.84",
+            Keywords: "electrical electronic earth gnd common reference zero"),
+
+        new(ShapeKind.Chassis, StencilCategory.Electrical, "Chassis earth",
+            Detail: "M 0.5,0 L 0.5,0.46 M 0.2,0.46 L 0.8,0.46 " +
+                    "M 0.28,0.46 L 0.12,0.82 M 0.5,0.46 L 0.34,0.82 M 0.72,0.46 L 0.56,0.82",
+            Keywords: "electrical electronic chassis frame earth ground hatched"),
+
+        new(ShapeKind.SwitchContact, StencilCategory.Electrical, "Switch",
+            Detail: "M 0,0.6 L 0.3,0.6 M 0.3,0.6 L 0.72,0.26 M 0.7,0.6 L 1,0.6",
+            Keywords: "electrical electronic switch contact spst open break toggle"),
+
+        new(ShapeKind.Fuse, StencilCategory.Electrical, "Fuse",
+            "M 0.24,0.32 L 0.76,0.32 L 0.76,0.68 L 0.24,0.68 Z",
+            Detail: "M 0,0.5 L 0.24,0.5 M 0.76,0.5 L 1,0.5",
+            Keywords: "electrical electronic fuse protection overcurrent breaker",
+            Defaults: new StencilDefaults(Hollow: true)),
+
+        new(ShapeKind.Lamp, StencilCategory.Electrical, "Lamp",
+            Ring(0.26),
+            Detail: "M 0,0.5 L 0.24,0.5 M 0.76,0.5 L 1,0.5 " +
+                    "M 0.32,0.32 L 0.68,0.68 M 0.68,0.32 L 0.32,0.68",
+            Keywords: "electrical electronic lamp bulb light signal indicator",
+            Defaults: new StencilDefaults(Hollow: true)),
+
+        new(ShapeKind.Transformer, StencilCategory.Electrical, "Transformer",
+            Detail: "M 0.06,0.12 L 0.28,0.12 Q 0.42,0.24 0.28,0.36 " +
+                    "Q 0.42,0.48 0.28,0.6 Q 0.42,0.72 0.28,0.84 L 0.06,0.84 " +
+                    "M 0.46,0.06 L 0.46,0.94 M 0.54,0.06 L 0.54,0.94 " +
+                    "M 0.94,0.12 L 0.72,0.12 Q 0.58,0.24 0.72,0.36 " +
+                    "Q 0.58,0.48 0.72,0.6 Q 0.58,0.72 0.72,0.84 L 0.94,0.84",
+            Keywords: "electrical electronic transformer coupling windings core turns"),
+
+        new(ShapeKind.Transistor, StencilCategory.Electrical, "Transistor",
+            Circle,
+            Detail: "M 0,0.5 L 0.28,0.5 M 0.28,0.26 L 0.28,0.74 " +
+                    "M 0.28,0.38 L 0.68,0.16 M 0.68,0.16 L 0.68,0 " +
+                    "M 0.28,0.62 L 0.68,0.84 M 0.68,0.84 L 0.68,1 " +
+                    "M 0.58,0.72 L 0.68,0.84 L 0.55,0.84",
+            Keywords: "electrical electronic transistor npn bjt base emitter collector",
+            Defaults: new StencilDefaults(Hollow: true)),
+
+        new(ShapeKind.Amplifier, StencilCategory.Electrical, "Amplifier",
+            "M 0.26,0.1 L 0.84,0.5 L 0.26,0.9 Z",
+            Detail: "M 0,0.3 L 0.26,0.3 M 0,0.7 L 0.26,0.7 M 0.84,0.5 L 1,0.5 " +
+                    "M 0.33,0.3 L 0.43,0.3 M 0.38,0.25 L 0.38,0.35 M 0.33,0.7 L 0.43,0.7",
+            Keywords: "electrical electronic amplifier op-amp opamp gain buffer comparator",
+            Defaults: new StencilDefaults(Hollow: true)),
+
+        new(ShapeKind.Antenna, StencilCategory.Electrical, "Antenna",
+            Detail: "M 0.5,1 L 0.5,0.42 M 0.5,0.42 L 0.22,0.06 M 0.5,0.42 L 0.78,0.06",
+            Keywords: "electrical electronic antenna aerial radio transmit receive"),
+
+        new(ShapeKind.Motor, StencilCategory.Electrical, "Motor",
+            Ring(0.32),
+            Detail: "M 0,0.5 L 0.18,0.5 M 0.82,0.5 L 1,0.5 " +
+                    "M 0.36,0.62 L 0.36,0.38 L 0.5,0.56 L 0.64,0.38 L 0.64,0.62",
+            Keywords: "electrical electronic motor drive rotary machine",
+            Defaults: new StencilDefaults(Hollow: true)),
     ];
 
     /// <summary>
@@ -402,6 +527,7 @@ public static class StencilCatalogue
         StencilCategory.Bpmn => "BPMN",
         StencilCategory.Uml => "UML",
         StencilCategory.Network => "Network",
+        StencilCategory.Electrical => "Electrical",
         _ => category.ToString()
     };
 

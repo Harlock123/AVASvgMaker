@@ -9,7 +9,8 @@ public enum StencilCategory
     Flowchart,
     Bpmn,
     Uml,
-    Network
+    Network,
+    Electrical
 }
 
 /// <summary>

@@ -43,7 +43,7 @@ Or [build it yourself](#building).
 
 **Drawing**
 
-- **96 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML and network, in categories that fold away, with a search box
+- **116 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML, network and electrical, in categories that fold away, with a search box
 - **Shapes of your own** - save any selection as a reusable shape and it joins the toolbox, kept between drawings and between sessions
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
 - **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder, each on its own paper
@@ -147,6 +147,9 @@ loose shapes.
 | **BPMN** | Start, intermediate, end, message and timer events; task, subprocess, user, service and script tasks; exclusive, parallel, inclusive and event gateways; data object, data store, group; pool, lane and container |
 | **UML** | Class, interface, package, note, actor, use case, component, node, state, initial state, final state |
 | **Network** | Server, workstation, laptop, router, switch, firewall, printer, mobile device, storage array, wireless access point |
+| **Electrical** | Resistor, capacitor, polarised capacitor, inductor, diode, LED, zener diode, battery, DC and AC source, ground, chassis earth, switch, fuse, lamp, transformer, transistor, amplifier, antenna, motor |
+
+![The electrical symbols](Images/electrical.png)
 
 Categories fold away, and the search box matches names *and* keywords - "wifi" finds the
 wireless access point, "if" finds the decision. A few shapes appear in two categories on
@@ -1210,7 +1213,7 @@ AVASvgMaker/
     TextBoxShape.cs      Borderless text, with a dashed guide while empty
     EndCapStyle.cs       None, Arrow, OpenArrow, Dot, Diamond
     Stencil.cs           One catalogue entry: name, category, outline
-    StencilCatalogue.cs  All 96 stencils
+    StencilCatalogue.cs  All 116 stencils
     ContainerShape.cs    Pools, lanes and grouping boxes
     StencilPath.cs       The unit-square path language, to geometry and to SVG
     StencilShape.cs      Draws a shape from a catalogue outline

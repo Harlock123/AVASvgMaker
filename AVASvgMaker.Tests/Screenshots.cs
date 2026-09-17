@@ -412,4 +412,40 @@ public class Screenshots
 
         dialog.Close();
     }
+
+    /// <summary>The electrical symbols, laid out as a sheet for the documentation.</summary>
+    [AvaloniaFact]
+    public void Electrical()
+    {
+        if (!Asked) return;
+
+        var set = StencilCatalogue.InCategory(StencilCategory.Electrical).ToList();
+
+        const int columns = 5;
+        const double wide = 150, tall = 116;
+
+        var rows = (set.Count + columns - 1) / columns;
+        var page = new DiagramDocument();
+        page.SetPageSize(columns * wide, rows * tall);
+
+        for (var i = 0; i < set.Count; i++)
+        {
+            var x = i % columns * wide;
+            var y = i / columns * tall;
+
+            var symbol = ShapeFactory.Create(set[i].Kind, new Rect(x + 30, y + 16, 90, 60));
+            set[i].ApplyDefaults(symbol);
+            page.Shapes.Add(symbol);
+
+            var name = ShapeFactory.Create(ShapeKind.TextBox, new Rect(x + 6, y + 80, wide - 12, 22));
+            name.Text = set[i].Name;
+            name.FontSize = 11;
+            page.Shapes.Add(name);
+        }
+
+        page.RouteConnectors();
+
+        using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "electrical.png")));
+        RasterExporter.Export(page, file, 2, RasterFormat.Png);
+    }
 }

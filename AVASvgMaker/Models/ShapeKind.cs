@@ -117,6 +117,28 @@ public enum ShapeKind
     StorageArray,
     WirelessAccessPoint,
 
+    // Electrical. Mostly line work rather than bodies - see StencilCatalogue.
+    Resistor,
+    Capacitor,
+    PolarisedCapacitor,
+    Inductor,
+    Diode,
+    LightEmittingDiode,
+    ZenerDiode,
+    Battery,
+    DcSource,
+    AcSource,
+    Ground,
+    Chassis,
+    SwitchContact,
+    Fuse,
+    Lamp,
+    Transformer,
+    Transistor,
+    Amplifier,
+    Antenna,
+    Motor,
+
     /// <summary>An outline of its own, rather than one from the catalogue. Imported SVG
     /// arrives as these where nothing simpler fits.</summary>
     Path
