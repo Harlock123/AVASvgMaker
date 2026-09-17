@@ -246,6 +246,15 @@ public static partial class DiagramFile
 
         public int EndPort { get; set; } = -1;
 
+        /// <summary>
+        /// How far along a glued connector each end sits, for the ends glued to one. Absent
+        /// in files written before a line could be glued to a line, where the middle is as
+        /// good a guess as any and nothing is glued to a line anyway.
+        /// </summary>
+        public double StartAlong { get; set; } = 0.5;
+
+        public double EndAlong { get; set; } = 0.5;
+
         /// <summary>Straight is the version 1 behaviour, and so the default when absent.</summary>
         public string Routing { get; set; } = nameof(ConnectorRouting.Straight);
 
@@ -420,6 +429,8 @@ public static partial class DiagramFile
                 EndCap = connector.EndCap.ToString(),
                 StartPort = connector.StartPort,
                 EndPort = connector.EndPort,
+                StartAlong = connector.StartAlong,
+                EndAlong = connector.EndAlong,
                 Routing = connector.Routing.ToString(),
                 Waypoints = connector.Waypoints.Count == 0
                     ? null
@@ -559,6 +570,8 @@ public static partial class DiagramFile
                 EndCap = Parse(connectorRecord.EndCap, EndCapStyle.Arrow),
                 StartPort = connectorRecord.StartPort,
                 EndPort = connectorRecord.EndPort,
+                StartAlong = connectorRecord.StartAlong,
+                EndAlong = connectorRecord.EndAlong,
                 Routing = Parse(connectorRecord.Routing, ConnectorRouting.Straight),
                 Waypoints = ToPoints(connectorRecord.Waypoints),
                 LabelOffset = connectorRecord.LabelOffset is { Length: 2 } moved

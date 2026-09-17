@@ -61,6 +61,7 @@ Or [build it yourself](#building).
 
 - **Connection points** - every shape offers four attachment points, sitting on the shape's own outline rather than the box around it; they light up while a connector is being drawn and the end snaps to the nearest one
 - **Glue** - an end dropped on a shape, or within a grid step of one of its connection points, sticks to it and tracks the shape as it moves and resizes
+- **Lines that join lines** - an end can be dropped on another connector as well as on a shape, which is where a loop back to a check belongs: it sticks a remembered fraction of the way along that line and rides along as the line re-routes
 - **Right-angle routing** - routed connectors keep clear of the shapes in their way, of the two they join, and of each other; they put their bends midway across the gaps they cross, and reroute themselves whenever a shape is placed, moved, resized or turned
 - **Curved corners** - a third choice beside straight and right-angle, set per connector: the same route with its turns rounded off, so the clearances, the glue and any bends you placed are unchanged; the curves reach SVG, PDF, the pictures and Visio as curves rather than as a lot of short lines
 - **Sides that suit** - the points a connector was drawn with are kept until they stop facing each other, and it then takes whichever of the four sides do, weighed as a pair rather than an end at a time - so shapes that end up stacked are joined top to bottom rather than around the outside of both

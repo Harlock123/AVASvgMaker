@@ -194,6 +194,7 @@ public class DrawingCanvas : Decorator
     private DiagramShape? _portShape;
 
     private int _portIndex = -1;
+    private double _glueAlong = 0.5;
 
     /// <summary>How close, in screen pixels, the pointer has to be to snap to a connection point.</summary>
     private const double PortSnapPixels = 12;
@@ -507,14 +508,14 @@ public class DrawingCanvas : Decorator
     /// within a grid step, which is what the pointer is already being snapped to, and never
     /// less than the radius a port has always snapped from.
     /// </summary>
-    private (DiagramShape? Shape, int Port) GlueAt(Point pagePoint, DiagramShape? skip = null)
+    private (DiagramShape? Shape, int Port, double Along) GlueAt(Point pagePoint, DiagramShape? skip = null)
     {
         var under = Document.Shapes
             .Where(shape => shape is not ConnectorShape && !ReferenceEquals(shape, skip))
             .LastOrDefault(shape => shape.HitTest(pagePoint));
 
         if (under is not null)
-            return (under, NearestPort(under, pagePoint));
+            return (under, NearestPort(under, pagePoint), 0.5);
 
         var reach = Math.Max(Grid.Size, Screen(PortSnapPixels));
         var closest = double.MaxValue;
@@ -544,7 +545,17 @@ public class DrawingCanvas : Decorator
             }
         }
 
-        return (found, port);
+        if (found is not null)
+            return (found, port, 0.5);
+
+        // Nothing but a line under the pointer. A connector can hang off another connector -
+        // a loop coming back to the run that feeds a check rather than to the check itself -
+        // and where along the line it lands is where the pointer was.
+        var line = Document.Shapes
+            .OfType<ConnectorShape>()
+            .LastOrDefault(other => !ReferenceEquals(other, skip) && other.HitTest(pagePoint, reach / 2));
+
+        return line is null ? (null, -1, 0.5) : (line, -1, line.Nearest(pagePoint));
     }
 
     /// <summary>
@@ -783,7 +794,7 @@ public class DrawingCanvas : Decorator
     /// </summary>
     private void MoveTail(CalloutShape callout, Point pagePoint)
     {
-        var (target, port) = GlueAt(pagePoint, skip: callout);
+        var (target, port, _) = GlueAt(pagePoint, skip: callout);
 
         // Only a point will do here, not merely a shape: the tail has to land somewhere exact.
         var pinned = target is not null && port >= 0;
@@ -1772,13 +1783,14 @@ public class DrawingCanvas : Decorator
     {
         // The same question the far end is asked, so a line begun near a shape is glued to it
         // rather than merely starting next to it.
-        var (target, port) = GlueAt(pagePoint);
+        var (target, port, along) = GlueAt(pagePoint);
         var anchor = target?.Bounds.Center ?? Grid.Snap(pagePoint);
 
         _pendingConnector = new ConnectorShape(anchor, Grid.Snap(pagePoint))
         {
             StartShape = target,
             StartPort = port,
+            StartAlong = along,
             StartCap = DefaultStartCap,
             EndCap = DefaultEndCap,
             StrokeThickness = DefaultLineWidth,
@@ -1897,12 +1909,13 @@ public class DrawingCanvas : Decorator
                 return;
 
             case DragMode.DrawingConnector when _pendingConnector is { } pending:
-                (_glueTarget, _portIndex) = GlueAt(pagePoint);
+                (_glueTarget, _portIndex, _glueAlong) = GlueAt(pagePoint, skip: pending);
                 _portShape = _glueTarget;
 
                 pending.End = _glueTarget?.Bounds.Center ?? Grid.Snap(pagePoint);
                 pending.EndShape = _glueTarget;
                 pending.EndPort = _portIndex;
+                pending.EndAlong = _glueAlong;
 
                 InvalidateVisual();
                 return;
@@ -1916,7 +1929,7 @@ public class DrawingCanvas : Decorator
 
         if (Tool == EditorTool.Connector)
         {
-            var (over, port) = GlueAt(pagePoint);
+            var (over, port, _) = GlueAt(pagePoint);
 
             if (!ReferenceEquals(over, _glueTarget) || port != _portIndex)
             {
@@ -2058,7 +2071,7 @@ public class DrawingCanvas : Decorator
     {
         // An end point dropped on a shape - or near enough to one of its points - glues to it;
         // dropped on bare page it un-glues.
-        (_glueTarget, _portIndex) = GlueAt(pagePoint);
+        (_glueTarget, _portIndex, _glueAlong) = GlueAt(pagePoint, skip: connector);
         _portShape = _glueTarget;
 
         var anchor = _glueTarget?.Bounds.Center ?? Grid.Snap(pagePoint);
@@ -2068,12 +2081,14 @@ public class DrawingCanvas : Decorator
             connector.Start = anchor;
             connector.StartShape = _glueTarget;
             connector.StartPort = _portIndex;
+            connector.StartAlong = _glueAlong;
         }
         else
         {
             connector.End = anchor;
             connector.EndShape = _glueTarget;
             connector.EndPort = _portIndex;
+            connector.EndAlong = _glueAlong;
         }
 
         _dragChanged = true;

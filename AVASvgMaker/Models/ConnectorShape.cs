@@ -53,6 +53,26 @@ public class ConnectorShape : DiagramShape
 
     public int EndPort { get; set; } = -1;
 
+    /// <summary>
+    /// How far along the line this end is glued to, from 0 at its start to 1 at its end, for
+    /// the ends that are glued to another connector rather than to a shape.
+    ///
+    /// A fraction rather than which bend: bends are not fixtures. The router puts them in and
+    /// takes them out as the shapes around them move, and a hand-placed one is let go the
+    /// moment it stops making sense - so a bend to hang a line off is a bend that will not be
+    /// there next time. A fraction is always somewhere on the line, and moves along with it.
+    /// </summary>
+    public double StartAlong { get; set; } = 0.5;
+
+    public double EndAlong { get; set; } = 0.5;
+
+    /// <summary>
+    /// Stops a line glued to a line that is glued back to it from resolving for ever. Two
+    /// connectors pointing at one another have no answer between them, so the second one asked
+    /// gives the position it was drawn at and lets the first settle.
+    /// </summary>
+    private bool _resolving;
+
     /// <summary>Straight by default, so documents written before routing existed look the same.</summary>
     public ConnectorRouting Routing { get; set; } = ConnectorRouting.Straight;
 
@@ -345,6 +365,52 @@ public class ConnectorShape : DiagramShape
         return false;
     }
 
+    /// <summary>
+    /// How far along this line the given point comes nearest, from 0 at its start to 1 at its
+    /// end. What a pointer dropped on a line means by "here".
+    /// </summary>
+    public double Nearest(Point at)
+    {
+        var path = Path;
+
+        if (path.Count < 2)
+            return 0;
+
+        var best = double.MaxValue;
+        var found = 0.0;
+        var walked = 0.0;
+        var total = 0.0;
+
+        for (var i = 0; i + 1 < path.Count; i++)
+            total += Distance(path[i], path[i + 1]);
+
+        if (total < 1e-9)
+            return 0;
+
+        for (var i = 0; i + 1 < path.Count; i++)
+        {
+            var run = path[i + 1] - path[i];
+            var length = Distance(path[i], path[i + 1]);
+
+            var step = length < 1e-9
+                ? 0
+                : Math.Clamp(((at.X - path[i].X) * run.X + (at.Y - path[i].Y) * run.Y) / (length * length), 0, 1);
+
+            var on = new Point(path[i].X + run.X * step, path[i].Y + run.Y * step);
+            var gap = Distance(at, on);
+
+            if (gap < best)
+            {
+                best = gap;
+                found = (walked + length * step) / total;
+            }
+
+            walked += length;
+        }
+
+        return found;
+    }
+
     /// <summary>A cheap first pass, so the outline is only sampled where it could matter.</summary>
     private static bool Overlaps(Point a, Point b, Rect rect) =>
         Math.Min(a.X, b.X) <= rect.Right && Math.Max(a.X, b.X) >= rect.Left &&
@@ -459,16 +525,22 @@ public class ConnectorShape : DiagramShape
     }
 
     /// <summary>Where the line actually starts once gluing and edge clipping are applied.</summary>
-    public Point ResolvedStart =>
-        Resolve(StartShape, EffectiveStartPort, Start, AnchorOf(EndShape, EndPort, End));
+    public Point ResolvedStart => Resolve(
+        StartShape, EffectiveStartPort, StartAlong, Start,
+        AnchorOf(EndShape, EndPort, EndAlong, End));
 
-    public Point ResolvedEnd =>
-        Resolve(EndShape, EffectiveEndPort, End, AnchorOf(StartShape, StartPort, Start));
+    public Point ResolvedEnd => Resolve(
+        EndShape, EffectiveEndPort, EndAlong, End,
+        AnchorOf(StartShape, StartPort, StartAlong, Start));
 
     /// <summary>The direction the line leaves each end, used when routing around obstacles.</summary>
-    public Vector StartDirection => Direction(StartShape, EffectiveStartPort, ResolvedStart);
+    public Vector StartDirection => Direction(
+        StartShape, EffectiveStartPort, StartAlong, ResolvedStart,
+        AnchorOf(EndShape, EndPort, EndAlong, End));
 
-    public Vector EndDirection => Direction(EndShape, EffectiveEndPort, ResolvedEnd);
+    public Vector EndDirection => Direction(
+        EndShape, EffectiveEndPort, EndAlong, ResolvedEnd,
+        AnchorOf(StartShape, StartPort, StartAlong, Start));
 
     private int EffectiveStartPort => EffectivePorts.Start;
 
@@ -496,8 +568,8 @@ public class ConnectorShape : DiagramShape
     {
         get
         {
-            var startAnchor = AnchorOf(StartShape, StartPort, Start);
-            var endAnchor = AnchorOf(EndShape, EndPort, End);
+            var startAnchor = AnchorOf(StartShape, StartPort, StartAlong, Start);
+            var endAnchor = AnchorOf(EndShape, EndPort, EndAlong, End);
 
             // The common case, and the cheap one: both ends already face the other, so the
             // points that were chosen are the points used and there is nothing to weigh.
@@ -571,7 +643,7 @@ public class ConnectorShape : DiagramShape
     /// <summary>The faces worth weighing: all four, or the one in hand when there is no choice.</summary>
     private static int[] Choices(DiagramShape? glued, int port)
     {
-        if (glued is null || port < 0)
+        if (glued is null or ConnectorShape || port < 0)
             return [port];
 
         var points = glued.ConnectionPoints;
@@ -585,7 +657,8 @@ public class ConnectorShape : DiagramShape
     /// <summary>True when a face points away from where the line has to go.</summary>
     private static bool FacesAway(DiagramShape? glued, int port, Point toward)
     {
-        if (glued is null || port < 0)
+        // A point on a line is not a face and has no opposite to flip to.
+        if (glued is null or ConnectorShape || port < 0)
             return false;
 
         var points = glued.ConnectionPoints;
@@ -614,18 +687,82 @@ public class ConnectorShape : DiagramShape
         return (bounds.Width + bounds.Height) / 2;
     }
 
-    private static Point AnchorOf(DiagramShape? glued, int port, Point free)
+    private Point AnchorOf(DiagramShape? glued, int port, double along, Point free)
     {
         if (glued is null)
             return free;
+
+        if (glued is ConnectorShape line)
+            return Trace(line, along, free).At;
 
         return Port(glued, port) ?? glued.Bounds.Center;
     }
 
-    private static Point Resolve(DiagramShape? glued, int port, Point free, Point toward)
+    /// <summary>
+    /// A point a fraction of the way along another connector, and the way that line runs
+    /// where it gets there. Measured along the line as drawn, so a route that grows a bend
+    /// carries what is hung off it round the bend with it.
+    /// </summary>
+    private (Point At, Vector Along) Trace(ConnectorShape line, double along, Point free)
+    {
+        // A line glued to a line glued back to this one: see _resolving.
+        if (ReferenceEquals(line, this) || _resolving || line._resolving)
+            return (free, default);
+
+        _resolving = true;
+
+        try
+        {
+            var path = line.Path;
+
+            if (path.Count < 2)
+                return (free, default);
+
+            var lengths = new double[path.Count - 1];
+            var total = 0.0;
+
+            for (var i = 0; i + 1 < path.Count; i++)
+            {
+                lengths[i] = Distance(path[i], path[i + 1]);
+                total += lengths[i];
+            }
+
+            if (total < 1e-9)
+                return (path[0], default);
+
+            var want = Math.Clamp(along, 0, 1) * total;
+
+            for (var i = 0; i < lengths.Length; i++)
+            {
+                if (want > lengths[i] && i < lengths.Length - 1)
+                {
+                    want -= lengths[i];
+                    continue;
+                }
+
+                var step = lengths[i] < 1e-9 ? 0 : want / lengths[i];
+                var run = path[i + 1] - path[i];
+
+                return (
+                    new Point(path[i].X + run.X * step, path[i].Y + run.Y * step),
+                    lengths[i] < 1e-9 ? default : new Vector(run.X / lengths[i], run.Y / lengths[i]));
+            }
+
+            return (path[^1], default);
+        }
+        finally
+        {
+            _resolving = false;
+        }
+    }
+
+    private Point Resolve(DiagramShape? glued, int port, double along, Point free, Point toward)
     {
         if (glued is null)
             return free;
+
+        if (glued is ConnectorShape line)
+            return Trace(line, along, free).At;
 
         return Port(glued, port) ?? ClipToRect(glued.Bounds, toward);
     }
@@ -637,10 +774,25 @@ public class ConnectorShape : DiagramShape
         return port >= 0 && port < points.Count ? points[port] : null;
     }
 
-    private static Vector Direction(DiagramShape? glued, int port, Point resolved)
+    private Vector Direction(DiagramShape? glued, int port, double along, Point resolved, Point toward)
     {
         if (glued is null)
             return default;
+
+        // Off a line, the way out is square to it - on the side the rest of this connector is,
+        // so a loop coming back to a check leaves the line it joins facing where it is going.
+        if (glued is ConnectorShape line)
+        {
+            var run = Trace(line, along, resolved).Along;
+
+            if (Math.Abs(run.X) < 0.0001 && Math.Abs(run.Y) < 0.0001)
+                return default;
+
+            var square = new Vector(-run.Y, run.X);
+            var away = new Vector(toward.X - resolved.X, toward.Y - resolved.Y);
+
+            return square.X * away.X + square.Y * away.Y < 0 ? new Vector(run.Y, -run.X) : square;
+        }
 
         if (port >= 0)
             return glued.ConnectionDirection(port);

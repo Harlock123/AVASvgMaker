@@ -509,7 +509,7 @@ public class DiagramDocument
         // A moves aside for B, which then has to move aside for A - whereas an order that only
         // looks backwards cannot come round on itself. Drawing order is the order used, so the
         // same page always routes the same way.
-        foreach (var connector in Shapes.OfType<ConnectorShape>())
+        foreach (var connector in Ordered(Shapes.OfType<ConnectorShape>().ToList()))
         {
             connector.UpdateRoute(obstacles, RouteClearance, taken);
 
@@ -518,6 +518,40 @@ public class DiagramDocument
             for (var i = 0; i + 1 < path.Count; i++)
                 taken.Add((path[i], path[i + 1]));
         }
+    }
+
+    /// <summary>
+    /// The connectors, with any hanging off another coming after the one it hangs off: a line
+    /// glued to a line has nowhere to be until that line has been routed. Ties keep drawing
+    /// order, so a page with none of this in it routes exactly as it did before.
+    ///
+    /// Two connectors glued to each other have no order between them. They are left where the
+    /// sort puts them and the resolving guard sees to it that neither waits on the other.
+    /// </summary>
+    private static List<ConnectorShape> Ordered(List<ConnectorShape> lines)
+    {
+        var depth = new Dictionary<ConnectorShape, int>();
+
+        int Depth(ConnectorShape line, int guard)
+        {
+            if (depth.TryGetValue(line, out var known))
+                return known;
+
+            if (guard > lines.Count)
+                return 0;
+
+            var deepest = 0;
+
+            foreach (var end in new[] { line.StartShape, line.EndShape })
+            {
+                if (end is ConnectorShape other && !ReferenceEquals(other, line))
+                    deepest = Math.Max(deepest, Depth(other, guard + 1) + 1);
+            }
+
+            return depth[line] = deepest;
+        }
+
+        return lines.OrderBy(line => Depth(line, 0)).ToList();
     }
 
     /// <summary>

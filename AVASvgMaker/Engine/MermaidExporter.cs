@@ -84,6 +84,14 @@ public static class MermaidExporter
         // An edge joins two named nodes, so a line with a loose end has nothing to be.
         foreach (var line in lines)
         {
+            // A line hung off another line has no name at that end to write down: Mermaid
+            // joins nodes to nodes and has nothing for a point partway along an edge.
+            if (line.StartShape is ConnectorShape || line.EndShape is ConnectorShape)
+            {
+                Leave("a line joined to another line, which Mermaid has nothing for");
+                continue;
+            }
+
             if (line.StartShape is null || line.EndShape is null ||
                 !names.TryGetValue(line.StartShape, out var from) ||
                 !names.TryGetValue(line.EndShape, out var to))

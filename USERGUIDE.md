@@ -151,6 +151,30 @@ every straight run:
 Double-clicking a bend also removes it. **Edit -> Reset connector route** hands a connector
 back to the router and forgets everything you placed by hand.
 
+### Joining a line to a line
+
+A connector's end can be dropped on another **connector** as well as on a shape. Drag the end
+over a line and let go: it sticks to the line at the point you dropped it, and stays there as
+that line re-routes.
+
+This is what a loop wants. A "no" branch coming back round to a check usually belongs on the
+run that feeds the check rather than on the check itself - drawn to the box, it arrives
+alongside every other line that ends there and the diagram stops saying which is which.
+
+Where it lands is remembered as a fraction of the way along the line, not as a bend. Bends are
+not fixtures: the router puts them in and takes them out as the shapes move, so a line hung off
+a bend would be hung off something that may not be there next time. A fraction is always
+somewhere on the line, and carries round a new corner with it.
+
+The line being joined is routed first, so what hangs off it knows where to be. Two connectors
+joined to each other have no answer between them and are left where they were drawn rather
+than chasing one another.
+
+One thing it costs: **Mermaid cannot write it down.** Mermaid joins nodes to nodes and has
+nothing for a point partway along an edge, so a line joined to a line is left out of that
+export, and the summary says so. Every other export draws it, because every other export draws
+where things are rather than what connects to what.
+
 ### When bends are let go
 
 Bends you place by hand are yours, and the router leaves them alone - even where its own route
