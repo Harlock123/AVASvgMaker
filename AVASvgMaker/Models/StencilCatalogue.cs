@@ -37,6 +37,13 @@ public static class StencilCatalogue
                $"C {less},{b} {t},{more} {t},0.5 C {t},{less} {less},{t} 0.5,{t} Z";
     }
 
+    /// <summary>
+    /// A supply rail: a bar across the top of a stub that runs down to the bottom of the box,
+    /// which is where the shape's bottom connection point is. The top of the box is left empty
+    /// on purpose - that is where the label goes.
+    /// </summary>
+    private const string Rail = "M 0.2,0.55 L 0.8,0.55 M 0.5,0.55 L 0.5,1";
+
     private static readonly Stencil[] Fixed =
     [
         // ---- Basic ----------------------------------------------------------------
@@ -450,6 +457,44 @@ public static class StencilCatalogue
             Detail: "M 0.5,0 L 0.5,0.46 M 0.2,0.46 L 0.8,0.46 " +
                     "M 0.28,0.46 L 0.12,0.82 M 0.5,0.46 L 0.34,0.82 M 0.72,0.46 L 0.56,0.82",
             Keywords: "electrical electronic chassis frame earth ground hatched"),
+
+        // Ground as a digital page draws it: a solid triangle rather than the earth's bars.
+        new(ShapeKind.DigitalGround, StencilCategory.Electrical, "Digital ground",
+            "M 0.22,0.38 L 0.78,0.38 L 0.5,0.92 Z",
+            Detail: "M 0.5,0 L 0.5,0.38",
+            Keywords: "electrical electronic ground gnd digital signal common zero triangle"),
+
+        // The supply rails. All the same symbol - a bar on a stub - and the label is what
+        // tells them apart, which is why it is text the shape carries rather than line work.
+        new(ShapeKind.Rail5V, StencilCategory.Electrical, "+5V",
+            Detail: Rail,
+            Keywords: "electrical electronic power supply rail 5v vcc vdd positive volts",
+            Defaults: new StencilDefaults(Label: "+5V", TextVerticalAlign: TextVerticalAlign.Top)),
+
+        new(ShapeKind.Rail3V3, StencilCategory.Electrical, "+3.3V",
+            Detail: Rail,
+            Keywords: "electrical electronic power supply rail 3v3 3.3v vdd positive volts",
+            Defaults: new StencilDefaults(Label: "+3.3V", TextVerticalAlign: TextVerticalAlign.Top)),
+
+        new(ShapeKind.SupplyRail, StencilCategory.Electrical, "Supply rail",
+            Detail: Rail,
+            Keywords: "electrical electronic power supply rail voltage vcc vdd 12v volts",
+            Defaults: new StencilDefaults(Label: "+V", TextVerticalAlign: TextVerticalAlign.Top)),
+
+        // The negative rail hangs the other way up, under the circuit it feeds.
+        new(ShapeKind.NegativeRail, StencilCategory.Electrical, "Negative rail",
+            Detail: "M 0.2,0.45 L 0.8,0.45 M 0.5,0 L 0.5,0.45",
+            Keywords: "electrical electronic power supply rail negative vee vss volts",
+            Defaults: new StencilDefaults(Label: "-5V", TextVerticalAlign: TextVerticalAlign.Bottom)),
+
+        new(ShapeKind.SupplyFlag, StencilCategory.Electrical, "VCC flag",
+            Detail: "M 0.5,1 L 0.5,0.5 M 0.36,0.66 L 0.5,0.5 L 0.64,0.66",
+            Keywords: "electrical electronic power supply vcc vdd rail flag arrow volts",
+            Defaults: new StencilDefaults(Label: "VCC", TextVerticalAlign: TextVerticalAlign.Top)),
+
+        new(ShapeKind.NoConnect, StencilCategory.Electrical, "No connect",
+            Detail: "M 0.3,0.3 L 0.7,0.7 M 0.7,0.3 L 0.3,0.7",
+            Keywords: "electrical electronic no connect nc unused pin cross open"),
 
         new(ShapeKind.SwitchContact, StencilCategory.Electrical, "Switch",
             Detail: "M 0,0.6 L 0.3,0.6 M 0.3,0.6 L 0.72,0.26 M 0.7,0.6 L 1,0.6",

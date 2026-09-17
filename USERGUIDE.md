@@ -51,6 +51,15 @@ make it mean something else - so setting a fill colour does nothing you can see 
 few that do have a body, like a fuse or an amplifier, arrive hollow on purpose. The line
 colour, weight and style work on all of them as usual.
 
+The **supply rails** in that set - **+5V**, **+3.3V**, the generic **Supply rail** and the
+**Negative rail** - are the one place a symbol arrives with writing on it. A bar on a stub
+does not say 5 from 3.3, so the voltage is the shape's own text: press `F2` and a +5V becomes
+a `+12V` or a `VBAT`, and it is the new name that gets saved and exported. The label sits
+clear of the line work, above the bar on a positive rail and below it on a negative one.
+Connect to the end of the stub - the point at the bottom of a supply rail, the top of an earth.
+There is a **Digital ground** triangle beside the earth symbols for pages drawn the digital
+way, and a **No connect** cross for a pin that is deliberately left alone.
+
 The **Electronic** set is the chips: a 555, a 741, the common 74xx logic, and blank DIP-8,
 DIP-14 and DIP-16 packages for anything not on the list. They are different in a more useful
 way - a chip has **a connection point for every pin**, named and in the right place, instead

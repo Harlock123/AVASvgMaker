@@ -1271,6 +1271,15 @@ public class DrawingCanvas : Decorator
             ShapeKind.Pool => (520.0, 260.0),
             ShapeKind.Lane => (480.0, 110.0),
             ShapeKind.ContainerBox => (320.0, 220.0),
+            // An upright symbol - an earth, a supply rail - is drawn in a square, and comes out
+            // stretched in the wide box everything else gets. A no-connect is a mark on a pin
+            // and wants to be small.
+            ShapeKind.NoConnect => (32.0, 32.0),
+
+            ShapeKind.Ground or ShapeKind.Chassis or ShapeKind.DigitalGround
+                or ShapeKind.Rail5V or ShapeKind.Rail3V3 or ShapeKind.SupplyRail
+                or ShapeKind.NegativeRail or ShapeKind.SupplyFlag => (64.0, 72.0),
+
             // A chip needs a row for every pin down each side, and a pin whose name does not
             // fit in its row is a pin nobody can read.
             _ when ChipCatalogue.Find(kind) is { } chip =>

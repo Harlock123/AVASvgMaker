@@ -22,7 +22,9 @@ public enum StencilCategory
 public record StencilDefaults(
     double? StrokeThickness = null,
     StrokeStyle? StrokeStyle = null,
-    bool Hollow = false);
+    bool Hollow = false,
+    string? Label = null,
+    TextVerticalAlign? TextVerticalAlign = null);
 
 /// <summary>
 /// One entry in the stencil catalogue: what it is called, where it lives in the toolbox, and
@@ -58,5 +60,14 @@ public record Stencil(
 
         if (defaults.Hollow)
             shape.Fill = Avalonia.Media.Colors.Transparent;
+
+        // A supply rail is its label - the symbol alone does not say 5 from 3.3 - so it
+        // arrives with one, as the shape's own text and renameable like any other. Only when
+        // there is nothing there already: a shape being read back from a file has its own.
+        if (defaults.Label is { } label && string.IsNullOrEmpty(shape.Text))
+            shape.Text = label;
+
+        if (defaults.TextVerticalAlign is { } align)
+            shape.TextVerticalAlign = align;
     }
 }

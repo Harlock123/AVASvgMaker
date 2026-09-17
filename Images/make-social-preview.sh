@@ -29,7 +29,7 @@ magick -size 1280x640 xc:'#0A0E18' \
   -font Adwaita-Sans -pointsize 21 -fill '#7B8FAC' \
     -annotate +72+332 'Reads Visio .vsdx and Mermaid' \
     -annotate +72+366 'Exports SVG, PNG, PDF and Mermaid' \
-    -annotate +72+400 '130 stencils, self-routing connectors, swimlanes' \
+    -annotate +72+400 '137 stencils, self-routing connectors, swimlanes' \
   -font Adwaita-Sans-Bold -pointsize 20 -fill '#0078D7' \
     -annotate +72+552 'github.com/Harlock123/AVASvgMaker' \
   -font Adwaita-Sans -pointsize 19 -fill '#5F7186' \

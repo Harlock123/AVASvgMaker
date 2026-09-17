@@ -138,6 +138,13 @@ public enum ShapeKind
     Amplifier,
     Antenna,
     Motor,
+    DigitalGround,
+    Rail5V,
+    Rail3V3,
+    SupplyRail,
+    NegativeRail,
+    SupplyFlag,
+    NoConnect,
 
     // Electronic. Packages with a leg per pin - see ChipCatalogue and ChipShape.
     Chip555,

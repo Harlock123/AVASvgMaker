@@ -43,7 +43,7 @@ Or [build it yourself](#building).
 
 **Drawing**
 
-- **130 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML, network, electrical and electronic, in categories that fold away, with a search box
+- **137 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML, network, electrical and electronic, in categories that fold away, with a search box
 - **Shapes of your own** - save any selection as a reusable shape and it joins the toolbox, kept between drawings and between sessions
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
 - **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder, each on its own paper
@@ -147,10 +147,14 @@ loose shapes.
 | **BPMN** | Start, intermediate, end, message and timer events; task, subprocess, user, service and script tasks; exclusive, parallel, inclusive and event gateways; data object, data store, group; pool, lane and container |
 | **UML** | Class, interface, package, note, actor, use case, component, node, state, initial state, final state |
 | **Network** | Server, workstation, laptop, router, switch, firewall, printer, mobile device, storage array, wireless access point |
-| **Electrical** | Resistor, capacitor, polarised capacitor, inductor, diode, LED, zener diode, battery, DC and AC source, ground, chassis earth, switch, fuse, lamp, transformer, transistor, amplifier, antenna, motor |
+| **Electrical** | Resistor, capacitor, polarised capacitor, inductor, diode, LED, zener diode, battery, DC and AC source, ground, digital ground, chassis earth, +5V, +3.3V, supply and negative rails, VCC flag, no connect, switch, fuse, lamp, transformer, transistor, amplifier, antenna, motor |
 | **Electronic** | 555 timer, 741 op-amp, 7400 NAND, 7402 NOR, 7404 inverter, 7408 AND, 7432 OR, 7474 flip-flop, 7486 XOR, 74138 decoder, 74595 shift register, and blank DIP-8, DIP-14 and DIP-16 packages |
 
 ![The electrical symbols](Images/electrical.png)
+
+A supply rail carries its voltage as the shape's own text, so `F2` turns a **+5V** into a
+`+12V` or a `VBAT` - the symbol is the same bar on a stub either way, and the label is what
+tells them apart.
 
 The **Electronic** chips are drawn as dual in-line packages, and each one carries a
 connection point per pin rather than the four every other shape has. The pinouts are from the
@@ -1226,7 +1230,7 @@ AVASvgMaker/
     TextBoxShape.cs      Borderless text, with a dashed guide while empty
     EndCapStyle.cs       None, Arrow, OpenArrow, Dot, Diamond
     Stencil.cs           One catalogue entry: name, category, outline
-    StencilCatalogue.cs  All 130 stencils
+    StencilCatalogue.cs  All 137 stencils
     Chip.cs              The DIP pinouts, from the datasheets
     ChipShape.cs         A chip package: a leg and a named connection point per pin
     ContainerShape.cs    Pools, lanes and grouping boxes

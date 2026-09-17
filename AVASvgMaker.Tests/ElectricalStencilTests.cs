@@ -32,7 +32,7 @@ public class ElectricalStencilTests
     [AvaloniaFact]
     public void TheyAreAllThere()
     {
-        Assert.Equal(20, Electrical.Count);
+        Assert.Equal(27, Electrical.Count);
         Assert.Equal("Electrical", StencilCatalogue.CategoryName(StencilCategory.Electrical));
     }
 
