@@ -313,19 +313,24 @@ public class ChipShape : DiagramShape
     /// part number still clear of it. Measuring text here would need a font, so this counts
     /// characters instead - the numbers are the average glyph widths of the default face at
     /// the sizes the two labels use.
+    ///
+    /// They are deliberately generous. The default face is whatever the machine has, and one
+    /// that measures a few per cent wider than the machine this was calibrated on would have
+    /// a part number touching the pin names on a chip sized to the pixel - which is what the
+    /// build runner's font did.
     /// </summary>
     public static Size PreferredSize(Chip chip)
     {
         var longest = chip.Pins.Max(pin => pin.Length);
-        var part = chip.Name.Length * 8.0 + 20;
+        var part = chip.Name.Length * 8.8 + 20;
 
         if (chip.Package == ChipPackage.To220)
             return new Size(
-                Math.Clamp(Math.Ceiling(Math.Max(chip.Count * (longest * 6.2 + 12), part)), 90, 220),
+                Math.Clamp(Math.Ceiling(Math.Max(chip.Count * (longest * 6.8 + 12), part)), 90, 250),
                 88);
 
         return new Size(
-            Math.Clamp(Math.Ceiling((longest * 6.0 + 4) * 2 + part) + 40, 110, 220),
+            Math.Clamp(Math.Ceiling((longest * 6.6 + 4) * 2 + part) + 40, 110, 250),
             Math.Max(80, chip.PerSide * 24));
     }
 

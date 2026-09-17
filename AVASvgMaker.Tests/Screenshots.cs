@@ -529,7 +529,7 @@ public class Screenshots
         var chips = ChipCatalogue.All.OrderBy(chip => chip.Count).ThenBy(chip => chip.Name).ToList();
 
         const int columns = 6;
-        const double wide = 240, margin = 16;
+        const double wide = 275, margin = 16;
 
         // A row is as tall as the tallest chip in it: a 16-pin package is twice the height of
         // an 8-pin one, and a fixed cell would leave a band of white under every short row.

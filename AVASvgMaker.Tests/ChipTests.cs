@@ -148,6 +148,11 @@ public class ChipTests
     /// The size a chip is dropped at has to hold the longest pin name on both sides with the
     /// part number still clear between them. This is the arithmetic the drawing does, done
     /// again from the outside: pin font, package width, the gutter the names need.
+    ///
+    /// With slack in it, because the measuring here is done with whatever font this machine
+    /// calls default and the drawing will be done with whatever font the reader's does. A
+    /// size that only just fits on one machine is a size that does not fit on another - which
+    /// is how this test came to pass here and fail on the build runner.
     /// </summary>
     [AvaloniaFact]
     public void TheSizeItIsDroppedAtFitsTheNamesAndThePartNumber()
@@ -161,9 +166,11 @@ public class ChipTests
             var names = chip.Pins.Max(pin => Measure(pin, pinSize));
             var part = Measure(chip.Name, 13);
 
-            Assert.True(names * 2 + part + 16 <= package,
-                $"{chip.Name} is {package:0.#} wide, and needs {names * 2 + part + 16:0.#} " +
-                "for its names and its part number");
+            var needed = names * 2 + part + 16;
+
+            Assert.True(needed * 1.08 <= package,
+                $"{chip.Name} is {package:0.#} wide, and needs {needed:0.#} for its names and " +
+                "its part number - too tight for a machine whose font measures wider");
 
             // And a row per pin, tall enough for the name in it to be read.
             Assert.True(size.Height / chip.PerSide >= 9, $"{chip.Name}'s rows are too shallow");
@@ -172,7 +179,7 @@ public class ChipTests
         var regulator = ChipCatalogue.Find(ShapeKind.Regulator7805)!;
         var foot = ChipShape.PreferredSize(regulator).Width / regulator.Count;
 
-        Assert.True(regulator.Pins.Max(pin => Measure(pin, 10)) + 4 <= foot,
+        Assert.True((regulator.Pins.Max(pin => Measure(pin, 10)) + 4) * 1.08 <= foot,
             $"{regulator.Name} has {foot:0.#} across each leg, and its names need more");
     }
 
