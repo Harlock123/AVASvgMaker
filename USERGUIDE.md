@@ -22,7 +22,9 @@ drawing to someone else.
 ![The window](Images/overview.png)
 
 Down the left is the **toolbox**, holding every shape you can draw, in categories that fold
-away, with a search box at the top. Down the right is the **properties panel**, which formats
+away, with a search box at the top. The shapes are laid across the panel rather than listed
+down it, so a category of two dozen fits without much scrolling; a name too long for its tile
+is cut short, and hovering over the shape shows the whole of it. Down the right is the **properties panel**, which formats
 whatever is selected and shows the settings that apply to it - a shape gets FILL, a connector
 gets CONNECTOR with its route and its line ends, and both get LINE and TEXT. In the middle is the **page**, floating on a workspace, with **rulers**
 along the top and left edge and **page tabs** along the bottom once a document has more than

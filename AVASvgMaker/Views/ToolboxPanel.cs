@@ -29,10 +29,10 @@ public class ToolboxPanel : UserControl
     private static readonly IBrush ItemBorder = AppTheme.Border;
 
     private readonly List<(Stencil Stencil, Border Item)> _items = [];
-    private readonly List<(StencilCategory Category, Expander Group, StackPanel Items)> _groups = [];
+    private readonly List<(StencilCategory Category, Expander Group, WrapPanel Items)> _groups = [];
 
     /// <summary>The shapes you saved yourself, in a category of their own above the rest.</summary>
-    private readonly StackPanel _mine = new() { Spacing = 4, Margin = new Thickness(0, 4, 0, 0) };
+    private readonly WrapPanel _mine = Tiles();
 
     private readonly Expander _mineGroup;
 
@@ -89,7 +89,7 @@ public class ToolboxPanel : UserControl
 
         foreach (var category in Enum.GetValues<StencilCategory>())
         {
-            var items = new StackPanel { Spacing = 4, Margin = new Thickness(0, 4, 0, 0) };
+            var items = Tiles();
 
             foreach (var stencil in StencilCatalogue.InCategory(category))
             {
@@ -104,6 +104,10 @@ public class ToolboxPanel : UserControl
                 // Only the first category starts open, so the whole catalogue is not a wall.
                 IsExpanded = category == StencilCategory.Basic,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
+
+                // The theme's own padding is generous enough to cost a column of shapes,
+                // which in a panel this narrow is a third of the room.
+                Padding = new Thickness(4, 2, 4, 6),
                 Content = items
             };
 
@@ -157,26 +161,51 @@ public class ToolboxPanel : UserControl
         };
     }
 
-    private Border CreateItem(Stencil stencil)
+    /// <summary>
+    /// The grid the shapes sit in. Laid across and then down rather than one to a line: a
+    /// category of two dozen wanted a screen and a half of scrolling to see the end of, and
+    /// the thing you are looking for is a picture long before it is a word.
+    ///
+    /// It flows to whatever width it is given, so widening the panel gives more columns
+    /// rather than more white space.
+    /// </summary>
+    private static WrapPanel Tiles() => new()
     {
-        var layout = new DockPanel { LastChildFill = true };
+        ItemWidth = TileWidth,
+        ItemHeight = TileHeight,
+        Margin = new Thickness(0, 4, 0, 0)
+    };
 
-        var preview = new ShapePreview(stencil.Kind)
-        {
-            Width = 40,
-            Height = 30,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
+    private const double TileWidth = 60;
+    private const double TileHeight = 64;
 
-        DockPanel.SetDock(preview, Dock.Left);
+    /// <summary>
+    /// One shape in the grid: its picture, and its name under it in as many of two lines as
+    /// it takes. The name is kept - a picture of a "predefined process" and a picture of a
+    /// "subprocess" are the same picture until you read them - and the whole of it is on the
+    /// tooltip for the few that are too long to sit under a tile.
+    /// </summary>
+    private Border Tile(Control preview, string name, object tag)
+    {
+        preview.Width = 34;
+        preview.Height = 22;
+
+        var layout = new StackPanel { Spacing = 2 };
         layout.Children.Add(preview);
 
         layout.Children.Add(new TextBlock
         {
-            Text = stencil.Name,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = 12
+            Text = name,
+            TextAlignment = TextAlignment.Center,
+            // Wrapped only where there is a space to wrap at. A tile this narrow turns
+            // "Parallelogram" into "Parallelogra" and a lonely "m" otherwise, where a name of
+            // one long word reads better cut short - and the whole of it is on the tooltip
+            // either way. Names of two words have somewhere to break and take two lines.
+            TextWrapping = name.Contains(' ') ? TextWrapping.Wrap : TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxLines = 2,
+            FontSize = 10,
+            LineHeight = 11
         });
 
         var border = new Border
@@ -185,11 +214,20 @@ public class ToolboxPanel : UserControl
             BorderBrush = ItemBorder,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(4),
-            Padding = new Thickness(6),
+            Padding = new Thickness(3, 4, 3, 3),
+            Margin = new Thickness(0, 0, 2, 2),
             Cursor = new Cursor(StandardCursorType.Hand),
-            Tag = stencil.Kind,
+            Tag = tag,
             Child = layout
         };
+
+        ToolTip.SetTip(border, name);
+        return border;
+    }
+
+    private Border CreateItem(Stencil stencil)
+    {
+        var border = Tile(new ShapePreview(stencil.Kind), stencil.Name, stencil.Kind);
 
         border.PointerPressed += OnItemPointerPressed;
         return border;
@@ -215,37 +253,10 @@ public class ToolboxPanel : UserControl
 
     private Border CreateCustomItem(CustomStencil stencil)
     {
-        var layout = new DockPanel { LastChildFill = true };
+        var border = Tile(new FragmentPreview(stencil.Fragment), stencil.Name, stencil);
 
-        var preview = new FragmentPreview(stencil.Fragment)
-        {
-            Width = 40,
-            Height = 30,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-
-        DockPanel.SetDock(preview, Dock.Left);
-        layout.Children.Add(preview);
-
-        layout.Children.Add(new TextBlock
-        {
-            Text = stencil.Name,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = 12
-        });
-
-        var border = new Border
-        {
-            Background = stencil.Id == ArmedStencil ? ItemArmedBackground : ItemBackground,
-            BorderBrush = ItemBorder,
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4),
-            Padding = new Thickness(6),
-            Cursor = new Cursor(StandardCursorType.Hand),
-            Tag = stencil,
-            Child = layout
-        };
+        if (stencil.Id == ArmedStencil)
+            border.Background = ItemArmedBackground;
 
         var menu = new ContextMenu();
         menu.Items.Add(Item("_Rename...", () => RenameRequested?.Invoke(stencil)));

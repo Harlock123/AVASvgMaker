@@ -212,7 +212,9 @@ public class CustomStencilTests : IDisposable
 
         Assert.True(mine.IsVisible);
 
-        var item = ((StackPanel)mine.Content!).Children.OfType<Border>().Single();
+        // Panel rather than any particular one: what matters is that the shape is in there,
+        // not whether the shapes are listed down the panel or laid out across it.
+        var item = ((Panel)mine.Content!).Children.OfType<Border>().Single();
         Assert.Equal(saved.Id, (item.Tag as CustomStencil)?.Id);
 
         // Arming it tells the canvas. The press itself is not simulated here: the handler

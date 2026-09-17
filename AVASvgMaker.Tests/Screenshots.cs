@@ -8,6 +8,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using AVASvgMaker.Engine;
 using AVASvgMaker.Models;
@@ -322,5 +323,68 @@ public class Screenshots
 
         using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "mermaid-import.png")));
         RasterExporter.Export(page, file, 2, RasterFormat.Png);
+    }
+
+    /// <summary>
+    /// Saved shapes sitting in the toolbox. The toolbox is rendered on its own rather than
+    /// cropped out of a window shot, so the picture is the panel and nothing else.
+    ///
+    /// The library is pointed at a temporary file for the duration: this writes shapes, and
+    /// writing them into whoever is running it's own collection would be rude.
+    /// </summary>
+    [AvaloniaFact]
+    public void CustomShapes()
+    {
+        if (!Asked) return;
+
+        var was = StencilLibrary.Path;
+        var scratch = Path.Combine(Path.GetTempPath(), "ava-shot-" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            StencilLibrary.Path = Path.Combine(scratch, "stencils.json");
+            StencilLibrary.Reload();
+
+            StencilLibrary.Add("Server", Fragment("Server", "eu-west-1"));
+            StencilLibrary.Add("Decision pair", Fragment("Ready?", "Ship it"));
+
+            var (window, _) = Window();
+            var toolbox = window.FindControl<Views.ToolboxPanel>("Toolbox")!;
+
+            Harness.Settle(window);
+
+            var size = new PixelSize(
+                (int)Math.Round(toolbox.Bounds.Width * 2),
+                (int)Math.Round(Math.Min(toolbox.Bounds.Height, 420) * 2));
+
+            using var bitmap = new RenderTargetBitmap(size, new Vector(192, 192));
+            bitmap.Render(toolbox);
+
+            using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "custom-shapes.png")));
+            bitmap.Save(file);
+        }
+        finally
+        {
+            StencilLibrary.Path = was;
+            StencilLibrary.Reload();
+
+            if (Directory.Exists(scratch))
+                Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    /// <summary>A little group of shapes, as saving a selection would produce.</summary>
+    private static string Fragment(string top, string bottom)
+    {
+        var page = Harness.Page();
+
+        var box = Harness.Box(page, new Rect(100, 100, 120, 60), top);
+        var label = Harness.Box(page, new Rect(100, 180, 120, 30), bottom);
+
+        box.Bold = true;
+        Harness.Join(page, box, 2, label, 0);
+        page.Group([box, label]);
+
+        return ShapeClipboard.Copy(page, page.Shapes.ToList())!;
     }
 }
