@@ -138,7 +138,64 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      # Uploaded one at a time. Seven forty-megabyte files racing each other were slow
+      # enough that the largest of them timed out on its headers, and a failed upload
+      # leaves the release sitting as a draft nobody can see - which is a worse outcome
+      # than a slow release, because nothing says so unless you go and look.
+      #
+      # Held as a draft here on purpose: the step below publishes it, and only once every
+      # file is accounted for. Allowed to fail without failing the job, because the step
+      # below can finish what it started.
       - uses: softprops/action-gh-release@v3
+        continue-on-error: true
         with:
           files: artifacts/*
           generate_release_notes: true
+          preserve_order: true
+          draft: true
+
+      # What the upload above did not manage, tried again here, and the release published
+      # only when the files on it match the files that were built. A release that is short
+      # of a platform stays a draft and the job goes red, rather than going out incomplete.
+      - name: Fill any gaps, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # This job never checks the repository out - it only needs the built files - so
+          # there is no git remote for gh to work the repository out from. Without this,
+          # every query fails, the release looks empty and it is left as a draft.
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+
+          tag="$GITHUB_REF_NAME"
+          want=$(ls artifacts | sort)
+
+          # Nothing to fill in if the release was never made. Checked once here rather than
+          # discovered seven files and twenty-one retries later.
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::there is no release for $tag to put the files on"
+            exit 1
+          fi
+
+          for name in $want; do
+            for attempt in 1 2 3; do
+              if gh release view "$tag" --json assets --jq '.assets[].name' | grep -qxF "$name"; then
+                break
+              fi
+
+              echo "::notice::uploading $name (attempt $attempt)"
+              gh release upload "$tag" "artifacts/$name" --clobber || true
+              sleep $(( attempt * 10 ))
+            done
+          done
+
+          have=$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)
+
+          if [ "$want" != "$have" ]; then
+            echo "::error::the release is short of files - left as a draft"
+            diff <(echo "$want") <(echo "$have") || true
+            exit 1
+          fi
+
+          gh release edit "$tag" --draft=false
+          echo "published $tag with $(echo "$have" | wc -l) files"
