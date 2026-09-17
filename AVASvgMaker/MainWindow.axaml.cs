@@ -635,7 +635,10 @@ public partial class MainWindow : Window
         var wasSyncing = _syncing;
         _syncing = true;
 
-        var arming = selection.Count == 0 && Canvas.Tool == EditorTool.Connector;
+        // The connector tool means one is about to be drawn, and its settings are wanted
+        // whether or not something else happens to be selected at the time - which, straight
+        // after dropping a shape, it usually is.
+        var arming = Canvas.Tool == EditorTool.Connector;
 
         PropertiesHint.Text = selection.Count switch
         {
@@ -1148,32 +1151,68 @@ public partial class MainWindow : Window
         if (Canvas is null || _syncing)
             return;
 
-        Canvas.DefaultStartCap = SelectedCap(StartCapBox);
-        Canvas.DefaultEndCap = SelectedCap(EndCapBox);
-        Canvas.DefaultRouting = SelectedRouting(RoutingBox);
+        // The one that changed, and only that one. Reading all three back would take the
+        // dash a mixed selection shows for the others and write it as a value.
+        if (ReferenceEquals(sender, StartCapBox))
+        {
+            Canvas.DefaultStartCap = SelectedCap(StartCapBox);
+            Canvas.ApplyConnectorStyle(start: Canvas.DefaultStartCap);
+        }
+        else if (ReferenceEquals(sender, EndCapBox))
+        {
+            Canvas.DefaultEndCap = SelectedCap(EndCapBox);
+            Canvas.ApplyConnectorStyle(end: Canvas.DefaultEndCap);
+        }
+        else if (ReferenceEquals(sender, RoutingBox))
+        {
+            Canvas.DefaultRouting = SelectedRouting(RoutingBox);
+            Canvas.ApplyConnectorStyle(routing: Canvas.DefaultRouting);
+        }
 
-        Canvas.ApplyConnectorStyle();
         Canvas.ReportStatus();
     }
 
     /// <summary>Selecting a connector pulls its line ends back into the toolbar.</summary>
+    /// <summary>
+    /// Shows what the selected connectors are, all of them rather than the last one clicked.
+    /// Where they disagree the box shows a dash, as the shape panel's do, instead of claiming
+    /// a uniformity that is not there.
+    /// </summary>
     private void SyncConnectorStyle()
     {
-        if (Canvas.Document.Selected is not ConnectorShape connector)
+        var connectors = Canvas.Document.Selection.OfType<ConnectorShape>().ToList();
+
+        if (connectors.Count == 0)
             return;
 
         // A sync can be triggered from inside another one; restore rather than clear.
         var wasSyncing = _syncing;
         _syncing = true;
 
-        SelectByTag(StartCapBox, connector.StartCap.ToString());
-        SelectByTag(EndCapBox, connector.EndCap.ToString());
-        SelectByTag(RoutingBox, connector.Routing.ToString());
+        var first = connectors[0];
 
-        Canvas.DefaultStartCap = connector.StartCap;
-        Canvas.DefaultEndCap = connector.EndCap;
-        Canvas.DefaultLineWidth = connector.StrokeThickness;
-        Canvas.DefaultRouting = connector.Routing;
+        var startMixed = connectors.Any(line => line.StartCap != first.StartCap);
+        var endMixed = connectors.Any(line => line.EndCap != first.EndCap);
+        var routeMixed = connectors.Any(line => line.Routing != first.Routing);
+        var weightMixed = connectors.Any(line => line.StrokeThickness != first.StrokeThickness);
+
+        Choose(StartCapBox, first.StartCap.ToString(), startMixed);
+        Choose(EndCapBox, first.EndCap.ToString(), endMixed);
+        Choose(RoutingBox, first.Routing.ToString(), routeMixed);
+
+        // What the next connector drawn will look like, taken from the selection only where
+        // the selection agrees: a dash is not something to draw with.
+        if (!startMixed)
+            Canvas.DefaultStartCap = first.StartCap;
+
+        if (!endMixed)
+            Canvas.DefaultEndCap = first.EndCap;
+
+        if (!routeMixed)
+            Canvas.DefaultRouting = first.Routing;
+
+        if (!weightMixed)
+            Canvas.DefaultLineWidth = first.StrokeThickness;
 
         _syncing = wasSyncing;
     }

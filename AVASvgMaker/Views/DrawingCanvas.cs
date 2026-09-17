@@ -2875,28 +2875,47 @@ public class DrawingCanvas : Decorator
 
     /// <summary>Applies the toolbar's line-end settings to the selected connector, if there is one.</summary>
     /// <summary>Applies the toolbar's line-end settings to every selected connector.</summary>
-    public void ApplyConnectorStyle()
+    /// <summary>
+    /// Sets what is given on every selected connector, and leaves the rest of them alone.
+    ///
+    /// One field at a time, because a selection whose connectors disagree about something
+    /// shows a dash for it - and a dash written back as a value would quietly give every
+    /// selected connector the same end because somebody changed the route.
+    ///
+    /// The line weight is ordinary shape formatting and goes through SetStrokeThickness
+    /// rather than being written here as well - one field, one write path.
+    /// </summary>
+    public void ApplyConnectorStyle(
+        EndCapStyle? start = null, EndCapStyle? end = null, ConnectorRouting? routing = null)
     {
         var connectors = Document.Selection.OfType<ConnectorShape>().ToList();
 
         if (connectors.Count == 0)
             return;
 
-        // The line weight is ordinary shape formatting, so it goes through SetStrokeThickness
-        // rather than being written here as well - one field, one write path.
         using (Document.BeginBatch())
         {
             var changed = false;
 
             foreach (var connector in connectors)
             {
-                if (connector.StartCap != DefaultStartCap || connector.EndCap != DefaultEndCap ||
-                    connector.Routing != DefaultRouting)
+                if (start is { } head && connector.StartCap != head)
+                {
+                    connector.StartCap = head;
                     changed = true;
+                }
 
-                connector.StartCap = DefaultStartCap;
-                connector.EndCap = DefaultEndCap;
-                connector.Routing = DefaultRouting;
+                if (end is { } tail && connector.EndCap != tail)
+                {
+                    connector.EndCap = tail;
+                    changed = true;
+                }
+
+                if (routing is { } way && connector.Routing != way)
+                {
+                    connector.Routing = way;
+                    changed = true;
+                }
             }
 
             if (!changed)
