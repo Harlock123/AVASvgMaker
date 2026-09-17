@@ -146,6 +146,20 @@ public enum ShapeKind
     SupplyFlag,
     NoConnect,
 
+    // Logic. The ANSI gate symbols, with a lead per input - see GateCatalogue and GateShape.
+    GateAnd,
+    GateNand,
+    GateOr,
+    GateNor,
+    GateXor,
+    GateXnor,
+    GateAnd3,
+    GateNand3,
+    GateOr3,
+    GateBuffer,
+    GateInverter,
+    GateTriState,
+
     // Electronic. Packages with a leg per pin - see ChipCatalogue and ChipShape.
     Chip555,
     Chip741,

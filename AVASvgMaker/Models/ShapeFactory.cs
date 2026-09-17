@@ -31,6 +31,7 @@ public static class ShapeFactory
         // A chip is drawn rather than stencilled because it has a connection point per pin,
         // and an outline has only the four corners of its box to offer.
         _ when ChipCatalogue.Find(kind) is { } chip => new ChipShape(chip, bounds),
+        _ when GateCatalogue.Find(kind) is { } gate => new GateShape(gate, bounds),
         ShapeKind.Connector => throw new ArgumentException(
             "Connectors are built from their end points - see ConnectorShape.", nameof(kind)),
         _ => StencilCatalogue.Find(kind) is { } stencil

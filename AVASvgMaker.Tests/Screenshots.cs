@@ -518,6 +518,87 @@ public class Screenshots
         RasterExporter.Export(page, file, 2, RasterFormat.Png);
     }
 
+    /// <summary>The logic gates, each at the size it is dropped at.</summary>
+    [AvaloniaFact]
+    public void Gates()
+    {
+        if (!Asked) return;
+
+        var gates = GateCatalogue.All.ToList();
+
+        const int columns = 4;
+        const double wide = 190, tall = 130;
+
+        var page = new DiagramDocument();
+        page.SetPageSize(columns * wide, (gates.Count + columns - 1) / columns * tall);
+
+        for (var i = 0; i < gates.Count; i++)
+        {
+            var size = GateShape.PreferredSize(gates[i]);
+
+            var x = i % columns * wide;
+            var y = i / columns * tall + 18;
+
+            page.Shapes.Add(ShapeFactory.Create(
+                gates[i].Kind, new Rect(x + (wide - size.Width) / 2, y, size.Width, size.Height)));
+
+            var name = ShapeFactory.Create(
+                ShapeKind.TextBox, new Rect(x + 6, y + size.Height + 8, wide - 12, 22));
+
+            name.Text = gates[i].Name;
+            name.FontSize = 11;
+            page.Shapes.Add(name);
+        }
+
+        page.RouteConnectors();
+
+        using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "gates.png")));
+        RasterExporter.Export(page, file, 2, RasterFormat.Png);
+    }
+
+    /// <summary>
+    /// A half adder: the figure that shows what a lead per input is for. Both gates take the
+    /// same two signals, in the same order, and the sum and the carry come out of the front.
+    /// </summary>
+    [AvaloniaFact]
+    public void HalfAdder()
+    {
+        if (!Asked) return;
+
+        var page = new DiagramDocument();
+        page.SetPageSize(600, 300);
+
+        var a = Put(page, ShapeKind.TextBox, new Rect(20, 96, 30, 26), "A");
+        var b = Put(page, ShapeKind.TextBox, new Rect(20, 186, 30, 26), "B");
+
+        var sum = Put(page, ShapeKind.TextBox, new Rect(510, 66, 40, 26), "S");
+        var carry = Put(page, ShapeKind.TextBox, new Rect(530, 216, 40, 26), "C");
+
+        var xor = Put(page, ShapeKind.GateXor, new Rect(300, 43, 108, 72));
+        var and = Put(page, ShapeKind.GateAnd, new Rect(370, 193, 108, 72));
+
+        // A to the upper input of both gates and B to the lower input of both, which is the
+        // whole of a half adder - and is only sayable because an input is a place, not a side.
+        foreach (var (from, input) in new[] { (a, 0), (b, 1) })
+        foreach (var gate in new[] { xor, and })
+            Harness.Join(page, from, 1, gate, input);
+
+        foreach (var (gate, to) in new[] { (xor, sum), (and, carry) })
+            Harness.Join(page, gate, 2, to, 3);
+
+        // A circuit has no arrowheads on it.
+        foreach (var line in page.Shapes.OfType<ConnectorShape>())
+        {
+            line.StartCap = EndCapStyle.None;
+            line.EndCap = EndCapStyle.None;
+        }
+
+        page.RouteConnectors();
+
+        using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "half-adder.png")));
+        RasterExporter.Export(page, file, 2, RasterFormat.Png);
+    }
+
     /// <summary>The chips, each at the size it is dropped at, with the pins they carry.</summary>
     [AvaloniaFact]
     public void Chips()

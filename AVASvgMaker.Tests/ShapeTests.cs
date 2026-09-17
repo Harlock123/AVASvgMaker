@@ -37,10 +37,11 @@ public class ShapeTests
             if (!geometry.FillContains(Box.Center))
                 continue;
 
-            // A chip's points are the tips of its legs, which stick out of the package on
-            // purpose - a wire should meet the end of pin 3, not the side of the body it
-            // comes out of. They have their own rule, two tests down.
-            if (ChipCatalogue.Is(kind))
+            // A chip's points are the tips of its legs, and a gate's the tips of its leads,
+            // which stick out of the body on purpose - a wire should meet the end of pin 3 or
+            // of the upper input, not the side of the thing it comes out of. Both have rules
+            // of their own: ChipShape's is two tests down, GateShape's is in GateTests.
+            if (ChipCatalogue.Is(kind) || GateCatalogue.Is(kind))
                 continue;
 
             checkedKinds++;

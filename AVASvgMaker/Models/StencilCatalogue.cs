@@ -557,6 +557,8 @@ public static class StencilCatalogue
     public static readonly IReadOnlyList<Stencil> All =
     [
         .. Fixed,
+        .. GateCatalogue.All.Select(gate =>
+            new Stencil(gate.Kind, StencilCategory.Logic, gate.Name, Keywords: gate.Keywords)),
         .. ChipCatalogue.All.Select(chip =>
             new Stencil(chip.Kind, StencilCategory.Electronic, chip.Name, Keywords: chip.Keywords))
     ];
@@ -585,6 +587,7 @@ public static class StencilCatalogue
         StencilCategory.Uml => "UML",
         StencilCategory.Network => "Network",
         StencilCategory.Electrical => "Electrical",
+        StencilCategory.Logic => "Logic gates",
         StencilCategory.Electronic => "Electronic",
         _ => category.ToString()
     };

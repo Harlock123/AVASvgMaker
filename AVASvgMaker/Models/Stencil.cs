@@ -11,6 +11,7 @@ public enum StencilCategory
     Uml,
     Network,
     Electrical,
+    Logic,
     Electronic
 }
 

@@ -62,6 +62,24 @@ Connect to the end of the stub - the point at the bottom of a supply rail, the t
 There is a **Digital ground** triangle beside the earth symbols for pages drawn the digital
 way, and a **No connect** cross for a pin that is deliberately left alone.
 
+The **Logic gates** drawer holds the ANSI symbols - AND, NAND, OR, NOR, XOR, XNOR, the
+three-input AND, NAND and OR, a buffer, an inverter and a tri-state buffer - for a circuit
+drawn at the level of the logic rather than the packages.
+
+![The logic gates](Images/gates.png)
+
+A gate works the way a chip does: **a lead per input with a connection point on the end of
+it**, the output on the front, and an enable coming down into the top of a tri-state. Inputs
+are places rather than a side, so a wire drawn to the upper input stays on the upper input
+when the gate is moved, which is what lets a half adder be drawn at all - the XOR and the AND
+have to take the same two signals in the same order.
+
+![A half adder, drawn from an XOR and an AND](Images/half-adder.png)
+
+Gates carry no writing of their own. Type into one with `F2` and the label goes in the back
+half of the body, where a reference like `U1A` belongs, clear of the point of an OR and inside
+the round front of an AND.
+
 The **Electronic** set is the chips: the 555 and 556 timers, the 741, LM358 and LM324
 op-amps, the common 74xx and 4000-series logic, an ATmega328P, an MCP23017, a MAX232, a
 ULN2003, an L293D, a 4N35 optocoupler, a 7805 regulator, and blank DIP-6 to DIP-28 packages

@@ -43,7 +43,7 @@ Or [build it yourself](#building).
 
 **Drawing**
 
-- **155 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML, network, electrical and electronic, in categories that fold away, with a search box
+- **167 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML, network, electrical, logic gates and electronic, in categories that fold away, with a search box
 - **Shapes of your own** - save any selection as a reusable shape and it joins the toolbox, kept between drawings and between sessions
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
 - **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder, each on its own paper
@@ -148,6 +148,7 @@ loose shapes.
 | **UML** | Class, interface, package, note, actor, use case, component, node, state, initial state, final state |
 | **Network** | Server, workstation, laptop, router, switch, firewall, printer, mobile device, storage array, wireless access point |
 | **Electrical** | Resistor, capacitor, polarised capacitor, inductor, diode, LED, zener diode, battery, DC and AC source, ground, digital ground, chassis earth, +5V, +3.3V, supply and negative rails, VCC flag, no connect, switch, fuse, lamp, transformer, transistor, amplifier, antenna, motor |
+| **Logic gates** | AND, NAND, OR, NOR, XOR, XNOR, three-input AND, NAND and OR, buffer, inverter, tri-state buffer |
 | **Electronic** | 555 and 556 timers, 741, LM358 and LM324 op-amps, 7400 NAND, 7402 NOR, 7404 inverter, 7408 AND, 7432 OR, 7474 flip-flop, 7486 XOR, 7447 seven-segment driver, 74138 decoder, 74245 bus transceiver, 74595 shift register, 4017 counter, ULN2003 darlington array, L293D H-bridge, MAX232, MCP23017 expander, ATmega328P, 4N35 optocoupler, a 7805 regulator, and blank DIP-6 to DIP-28 packages |
 
 ![The electrical symbols](Images/electrical.png)
@@ -173,6 +174,19 @@ tab with the mounting hole, and three legs out of the bottom - so its pins face 
 wire to `IN` or `OUT` leaves it the way the part is actually wired.
 
 ![A rail into a regulator, into a chip's supply pin, and down to an earth](Images/wiring.png)
+
+The **Logic gates** are the ANSI symbols, for a circuit drawn at the level of the logic rather
+than the packages:
+
+![The logic gates](Images/gates.png)
+
+**A gate's inputs are places, not a side.** Each one carries a lead per input with a connection
+point on the end of it, an output on the front, and an enable on top where there is one - so a
+wire drawn to the upper input of an adder's XOR is still on the upper input after the gate has
+been dragged, and the drawing has not quietly changed what it says. The OR family's back is a
+curve, and its input leads run on to meet it rather than stopping short in the air:
+
+![A half adder, drawn from an XOR and an AND](Images/half-adder.png)
 
 Categories fold away, and the search box matches names *and* keywords - "wifi" finds the
 wireless access point, "if" finds the decision. A few shapes appear in two categories on
@@ -1243,8 +1257,10 @@ AVASvgMaker/
     TextBoxShape.cs      Borderless text, with a dashed guide while empty
     EndCapStyle.cs       None, Arrow, OpenArrow, Dot, Diamond
     Stencil.cs           One catalogue entry: name, category, outline
-    StencilCatalogue.cs  All 155 stencils
+    StencilCatalogue.cs  All 167 stencils
     Chip.cs              The pinouts, from the datasheets, and the two packages
+    Gate.cs              The ANSI gate bodies, written in the unit square
+    GateShape.cs         A gate: a lead and a connection point per input, and the output
     ChipShape.cs         A chip package: a leg and a named connection point per pin
     ContainerShape.cs    Pools, lanes and grouping boxes
     StencilPath.cs       The unit-square path language, to geometry and to SVG

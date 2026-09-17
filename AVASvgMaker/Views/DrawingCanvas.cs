@@ -1280,6 +1280,10 @@ public class DrawingCanvas : Decorator
                 or ShapeKind.Rail5V or ShapeKind.Rail3V3 or ShapeKind.SupplyRail
                 or ShapeKind.NegativeRail or ShapeKind.SupplyFlag => (64.0, 72.0),
 
+            // A gate is wider than it is tall, with a row for every input.
+            _ when GateCatalogue.Find(kind) is { } gate =>
+                (GateShape.PreferredSize(gate).Width, GateShape.PreferredSize(gate).Height),
+
             // A chip needs a row for every pin down each side, and a pin whose name does not
             // fit in its row is a pin nobody can read.
             _ when ChipCatalogue.Find(kind) is { } chip =>
