@@ -60,8 +60,10 @@ Connect to the end of the stub - the point at the bottom of a supply rail, the t
 There is a **Digital ground** triangle beside the earth symbols for pages drawn the digital
 way, and a **No connect** cross for a pin that is deliberately left alone.
 
-The **Electronic** set is the chips: a 555, a 741, the common 74xx logic, and blank DIP-8,
-DIP-14 and DIP-16 packages for anything not on the list. They are different in a more useful
+The **Electronic** set is the chips: the 555 and 556 timers, the 741, LM358 and LM324
+op-amps, the common 74xx and 4000-series logic, an ATmega328P, an MCP23017, a MAX232, a
+ULN2003, an L293D, a 4N35 optocoupler, a 7805 regulator, and blank DIP-6 to DIP-28 packages
+for anything not on the list. They are different in a more useful
 way - a chip has **a connection point for every pin**, named and in the right place, instead
 of the four points every other shape offers. Point at a leg and the pin lights up like any
 other connection point, and a wire glued to pin 4 is still on pin 4 after the chip has been
@@ -73,6 +75,11 @@ an overbar renders differently in every font it meets.
 The part number in the middle is the chip's own text, so `F2` renames it - a board with three
 7400s can have them labelled `U1`, `U2` and `U3`. A chip is dropped at the size its pins need,
 and stretching it taller spreads the legs rather than moving them.
+
+The **7805** is the exception to all of that, being a regulator rather than a chip. It is
+drawn in its TO-220 package - the tab with its mounting hole at the top, three legs out of
+the bottom - so `IN`, `GND` and `OUT` face downwards and a wire leaves them that way. Wire a
++5V rail to its output and a higher rail to its input and the power half of a page is done.
 
 Once a shape is on the page:
 

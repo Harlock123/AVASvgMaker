@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Avalonia;
@@ -34,7 +35,7 @@ public class ChipTests
     [AvaloniaFact]
     public void TheyAreAllThere()
     {
-        Assert.Equal(14, ChipCatalogue.All.Count);
+        Assert.Equal(32, ChipCatalogue.All.Count);
         Assert.Equal("Electronic", StencilCatalogue.CategoryName(StencilCategory.Electronic));
 
         // Every chip is offered in the toolbox, and nothing else is in that drawer.
@@ -43,13 +44,18 @@ public class ChipTests
             StencilCatalogue.InCategory(StencilCategory.Electronic).Select(s => s.Kind).OrderBy(k => k));
     }
 
+    private static IEnumerable<Chip> Dips =>
+        ChipCatalogue.All.Where(chip => chip.Package == ChipPackage.Dip);
+
     /// <summary>A dual in-line package has the same number of legs down both sides.</summary>
     [AvaloniaFact]
     public void EveryPinoutIsAWholePackage()
     {
-        foreach (var chip in ChipCatalogue.All)
+        foreach (var chip in Dips)
         {
-            Assert.True(chip.Count is 8 or 14 or 16, $"{chip.Name} has {chip.Count} pins");
+            Assert.True(chip.Count % 2 == 0 && chip.Count is >= 6 and <= 28,
+                $"{chip.Name} has {chip.Count} pins");
+
             Assert.Equal(chip.Count, chip.PerSide * 2);
 
             foreach (var pin in chip.Pins)
@@ -62,6 +68,47 @@ public class ChipTests
     }
 
     /// <summary>
+    /// The regulator is the one part that is not a DIP: a tab, a body, and three legs out of
+    /// the bottom running left to right, which a wire has to leave downwards.
+    /// </summary>
+    [AvaloniaFact]
+    public void TheRegulatorWearsItsLegsOnItsFoot()
+    {
+        var chip = ChipCatalogue.Find(ShapeKind.Regulator7805)!;
+
+        Assert.Equal(ChipPackage.To220, chip.Package);
+        Assert.Equal(new[] { "IN", "GND", "OUT" }, chip.Pins);
+
+        var box = new Rect(100, 100, 120, 88);
+        var shape = (ChipShape)ShapeFactory.Create(chip.Kind, box);
+        var pins = shape.ConnectionPoints;
+
+        Assert.Equal(3, pins.Count);
+
+        for (var pin = 0; pin < 3; pin++)
+        {
+            Assert.Equal(box.Bottom, pins[pin].Y, 1);
+
+            Assert.True(pins[pin].X > box.X && pins[pin].X < box.Right,
+                $"leg {pin + 1} is off the end of the package");
+
+            Assert.Equal(0, shape.ConnectionDirection(pin).X, 3);
+            Assert.Equal(1, shape.ConnectionDirection(pin).Y, 3);
+        }
+
+        // In order, left to right, and none of them on top of another.
+        Assert.Equal(pins.Select(pin => pin.X).OrderBy(x => x), pins.Select(pin => pin.X));
+
+        // The names are on it, and so is the tab's hole.
+        var svg = Svg(ShapeFactory.Create(chip.Kind, box));
+
+        Assert.Contains(">IN<", svg);
+        Assert.Contains(">GND<", svg);
+        Assert.Contains(">OUT<", svg);
+        Assert.Contains("<circle", svg);
+    }
+
+    /// <summary>
     /// On the 74xx series power is always the same two legs - ground at the bottom of the left
     /// side, supply at the top of the right - and a pinout that has them anywhere else has been
     /// typed in the wrong order.
@@ -71,7 +118,7 @@ public class ChipTests
     {
         var logic = ChipCatalogue.All.Where(chip => chip.Keywords.Contains("74xx")).ToList();
 
-        Assert.Equal(9, logic.Count);
+        Assert.Equal(11, logic.Count);
 
         foreach (var chip in logic)
         {
@@ -105,7 +152,7 @@ public class ChipTests
     [AvaloniaFact]
     public void TheSizeItIsDroppedAtFitsTheNamesAndThePartNumber()
     {
-        foreach (var chip in ChipCatalogue.All)
+        foreach (var chip in Dips)
         {
             var size = ChipShape.PreferredSize(chip);
             var package = size.Width - 2 * Math.Clamp(size.Width * 0.14, 4, 20);
@@ -121,6 +168,12 @@ public class ChipTests
             // And a row per pin, tall enough for the name in it to be read.
             Assert.True(size.Height / chip.PerSide >= 9, $"{chip.Name}'s rows are too shallow");
         }
+
+        var regulator = ChipCatalogue.Find(ShapeKind.Regulator7805)!;
+        var foot = ChipShape.PreferredSize(regulator).Width / regulator.Count;
+
+        Assert.True(regulator.Pins.Max(pin => Measure(pin, 10)) + 4 <= foot,
+            $"{regulator.Name} has {foot:0.#} across each leg, and its names need more");
     }
 
     private static double Measure(string text, double size) => new FormattedText(
@@ -271,8 +324,10 @@ public class ChipTests
         Assert.DoesNotContain("NaN", svg);
         Assert.Contains("TRIG", svg);
 
-        // One pin-1 notch per chip, and it is an arc rather than a straight line.
-        Assert.Equal(ChipCatalogue.All.Count, Occurrences(svg, "<path d=\"M "));
+        // One pin-1 notch per DIP, and it is an arc rather than a straight line. The
+        // regulator has a tab with a hole in it instead.
+        Assert.Equal(Dips.Count(), Occurrences(svg, "<path d=\"M "));
+        Assert.Equal(1, Occurrences(svg, "<circle"));
     }
 
     private static int Occurrences(string text, string find) =>

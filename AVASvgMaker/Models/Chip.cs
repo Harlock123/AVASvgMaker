@@ -3,8 +3,18 @@ using System.Linq;
 
 namespace AVASvgMaker.Models;
 
+/// <summary>The shapes of package a chip is drawn in.</summary>
+public enum ChipPackage
+{
+    /// <summary>Dual in-line: legs down both sides, numbered anti-clockwise from the notch.</summary>
+    Dip,
+
+    /// <summary>A regulator's tabbed package: three legs out of the bottom, left to right.</summary>
+    To220
+}
+
 /// <summary>
-/// A chip in a dual in-line package: what it is called, and what each of its legs does.
+/// A chip: what it is called, and what each of its legs does.
 ///
 /// Pins are listed in the order they are numbered, which for a DIP means down the left side
 /// from the top and then back up the right - so pin 1 is top-left and the last pin is
@@ -14,10 +24,13 @@ namespace AVASvgMaker.Models;
 /// </summary>
 public record Chip(ShapeKind Kind, string Name, string Keywords, params string[] Pins)
 {
+    /// <summary>Which package it is drawn in. Nearly everything here is a DIP.</summary>
+    public ChipPackage Package { get; init; } = ChipPackage.Dip;
+
     public int Count => Pins.Length;
 
     /// <summary>How many legs run down each side. A DIP has the same number on both.</summary>
-    public int PerSide => Pins.Length / 2;
+    public int PerSide => Package == ChipPackage.To220 ? Pins.Length : Pins.Length / 2;
 }
 
 /// <summary>
@@ -70,6 +83,62 @@ public static class ChipCatalogue
             "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "GND",
             "Q7S", "/MR", "SHCP", "STCP", "/OE", "DS", "Q0", "VCC"),
 
+        new(ShapeKind.Chip4017, "4017", "counter decade johnson cmos 4000 cd4017 divider",
+            "Q5", "Q1", "Q0", "Q2", "Q6", "Q7", "Q3", "VSS",
+            "Q8", "Q4", "Q9", "CO", "/CE", "CLK", "RST", "VDD"),
+
+        new(ShapeKind.Chip7447, "7447", "decoder driver bcd seven segment display 74xx 7447",
+            "B", "C", "/LT", "/BI", "/RBI", "D", "A", "GND",
+            "e", "d", "c", "b", "a", "g", "f", "VCC"),
+
+        new(ShapeKind.Chip74245, "74245", "buffer transceiver octal bus three state 74xx 74hc245",
+            "DIR", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "GND",
+            "B8", "B7", "B6", "B5", "B4", "B3", "B2", "B1", "/OE", "VCC"),
+
+        new(ShapeKind.Chip556, "556", "timer dual 556 oscillator monostable astable ne556",
+            "DIS1", "THR1", "CTRL1", "/RST1", "OUT1", "TRIG1", "GND",
+            "TRIG2", "OUT2", "/RST2", "CTRL2", "THR2", "DIS2", "VCC"),
+
+        new(ShapeKind.ChipLm358, "LM358", "opamp op-amp amplifier dual lm358 operational analog",
+            "OUT1", "IN1-", "IN1+", "V-", "IN2+", "IN2-", "OUT2", "V+"),
+
+        new(ShapeKind.ChipLm324, "LM324", "opamp op-amp amplifier quad lm324 operational analog",
+            "OUT1", "IN1-", "IN1+", "V+", "IN2+", "IN2-", "OUT2",
+            "OUT3", "IN3-", "IN3+", "V-", "IN4+", "IN4-", "OUT4"),
+
+        new(ShapeKind.ChipUln2003, "ULN2003", "darlington driver array relay stepper uln2003 sink",
+            "IN1", "IN2", "IN3", "IN4", "IN5", "IN6", "IN7", "GND",
+            "COM", "OUT7", "OUT6", "OUT5", "OUT4", "OUT3", "OUT2", "OUT1"),
+
+        new(ShapeKind.ChipL293D, "L293D", "motor driver h-bridge l293d half bridge dc stepper",
+            "EN1", "IN1", "OUT1", "GND", "GND", "OUT2", "IN2", "VS",
+            "EN2", "IN3", "OUT3", "GND", "GND", "OUT4", "IN4", "VSS"),
+
+        new(ShapeKind.ChipMax232, "MAX232", "rs232 serial level shifter driver receiver max232 uart",
+            "C1+", "V+", "C1-", "C2+", "C2-", "V-", "T2OUT", "R2IN",
+            "R2OUT", "T2IN", "T1IN", "R1OUT", "R1IN", "T1OUT", "GND", "VCC"),
+
+        new(ShapeKind.Chip4N35, "4N35", "optocoupler optoisolator photocoupler 4n35 pc817 isolation",
+            "AN", "CATH", "NC", "EMIT", "COLL", "BASE"),
+
+        new(ShapeKind.ChipAtmega328, "ATmega328P",
+            "microcontroller avr atmega328 arduino mcu uno atmel",
+            "/RESET", "PD0", "PD1", "PD2", "PD3", "PD4", "VCC", "GND",
+            "PB6", "PB7", "PD5", "PD6", "PD7", "PB0",
+            "PB1", "PB2", "PB3", "PB4", "PB5", "AVCC", "AREF",
+            "GND", "PC0", "PC1", "PC2", "PC3", "PC4", "PC5"),
+
+        new(ShapeKind.ChipMcp23017, "MCP23017",
+            "expander port io i2c mcp23017 gpio microchip sixteen",
+            "GPB0", "GPB1", "GPB2", "GPB3", "GPB4", "GPB5", "GPB6", "GPB7",
+            "VDD", "VSS", "NC", "SCL", "SDA", "NC",
+            "A0", "A1", "A2", "/RESET", "INTB", "INTA", "GPA0",
+            "GPA1", "GPA2", "GPA3", "GPA4", "GPA5", "GPA6", "GPA7"),
+
+        // A regulator is not a DIP at all: a tab, a body and three legs out of the bottom.
+        new(ShapeKind.Regulator7805, "7805", "regulator linear 7805 78xx supply 5v power lm317 to220",
+            "IN", "GND", "OUT") { Package = ChipPackage.To220 },
+
         // Blanks, for a chip that is not in the list. The legs are numbered and nothing else
         // is claimed about them - which is better than offering a pinout that is almost right.
         new(ShapeKind.Dip8, "DIP-8", "chip ic dip 8 pin blank generic package socket",
@@ -79,7 +148,22 @@ public static class ChipCatalogue
             Numbers(14)),
 
         new(ShapeKind.Dip16, "DIP-16", "chip ic dip 16 pin blank generic package socket",
-            Numbers(16))
+            Numbers(16)),
+
+        new(ShapeKind.Dip6, "DIP-6", "chip ic dip 6 pin blank generic package socket",
+            Numbers(6)),
+
+        new(ShapeKind.Dip18, "DIP-18", "chip ic dip 18 pin blank generic package socket",
+            Numbers(18)),
+
+        new(ShapeKind.Dip20, "DIP-20", "chip ic dip 20 pin blank generic package socket",
+            Numbers(20)),
+
+        new(ShapeKind.Dip24, "DIP-24", "chip ic dip 24 pin blank generic package socket",
+            Numbers(24)),
+
+        new(ShapeKind.Dip28, "DIP-28", "chip ic dip 28 pin blank generic package socket",
+            Numbers(28))
     ];
 
     private static string[] Numbers(int count) =>

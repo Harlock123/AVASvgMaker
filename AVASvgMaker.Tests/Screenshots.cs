@@ -455,10 +455,12 @@ public class Screenshots
     {
         if (!Asked) return;
 
-        var chips = ChipCatalogue.All.ToList();
+        // By pin count, so a row is made of packages the same height and the sheet has no
+        // bands of white in it.
+        var chips = ChipCatalogue.All.OrderBy(chip => chip.Count).ThenBy(chip => chip.Name).ToList();
 
-        const int columns = 5;
-        const double wide = 230, margin = 16;
+        const int columns = 6;
+        const double wide = 240, margin = 16;
 
         // A row is as tall as the tallest chip in it: a 16-pin package is twice the height of
         // an 8-pin one, and a fixed cell would leave a band of white under every short row.
@@ -484,6 +486,6 @@ public class Screenshots
         page.RouteConnectors();
 
         using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "chips.png")));
-        RasterExporter.Export(page, file, 1.5, RasterFormat.Png);
+        RasterExporter.Export(page, file, 1.2, RasterFormat.Png);
     }
 }

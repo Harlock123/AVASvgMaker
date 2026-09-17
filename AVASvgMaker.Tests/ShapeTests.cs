@@ -75,7 +75,7 @@ public class ShapeTests
     {
         var checkedChips = 0;
 
-        foreach (var chip in ChipCatalogue.All)
+        foreach (var chip in ChipCatalogue.All.Where(chip => chip.Package == ChipPackage.Dip))
         {
             var shape = (ChipShape)ShapeFactory.Create(chip.Kind, Box);
             var points = shape.ConnectionPoints;
@@ -106,7 +106,8 @@ public class ShapeTests
             Assert.Equal(down.OrderBy(y => y), down);
         }
 
-        Assert.Equal(ChipCatalogue.All.Count, checkedChips);
+        // Every chip but the regulator, whose legs are along its foot - see ChipTests.
+        Assert.Equal(ChipCatalogue.All.Count - 1, checkedChips);
     }
 
     [AvaloniaTheory]
