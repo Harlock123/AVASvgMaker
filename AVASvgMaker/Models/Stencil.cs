@@ -10,7 +10,8 @@ public enum StencilCategory
     Bpmn,
     Uml,
     Network,
-    Electrical
+    Electrical,
+    Electronic
 }
 
 /// <summary>

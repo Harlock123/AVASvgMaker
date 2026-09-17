@@ -37,11 +37,17 @@ public class ShapeTests
             if (!geometry.FillContains(Box.Center))
                 continue;
 
+            // A chip's points are the tips of its legs, which stick out of the package on
+            // purpose - a wire should meet the end of pin 3, not the side of the body it
+            // comes out of. They have their own rule, two tests down.
+            if (ChipCatalogue.Is(kind))
+                continue;
+
             checkedKinds++;
 
             foreach (var (point, index) in shape.ConnectionPoints.Select((p, i) => (p, i)))
             {
-                var away = DiagramShape.ConnectionDirections[index];
+                var away = shape.ConnectionDirection(index);
                 var justInside = new Point(point.X - away.X * 0.5, point.Y - away.Y * 0.5);
                 var justOutside = new Point(point.X + away.X * 0.5, point.Y + away.Y * 0.5);
 
@@ -57,6 +63,50 @@ public class ShapeTests
 
         Assert.True(checkedKinds > 80, $"only {checkedKinds} kinds were checked");
         Assert.True(moved > 50, $"only {moved} points came in off the box");
+    }
+
+    /// <summary>
+    /// A chip's rule instead. Every pin sits on the left or right edge of the shape's box, at
+    /// the end of its own leg, numbered the way a DIP is: down the left side from the top and
+    /// then back up the right, so pin 1 and the last pin are the two at the top.
+    /// </summary>
+    [AvaloniaFact]
+    public void EveryChipPinSitsOnTheEndOfItsOwnLeg()
+    {
+        var checkedChips = 0;
+
+        foreach (var chip in ChipCatalogue.All)
+        {
+            var shape = (ChipShape)ShapeFactory.Create(chip.Kind, Box);
+            var points = shape.ConnectionPoints;
+
+            Assert.Equal(chip.Count, points.Count);
+            checkedChips++;
+
+            for (var pin = 0; pin < chip.Count; pin++)
+            {
+                var left = pin < chip.PerSide;
+                var edge = left ? Box.X : Box.Right;
+
+                Assert.Equal(edge, points[pin].X, 1);
+
+                Assert.True(points[pin].Y > Box.Y && points[pin].Y < Box.Bottom,
+                    $"{chip.Name} pin {pin + 1} is off the end of the package");
+
+                // And it faces out of the side it is on, or a wire leaves it sideways.
+                Assert.Equal(left ? -1 : 1, shape.ConnectionDirection(pin).X, 3);
+                Assert.Equal(0, shape.ConnectionDirection(pin).Y, 3);
+            }
+
+            // Pin 1 and the last pin are the pair at the top, one either side.
+            Assert.Equal(points[0].Y, points[^1].Y, 1);
+
+            // And they run down one side and back up the other, never repeating a row.
+            var down = points.Take(chip.PerSide).Select(p => p.Y).ToList();
+            Assert.Equal(down.OrderBy(y => y), down);
+        }
+
+        Assert.Equal(ChipCatalogue.All.Count, checkedChips);
     }
 
     [AvaloniaTheory]

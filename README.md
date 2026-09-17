@@ -43,7 +43,7 @@ Or [build it yourself](#building).
 
 **Drawing**
 
-- **116 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML, network and electrical, in categories that fold away, with a search box
+- **130 stencils** - basic shapes, arrows, callouts, a full flowchart set, BPMN, UML, network, electrical and electronic, in categories that fold away, with a search box
 - **Shapes of your own** - save any selection as a reusable shape and it joins the toolbox, kept between drawings and between sessions
 - **Page-like canvas** - a page floating on a workspace, with a drop shadow and scrollbars; Letter, Legal, Tabloid, A3, A4, A5 or any size you type, in either orientation
 - **Multiple pages** - tabs along the bottom, as a spreadsheet has them; add, rename, duplicate, delete, and drag to reorder, each on its own paper
@@ -148,8 +148,21 @@ loose shapes.
 | **UML** | Class, interface, package, note, actor, use case, component, node, state, initial state, final state |
 | **Network** | Server, workstation, laptop, router, switch, firewall, printer, mobile device, storage array, wireless access point |
 | **Electrical** | Resistor, capacitor, polarised capacitor, inductor, diode, LED, zener diode, battery, DC and AC source, ground, chassis earth, switch, fuse, lamp, transformer, transistor, amplifier, antenna, motor |
+| **Electronic** | 555 timer, 741 op-amp, 7400 NAND, 7402 NOR, 7404 inverter, 7408 AND, 7432 OR, 7474 flip-flop, 7486 XOR, 74138 decoder, 74595 shift register, and blank DIP-8, DIP-14 and DIP-16 packages |
 
 ![The electrical symbols](Images/electrical.png)
+
+The **Electronic** chips are drawn as dual in-line packages, and each one carries a
+connection point per pin rather than the four every other shape has. The pinouts are from the
+datasheets, numbered as a DIP is - down the left side from the top and back up the right, with
+the notch on the top edge marking which end pin 1 is on:
+
+![The chips](Images/chips.png)
+
+A wire glued to pin 4 stays on pin 4 when the chip is moved, and arrives along the leg rather
+than across the body. The part number in the middle is the shape's own text, so a 7400 can be
+renamed to `U3` like any other label. The blank DIP packages are there for a chip that is not
+in the list: numbered legs and no claim about what they do.
 
 Categories fold away, and the search box matches names *and* keywords - "wifi" finds the
 wireless access point, "if" finds the decision. A few shapes appear in two categories on
@@ -1213,7 +1226,9 @@ AVASvgMaker/
     TextBoxShape.cs      Borderless text, with a dashed guide while empty
     EndCapStyle.cs       None, Arrow, OpenArrow, Dot, Diamond
     Stencil.cs           One catalogue entry: name, category, outline
-    StencilCatalogue.cs  All 116 stencils
+    StencilCatalogue.cs  All 130 stencils
+    Chip.cs              The DIP pinouts, from the datasheets
+    ChipShape.cs         A chip package: a leg and a named connection point per pin
     ContainerShape.cs    Pools, lanes and grouping boxes
     StencilPath.cs       The unit-square path language, to geometry and to SVG
     StencilShape.cs      Draws a shape from a catalogue outline

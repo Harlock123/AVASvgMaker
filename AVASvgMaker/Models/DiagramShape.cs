@@ -308,17 +308,24 @@ public abstract class DiagramShape
         return near;
     }
 
-    /// <summary>The direction a connector should leave the given connection point.</summary>
+    /// <summary>
+    /// Which way a connection point faces before the shape is turned. The four sides of a box
+    /// by default; a shape with points of its own says where each of them looks - a chip's
+    /// pins face out of whichever side of the package they are on.
+    /// </summary>
+    protected virtual Vector OutwardDirection(int index) =>
+        index >= 0 && index < ConnectionDirections.Length ? ConnectionDirections[index] : default;
+
     /// <summary>
     /// The direction a connector should leave the given connection point, turned with the
     /// shape so a line still leaves a rotated box square on to the side it is attached to.
     /// </summary>
     public Vector ConnectionDirection(int index)
     {
-        if (index < 0 || index >= ConnectionDirections.Length)
-            return default;
+        var direction = OutwardDirection(index);
 
-        var direction = ConnectionDirections[index];
+        if (Math.Abs(direction.X) < 0.0001 && Math.Abs(direction.Y) < 0.0001)
+            return default;
 
         if (!IsRotated)
             return direction;
@@ -434,7 +441,14 @@ public abstract class DiagramShape
 
     #region Text
 
-    protected double LineHeight => FontSize * 1.3;
+    protected double LineHeight => LabelSize * 1.3;
+
+    /// <summary>
+    /// The size a label is actually drawn at. The same as <see cref="FontSize"/> for all but a
+    /// shape that has somewhere narrower than itself to fit its text into - see
+    /// <see cref="ChipShape"/>, whose part number shares the package with the pin names.
+    /// </summary>
+    protected virtual double LabelSize => FontSize;
 
     /// <summary>
     /// The face a label is drawn with. A font that is not installed falls back to the default
@@ -450,7 +464,7 @@ public abstract class DiagramShape
         CultureInfo.CurrentCulture,
         FlowDirection.LeftToRight,
         Face,
-        FontSize,
+        LabelSize,
         new SolidColorBrush(TextColor));
 
     /// <summary>
@@ -650,7 +664,7 @@ public abstract class DiagramShape
 
         var sb = new StringBuilder();
         sb.AppendLine(
-            $"  <text font-family=\"{SvgFontFamily()}\" font-size=\"{Num(FontSize)}\" " +
+            $"  <text font-family=\"{SvgFontFamily()}\" font-size=\"{Num(LabelSize)}\" " +
             $"fill=\"{ToHex(TextColor)}\"" +
             (Bold ? " font-weight=\"bold\"" : string.Empty) +
             (Italic ? " font-style=\"italic\"" : string.Empty) +

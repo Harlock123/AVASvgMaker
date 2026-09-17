@@ -51,6 +51,20 @@ make it mean something else - so setting a fill colour does nothing you can see 
 few that do have a body, like a fuse or an amplifier, arrive hollow on purpose. The line
 colour, weight and style work on all of them as usual.
 
+The **Electronic** set is the chips: a 555, a 741, the common 74xx logic, and blank DIP-8,
+DIP-14 and DIP-16 packages for anything not on the list. They are different in a more useful
+way - a chip has **a connection point for every pin**, named and in the right place, instead
+of the four points every other shape offers. Point at a leg and the pin lights up like any
+other connection point, and a wire glued to pin 4 is still on pin 4 after the chip has been
+dragged across the page. The pinouts are from the datasheets, numbered as a DIP is: down the
+left side from the top and then back up the right, with the notch on the top edge marking
+which end pin 1 is on. An inverted signal is written with a leading slash, `/RESET`, because
+an overbar renders differently in every font it meets.
+
+The part number in the middle is the chip's own text, so `F2` renames it - a board with three
+7400s can have them labelled `U1`, `U2` and `U3`. A chip is dropped at the size its pins need,
+and stretching it taller spreads the legs rather than moving them.
+
 Once a shape is on the page:
 
 | To do this | Do that |

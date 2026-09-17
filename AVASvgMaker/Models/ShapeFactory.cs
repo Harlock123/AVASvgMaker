@@ -28,6 +28,9 @@ public static class ShapeFactory
         // A callout is drawn rather than stencilled because its tail moves, and a stencil's
         // outline is a fixed string.
         _ when CalloutShape.HasTail(kind) => new CalloutShape(kind, bounds),
+        // A chip is drawn rather than stencilled because it has a connection point per pin,
+        // and an outline has only the four corners of its box to offer.
+        _ when ChipCatalogue.Find(kind) is { } chip => new ChipShape(chip, bounds),
         ShapeKind.Connector => throw new ArgumentException(
             "Connectors are built from their end points - see ConnectorShape.", nameof(kind)),
         _ => StencilCatalogue.Find(kind) is { } stencil

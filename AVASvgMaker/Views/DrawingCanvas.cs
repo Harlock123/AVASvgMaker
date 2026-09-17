@@ -1271,6 +1271,10 @@ public class DrawingCanvas : Decorator
             ShapeKind.Pool => (520.0, 260.0),
             ShapeKind.Lane => (480.0, 110.0),
             ShapeKind.ContainerBox => (320.0, 220.0),
+            // A chip needs a row for every pin down each side, and a pin whose name does not
+            // fit in its row is a pin nobody can read.
+            _ when ChipCatalogue.Find(kind) is { } chip =>
+                (ChipShape.PreferredSize(chip).Width, ChipShape.PreferredSize(chip).Height),
             _ => (DefaultShapeWidth, DefaultShapeHeight)
         };
 

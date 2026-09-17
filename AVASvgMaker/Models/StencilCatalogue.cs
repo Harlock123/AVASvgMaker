@@ -37,7 +37,7 @@ public static class StencilCatalogue
                $"C {less},{b} {t},{more} {t},0.5 C {t},{less} {less},{t} 0.5,{t} Z";
     }
 
-    public static readonly IReadOnlyList<Stencil> All =
+    private static readonly Stencil[] Fixed =
     [
         // ---- Basic ----------------------------------------------------------------
         new(ShapeKind.Rectangle, StencilCategory.Basic, "Rectangle", Keywords: "box square process"),
@@ -505,6 +505,18 @@ public static class StencilCatalogue
     ];
 
     /// <summary>
+    /// Everything above, and the chips. The chips are listed from <see cref="ChipCatalogue"/>
+    /// rather than written out again here: what a chip is called and the words people look it
+    /// up by belong beside its pinout, not in two places that can disagree.
+    /// </summary>
+    public static readonly IReadOnlyList<Stencil> All =
+    [
+        .. Fixed,
+        .. ChipCatalogue.All.Select(chip =>
+            new Stencil(chip.Kind, StencilCategory.Electronic, chip.Name, Keywords: chip.Keywords))
+    ];
+
+    /// <summary>
     /// Some shapes appear in two categories - a rectangle is also a flowchart Process - so
     /// the lookup keeps the first entry rather than refusing the duplicate.
     /// </summary>
@@ -528,6 +540,7 @@ public static class StencilCatalogue
         StencilCategory.Uml => "UML",
         StencilCategory.Network => "Network",
         StencilCategory.Electrical => "Electrical",
+        StencilCategory.Electronic => "Electronic",
         _ => category.ToString()
     };
 

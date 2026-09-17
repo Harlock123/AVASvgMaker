@@ -139,6 +139,22 @@ public enum ShapeKind
     Antenna,
     Motor,
 
+    // Electronic. Packages with a leg per pin - see ChipCatalogue and ChipShape.
+    Chip555,
+    Chip741,
+    Chip7400,
+    Chip7402,
+    Chip7404,
+    Chip7408,
+    Chip7432,
+    Chip7474,
+    Chip7486,
+    Chip74138,
+    Chip74595,
+    Dip8,
+    Dip14,
+    Dip16,
+
     /// <summary>An outline of its own, rather than one from the catalogue. Imported SVG
     /// arrives as these where nothing simpler fits.</summary>
     Path

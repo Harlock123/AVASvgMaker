@@ -448,4 +448,42 @@ public class Screenshots
         using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "electrical.png")));
         RasterExporter.Export(page, file, 2, RasterFormat.Png);
     }
+
+    /// <summary>The chips, each at the size it is dropped at, with the pins they carry.</summary>
+    [AvaloniaFact]
+    public void Chips()
+    {
+        if (!Asked) return;
+
+        var chips = ChipCatalogue.All.ToList();
+
+        const int columns = 5;
+        const double wide = 230, margin = 16;
+
+        // A row is as tall as the tallest chip in it: a 16-pin package is twice the height of
+        // an 8-pin one, and a fixed cell would leave a band of white under every short row.
+        var rows = Enumerable.Range(0, (chips.Count + columns - 1) / columns)
+            .Select(row => chips.Skip(row * columns).Take(columns)
+                .Max(chip => ChipShape.PreferredSize(chip).Height) + margin * 2)
+            .ToList();
+
+        var page = new DiagramDocument();
+        page.SetPageSize(columns * wide, rows.Sum());
+
+        for (var i = 0; i < chips.Count; i++)
+        {
+            var size = ChipShape.PreferredSize(chips[i]);
+
+            var x = i % columns * wide + (wide - size.Width) / 2;
+            var y = rows.Take(i / columns).Sum() + margin;
+
+            page.Shapes.Add(ShapeFactory.Create(
+                chips[i].Kind, new Rect(x, y, size.Width, size.Height)));
+        }
+
+        page.RouteConnectors();
+
+        using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "chips.png")));
+        RasterExporter.Export(page, file, 1.5, RasterFormat.Png);
+    }
 }
