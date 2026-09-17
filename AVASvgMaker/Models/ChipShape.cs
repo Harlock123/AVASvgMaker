@@ -322,15 +322,15 @@ public class ChipShape : DiagramShape
     public static Size PreferredSize(Chip chip)
     {
         var longest = chip.Pins.Max(pin => pin.Length);
-        var part = chip.Name.Length * 8.8 + 20;
+        var part = chip.Name.Length * 9.2 + 20;
 
         if (chip.Package == ChipPackage.To220)
             return new Size(
-                Math.Clamp(Math.Ceiling(Math.Max(chip.Count * (longest * 6.8 + 12), part)), 90, 250),
+                Math.Clamp(Math.Ceiling(Math.Max(chip.Count * (longest * 7.2 + 12), part)), 90, 250),
                 88);
 
         return new Size(
-            Math.Clamp(Math.Ceiling((longest * 6.6 + 4) * 2 + part) + 40, 110, 250),
+            Math.Clamp(Math.Ceiling((longest * 6.9 + 4) * 2 + part) + 40, 110, 250),
             Math.Max(80, chip.PerSide * 24));
     }
 
