@@ -51,6 +51,8 @@ make it mean something else - so setting a fill colour does nothing you can see 
 few that do have a body, like a fuse or an amplifier, arrive hollow on purpose. The line
 colour, weight and style work on all of them as usual.
 
+![The electrical symbols](Images/electrical.png)
+
 The **supply rails** in that set - **+5V**, **+3.3V**, the generic **Supply rail** and the
 **Negative rail** - are the one place a symbol arrives with writing on it. A bar on a stub
 does not say 5 from 3.3, so the voltage is the shape's own text: press `F2` and a +5V becomes
@@ -63,7 +65,11 @@ way, and a **No connect** cross for a pin that is deliberately left alone.
 The **Electronic** set is the chips: the 555 and 556 timers, the 741, LM358 and LM324
 op-amps, the common 74xx and 4000-series logic, an ATmega328P, an MCP23017, a MAX232, a
 ULN2003, an L293D, a 4N35 optocoupler, a 7805 regulator, and blank DIP-6 to DIP-28 packages
-for anything not on the list. They are different in a more useful
+for anything not on the list.
+
+![The chips](Images/chips.png)
+
+They are different in a more useful
 way - a chip has **a connection point for every pin**, named and in the right place, instead
 of the four points every other shape offers. Point at a leg and the pin lights up like any
 other connection point, and a wire glued to pin 4 is still on pin 4 after the chip has been
@@ -80,6 +86,8 @@ The **7805** is the exception to all of that, being a regulator rather than a ch
 drawn in its TO-220 package - the tab with its mounting hole at the top, three legs out of
 the bottom - so `IN`, `GND` and `OUT` face downwards and a wire leaves them that way. Wire a
 +5V rail to its output and a higher rail to its input and the power half of a page is done.
+
+![A rail into a regulator, into a chip's supply pin, and down to an earth](Images/wiring.png)
 
 Once a shape is on the page:
 
@@ -196,6 +204,8 @@ that line re-routes.
 This is what a loop wants. A "no" branch coming back round to a check usually belongs on the
 run that feeds the check rather than on the check itself - drawn to the box, it arrives
 alongside every other line that ends there and the diagram stops saying which is which.
+
+![A loop coming back onto the line that feeds a check](Images/line-to-line.png)
 
 Where it lands is remembered as a fraction of the way along the line, not as a bend. Bends are
 not fixtures: the router puts them in and takes them out as the shapes move, so a line hung off

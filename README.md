@@ -172,6 +172,8 @@ The 7805 regulator is the one part that is not a DIP. It is drawn in its TO-220 
 tab with the mounting hole, and three legs out of the bottom - so its pins face down, and a
 wire to `IN` or `OUT` leaves it the way the part is actually wired.
 
+![A rail into a regulator, into a chip's supply pin, and down to an earth](Images/wiring.png)
+
 Categories fold away, and the search box matches names *and* keywords - "wifi" finds the
 wireless access point, "if" finds the decision. A few shapes appear in two categories on
 purpose: a rectangle is also a flowchart Process.
@@ -855,6 +857,13 @@ each side - so drawings made before this look exactly as they did.
 A handful of stencils are hollow where their middle would be - a bowtie, a stick figure, a
 curved arrow - and there is no outline to walk out to along the way. Those keep the four
 points of the box, which is what every shape had before.
+
+![A loop coming back onto the line that feeds a check](Images/line-to-line.png)
+
+**A line can end on another line.** An end dropped on a connector sticks a remembered fraction
+of the way along it and rides along as that line re-routes, which is where a loop back to a
+check belongs - on the run that feeds the check, rather than alongside every other line that
+ends at the check itself.
 
 ![Two connectors taking different ways round](Images/routing.png)
 

@@ -449,6 +449,75 @@ public class Screenshots
         RasterExporter.Export(page, file, 2, RasterFormat.Png);
     }
 
+    /// <summary>
+    /// The power half of a page, wired: a rail into a regulator, the regulator into a chip's
+    /// supply pin, the chip's ground down to an earth. This is the figure that shows what a
+    /// connection point per pin is for, which a sheet of packages cannot.
+    /// </summary>
+    [AvaloniaFact]
+    public void Wiring()
+    {
+        if (!Asked) return;
+
+        var page = new DiagramDocument();
+        page.SetPageSize(560, 420);
+
+        var rail = Put(page, ShapeKind.Rail5V, new Rect(60, 24, 64, 72));
+        var regulator = Put(page, ShapeKind.Regulator7805, new Rect(210, 30, 120, 88));
+        var timer = Put(page, ShapeKind.Chip555, new Rect(230, 210, 156, 96));
+        var earth = Put(page, ShapeKind.DigitalGround, new Rect(80, 310, 64, 72));
+
+        StencilCatalogue.Find(ShapeKind.Rail5V)!.ApplyDefaults(rail);
+        rail.Text = "+9V";
+
+        // The rail into IN, OUT into the 555's VCC, the 555's GND down to the earth.
+        foreach (var (from, fromPin, to, toPin) in new[]
+                 {
+                     (rail, 2, regulator, 0),
+                     (regulator, 2, timer, 7),
+                     (timer, 0, earth, 0)
+                 })
+        {
+            var wire = Harness.Join(page, from, fromPin, to, toPin);
+            wire.EndCap = EndCapStyle.None;
+        }
+
+        page.RouteConnectors();
+
+        using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "wiring.png")));
+        RasterExporter.Export(page, file, 2, RasterFormat.Png);
+    }
+
+    /// <summary>A loop coming back onto the run that feeds a check, rather than onto the check.</summary>
+    [AvaloniaFact]
+    public void LineToLine()
+    {
+        if (!Asked) return;
+
+        var page = new DiagramDocument();
+        page.SetPageSize(660, 340);
+
+        var start = Put(page, ShapeKind.RoundedRectangle, new Rect(60, 40, 130, 50), "Start");
+        var check = Put(page, ShapeKind.Diamond, new Rect(50, 190, 150, 90), "Ready?");
+        var work = Put(page, ShapeKind.Rectangle, new Rect(470, 205, 140, 60), "Fix it");
+
+        var spine = Harness.Join(page, start, 2, check, 0);
+        var no = Harness.Join(page, check, 1, work, 3);
+        var loop = Harness.Join(page, work, 0, check, 1);
+
+        no.Text = "no";
+
+        // The loop comes back not to the check but to the line running into it.
+        loop.EndShape = spine;
+        loop.EndPort = -1;
+        loop.EndAlong = 0.55;
+
+        page.RouteConnectors();
+
+        using var file = File.Create(Path.GetFullPath(Path.Combine(Folder, "line-to-line.png")));
+        RasterExporter.Export(page, file, 2, RasterFormat.Png);
+    }
+
     /// <summary>The chips, each at the size it is dropped at, with the pins they carry.</summary>
     [AvaloniaFact]
     public void Chips()
