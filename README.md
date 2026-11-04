@@ -1,6 +1,6 @@
 # AVASvgMaker
 
-A Visio-style diagram editor built with **Avalonia UI** and **.NET 9**. Drag shapes from a
+A Visio-style diagram editor built with **Avalonia UI** and **.NET 10**. Drag shapes from a
 stencil toolbox onto a page-like canvas, label them, wire them together with connectors that
 route themselves around whatever is in the way - and around each other - and spread the work
 over as many pages as it needs. Export it as SVG or PDF for a printer, or as a picture for
@@ -1094,7 +1094,7 @@ dotnet build AVASvgMaker.sln
 dotnet run --project AVASvgMaker/AVASvgMaker.csproj
 ```
 
-Requires the .NET 9 SDK.
+Requires the .NET 10 SDK.
 
 ### Releases
 

@@ -6,7 +6,7 @@
     workflow publish AVASvgMaker/AVASvgMaker.csproj by name and never see this one.
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <UseAppHost>false</UseAppHost>

@@ -5,14 +5,14 @@ layout and implementation notes in depth; this file is the short version of how 
 
 ## What this is
 
-A Visio-style diagram editor in C# on .NET 9 and Avalonia 11.2, with no MVVM framework: custom `Control`
+A Visio-style diagram editor in C# on .NET 10 and Avalonia 11.2, with no MVVM framework: custom `Control`
 subclasses draw themselves. It saves its own `.avadiag` format, exports SVG, PDF, PNG/JPEG/WebP/BMP, Mermaid and
 `.vsdx`, and imports SVG, Visio drawings and Mermaid flowcharts. One self-contained executable per platform.
 
 ## Commands
 
 ```bash
-dotnet build AVASvgMaker.sln                      # needs the .NET 9 SDK (no global.json)
+dotnet build AVASvgMaker.sln                      # needs the .NET 10 SDK (no global.json)
 dotnet test AVASvgMaker.Tests                     # headless (Avalonia.Headless): no window opens
 dotnet run --project AVASvgMaker/AVASvgMaker.csproj
 AVASVG_SHOOT=1 dotnet test AVASvgMaker.Tests --filter FullyQualifiedName~Screenshots   # refresh Images/ window shots

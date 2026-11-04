@@ -22,7 +22,7 @@ either format, is one you can edit. This is newer than most of the claims here a
 most likely to be left out of a blurb copied from an older release.
 
 **Numbers that are checked, not rounded.** 167 stencils. Six builds: Windows, macOS and Linux,
-x64 and arm64 each. MIT. Avalonia UI and .NET 9.
+x64 and arm64 each. MIT. Avalonia UI and .NET 10.
 
 **Nothing to install** is worth saying plainly - a single self-contained executable, no
 account, no telemetry, no network access at all. It is what most of the alternatives cannot
@@ -86,7 +86,7 @@ so say so - developer submissions are accepted, undeclared ones get pulled.
     there is nothing to install and nothing to uninstall. It runs entirely offline, with no
     account, no telemetry and no network access of any kind.
 
-    Built with Avalonia UI and .NET 9. MIT licensed.
+    Built with Avalonia UI and .NET 10. MIT licensed.
 
 **Platforms** - Windows, Mac, Linux (x64 and arm64 builds for each)
 

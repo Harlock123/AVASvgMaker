@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Run the suite
         run: dotnet test AVASvgMaker.Tests --configuration Release --logger 'console;verbosity=normal'
@@ -45,7 +45,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Build every target
         run: |
@@ -80,7 +80,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       # The native compiler shells out to clang and needs zlib's headers.
       - name: Install the native toolchain
@@ -110,7 +110,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Build the guide
         run: |
