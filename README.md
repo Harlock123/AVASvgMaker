@@ -9,6 +9,14 @@ somebody else made is one you can edit.
 
 ![AVASvgMaker](Images/overview.png)
 
+**AI built in.** Ask the AI Chat (`F12`) to *"examine src/orders.py and flowchart it for me"* and it reads the file,
+works out its control flow, draws the flowchart, looks at it and tidies it, while you watch, with every step one
+`Ctrl+Z`. It runs on Claude, on a model on your own computer or network (Ollama, LM Studio, llama.cpp, vLLM, no key
+needed), or on OpenAI and other cloud services. AVASvgMaker is also an MCP server, so agents such as Claude Code can
+draw in the open window or on drawings of their own. See [AI: the chat and agents](#ai-the-chat-and-agents).
+
+![The AI Chat having read a Python file and drawn its flowchart on a new page, with the tool calls it made, the picture it checked and Undo this reply](Images/AVASvgMaker-ai-chat.png)
+
 Built in the same style as AVALander - no MVVM framework, just custom `Control` subclasses
 that render themselves.
 
@@ -1085,6 +1093,65 @@ the app started with, the status bar says so and suggests a restart. Half-applyi
 by rescaling the drawing alone would leave the menus, panels and text behind, which is worse
 than not trying.
 
+## AI: the chat and agents
+
+AVASvgMaker can be driven by an AI model, in its own AI Chat or by an agent working from outside, through the
+[Model Context Protocol](https://modelcontextprotocol.io). Either way the model draws with the same stencils,
+connectors, layout and export a person uses, every change it makes is one undo step in the same history as yours,
+and a call that fails changes nothing.
+
+### The AI Chat
+
+**AI › AI Chat** (`F12`) opens the chat on the right. Ask for a drawing (*"draw our office network"*, *"a swimlane of
+the refund process"*) or for one from a file: *"examine src/orders.py and flowchart it for me"* reads the file (in
+pieces if it's long), works out its control flow and draws it on a new page with decisions, labelled branches, loops
+and exits, then looks at the page and tidies it. Each tool call shows as a line that opens to its input and result,
+with the pictures the model looked at. **Undo this reply** puts the drawing back as it was before an answer;
+**Timeline** lists every answer that changed something, with a picture of the page before it. **History** keeps
+chats on this computer, only if you tick *Keep chat history*.
+
+**Setup…** chooses the model:
+
+- **Claude**, through Anthropic's API, with your own API key (`ANTHROPIC_API_KEY`, or **Key…**: kept in an owner-only
+  file, only ever shown masked). Your account is billed; the chat shows the tokens and an estimated cost, and can stop
+  at a budget.
+- **Any OpenAI-compatible server**: Ollama (`http://localhost:11434/v1`), LM Studio (`http://localhost:1234/v1`),
+  llama.cpp's server or vLLM on this computer or another on your network, with **no key** and nothing leaving your
+  network; or OpenAI (`https://api.openai.com/v1`) and other cloud services (OpenRouter, Groq, Mistral, Gemini) with
+  that service's key under **Key…**. **Refresh** lists the server's models. *Core tools only* gives small models a
+  shorter list of tools; *Model sees pictures* sends them the page pictures.
+
+Files the chat reads, opens, saves and exports are in its working folder: **AI › Working Folder…**, else the
+drawing's own folder, else Documents. Nothing outside it can be read or written.
+
+### Agents from outside
+
+**AI › Allow AI Agents (MCP)** lets an agent on this computer draw in the open window; **AI › Connect an Agent…**
+shows how to add it. For Claude Code:
+
+```bash
+claude mcp add avasvgmaker -- /path/to/AVASvgMaker --mcp --attach
+```
+
+Without `--attach`, `AVASvgMaker --mcp` is a server with a drawing of its own and no window (`--root FOLDER` sets
+its working folder). **Connect an Agent** can also open a network door (MCP over HTTP, port 8769, with an access
+token), or `AVASvgMaker --mcp --http 8769` serves one headless.
+
+### The tools
+
+32 tools: the drawing and its pages; `list_stencils`; `add_shapes`, `connect`, `set_shape`, `delete_shapes`,
+`arrange` and `lay_out`; `add_flowchart` (a whole flowchart from nodes and edges, laid out, in one call),
+`import_mermaid` and `get_mermaid`; `list_files` and `read_file` (text files in the working folder, with line
+numbers); `render_page` (a picture of a page, for the model to check its work) and `export` (SVG, PDF, PNG, JPEG,
+WebP, BMP, Mermaid, Visio). For longer work, as AVA Modeler has them: `batch` runs several calls as one undo step, all
+or nothing, or as a dry run; `checkpoint`, `diff`, `render_checkpoint` and `restore_checkpoint`; and `get_recording`,
+`save_steps` and `run_steps` keep a session's changes as a steps file with `${parameters}` to run again with other
+values. In the open window, deleting most of a page's shapes asks you first. Three saved recipes (MCP prompts) give
+step-by-step plans: a flowchart of a source file, an approval process and a network diagram.
+
+Every shape now carries a lasting id (`"s12"`), saved in the file (format version 20; older files still open), so an
+agent's references hold through undo, saving and opening.
+
 ## Building
 
 ### While you work
@@ -1219,7 +1286,7 @@ passes anything else through as text rather than guessing.
 dotnet test AVASvgMaker.Tests
 ```
 
-A hundred and sixty-odd tests, a few seconds to run. They live in a project of their own, which is not merely
+Over five hundred tests, a few seconds to run. They live in a project of their own, which is not merely
 absent from the shipped binaries but invisible to the build that makes them: `build.sh` and the
 release workflow publish `AVASvgMaker/AVASvgMaker.csproj` by name and never see the test
 project at all. The release job will not run until they pass.

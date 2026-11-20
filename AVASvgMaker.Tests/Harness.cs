@@ -92,6 +92,8 @@ internal static class Harness
         Key.Delete => PhysicalKey.Delete,
         Key.Escape => PhysicalKey.Escape,
         Key.F2 => PhysicalKey.F2,
+        Key.F12 => PhysicalKey.F12,
+        Key.Z => PhysicalKey.Z,
         _ => PhysicalKey.None
     };
 

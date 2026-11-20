@@ -724,6 +724,46 @@ One thing worth knowing: the exporter was built to the published file format and
 read back and checked by this app, but it has not been opened in Visio itself - there is no
 copy of Visio to try it with. If you have one, the result either way is worth reporting.
 
+## The AI Chat and AI agents
+
+![The AI Chat having read a Python file and drawn its flowchart](Images/AVASvgMaker-ai-chat.png)
+
+**AI › AI Chat** (`F12`) opens a chat on the right where you ask for a drawing in your own words and watch it being
+made. Some things to try:
+
+- *Examine src/orders.py and flowchart it for me.* The model reads the file, works out its steps, decisions and
+  loops, and draws them on a new page.
+- *Draw our office network: the internet, a firewall, a router, a switch, two servers and the printers.*
+- *Make the decisions yellow and lay it out across the page.*
+
+Every change it makes is one step `Ctrl+Z` takes back, and **Undo this reply** takes back a whole answer.
+**Timeline** shows each answer that changed the drawing, with a picture of the page before it, and **Go Back** returns
+to it. **Stop** stops the model at any time. If you've ticked *Keep chat history*, **History** keeps your chats to
+reopen or export as Markdown.
+
+**Choosing the model.** Press **Setup…** in the chat:
+
+- **Claude (Anthropic API)** needs your Anthropic API key: set `ANTHROPIC_API_KEY` before starting, or press **Key…**
+  and paste it. Your Anthropic account is billed for what the chat uses; the line under the chat shows the tokens and
+  roughly what they cost.
+- **OpenAI-compatible server** covers a model on your own computer, one on another computer on your network, and
+  OpenAI and other cloud services:
+  - Ollama on this computer: `http://localhost:11434/v1` (the default). LM Studio: `http://localhost:1234/v1`.
+    No key is needed, and nothing leaves your computer.
+  - Another computer: its address instead, such as `http://192.168.1.20:11434/v1` (start Ollama there with
+    `OLLAMA_HOST=0.0.0.0`).
+  - OpenAI: `https://api.openai.com/v1`, a model such as `gpt-4.1`, and your OpenAI key under **Key…**.
+
+  Type the model's name, or press **Refresh** to choose from the server's models. Small local models do best with
+  *Core tools only* and simple requests.
+
+**Files.** The chat reads and writes only in its working folder: the one chosen with **AI › Working Folder…**, else
+the folder your drawing is saved in, else Documents. Give file paths relative to it (*src/orders.py*).
+
+**Agents from outside.** **AI › Allow AI Agents (MCP)** lets an AI agent on this computer, such as Claude Code, draw
+in this window; **AI › Connect an Agent…** shows the command to add it and can let agents on other computers in over
+the network with an access token.
+
 ## Keyboard
 
 | | |
@@ -735,6 +775,7 @@ copy of Visio to try it with. If you have one, the result either way is worth re
 | `Ctrl+A` | Select all |
 | `Ctrl+,` | Preferences - theme, default formatting, grid and paper |
 | `F4` | The data the selected shape carries |
+| `F12` | The AI Chat |
 | `Ctrl+G` `Ctrl+Shift+G` | Group, Ungroup |
 | `Ctrl+Shift+F` `Ctrl+Shift+B` | Bring to front, Send to back |
 | `Ctrl+]` `Ctrl+[` | Bring forward, Send backward |

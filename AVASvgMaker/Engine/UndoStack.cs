@@ -122,6 +122,32 @@ public class UndoStack
         StateChanged?.Invoke();
     }
 
+    /// <summary>How many steps there are to undo (an AI agent's batch notes it before its first step).</summary>
+    public int Depth => _undo.Count;
+
+    /// <summary>
+    /// Makes every step taken since there were <paramref name="depth"/> steps into one, so one undo takes them all
+    /// back: an AI agent's batch of calls is one step, as the person's own compound edits are.
+    /// </summary>
+    public void Squash(int depth)
+    {
+        if (depth < 0 || _undo.Count <= depth + 1)
+            return;
+
+        _undo.RemoveRange(depth + 1, _undo.Count - depth - 1);
+        StateChanged?.Invoke();
+    }
+
+    /// <summary>Forgets what could be redone (after a batch is taken back, or a dry run).</summary>
+    public void ForgetRedo()
+    {
+        if (_redo.Count == 0)
+            return;
+
+        _redo.Clear();
+        StateChanged?.Invoke();
+    }
+
     /// <summary>Records that the current state is the one on disk.</summary>
     public void MarkSaved() => _savedJson = _current.Json;
 

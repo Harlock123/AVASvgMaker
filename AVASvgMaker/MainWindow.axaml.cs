@@ -88,6 +88,8 @@ public partial class MainWindow : Window
         _history = new UndoStack(Canvas.Document);
         _history.StateChanged += SyncHistoryMenu;
 
+        SetUpAgents();
+
         KeyDown += OnWindowKeyDown;
         Closing += OnWindowClosing;
 
@@ -1421,6 +1423,13 @@ public partial class MainWindow : Window
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F12 && e.KeyModifiers == KeyModifiers.None)
+        {
+            ToggleChat();
+            e.Handled = true;
+            return;
+        }
+
         // Alt and an arrow nudges the selection from anywhere in the window. The page offers
         // the same on a bare arrow, but only while it holds the keyboard focus - after using
         // a toolbar box or a panel the arrows belong to whatever was touched last, and the

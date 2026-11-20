@@ -187,6 +187,13 @@
                 <MenuItem Header="_Properties panel" InputGesture="F10"
                           Click="OnTogglePropertiesClick" />
             </MenuItem>
+            <MenuItem Header="_AI">
+                <MenuItem x:Name="ChatMenuItem" Header="AI _Chat" InputGesture="F12" ToggleType="CheckBox" Click="OnToggleChatClick" />
+                <Separator />
+                <MenuItem x:Name="AllowAgentsMenuItem" Header="_Allow AI Agents (MCP)" ToggleType="CheckBox" Click="OnAllowAgentsClick" />
+                <MenuItem Header="_Connect an Agent..." Click="OnConnectAgentClick" />
+                <MenuItem Header="_Working Folder..." Click="OnWorkingFolderClick" />
+            </MenuItem>
         </Menu>
 
         <!-- Toolbar -->
@@ -270,6 +277,9 @@
         </Border>
 
         <!-- Properties -->
+        <!-- The AI Chat (F12, AI > AI Chat), made the first time it is shown: MainWindow.Agents.cs. -->
+        <Border x:Name="ChatHolder" DockPanel.Dock="Right" Width="440" IsVisible="False"
+                BorderBrush="{x:Static views:AppTheme.Border}" BorderThickness="1,0,0,0" />
         <Border x:Name="PropertiesPanel" DockPanel.Dock="Right" Width="236"
                 Background="{x:Static views:AppTheme.Panel}" BorderBrush="{x:Static views:AppTheme.Border}" BorderThickness="1,0,0,0" Padding="12,10">
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">

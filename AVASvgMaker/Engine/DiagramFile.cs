@@ -27,10 +27,11 @@ public static partial class DiagramFile
     /// 2 added connection ports and routing, 3 hand-placed bends, 4 the line style,
     /// 5 containers, 6 multiple pages, 7 a paper size per page, 8 lane heights,
     /// 9 the font a label is in, 10 grouping, 11 the margin guide, 12 rotation,
-    /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand.
+    /// 13 shapes carrying an outline of their own, 14 a connector's label moved by hand,
+    /// 20 a shape's lasting id (<see cref="DiagramShape.Uid"/>), which AI agents refer to it by.
     /// Older files still load.
     /// </summary>
-    public const int CurrentVersion = 19;
+    public const int CurrentVersion = 20;
 
     /// <summary>
     /// Serialisation is generated at build time rather than discovered by reflection, so the
@@ -124,6 +125,9 @@ public static partial class DiagramFile
     private sealed class ShapeRecord
     {
         public int Id { get; set; }
+
+        /// <summary>Version 20 onwards: the id that lasts from save to save (the one above is renumbered).</summary>
+        public string? Uid { get; set; }
         public string Kind { get; set; } = nameof(ShapeKind.Rectangle);
 
         /// <summary>Omitted for connectors, which are defined by their end points instead.</summary>
@@ -353,6 +357,7 @@ public static partial class DiagramFile
         var record = new ShapeRecord
         {
             Id = ids[shape],
+            Uid = string.IsNullOrEmpty(shape.Uid) ? null : shape.Uid,
             Kind = shape.Kind.ToString(),
             X = isConnector ? null : bounds.X,
             Y = isConnector ? null : bounds.Y,
@@ -608,6 +613,7 @@ public static partial class DiagramFile
         shape.TextVerticalAlign = Parse(record.TextVerticalAlign, Models.TextVerticalAlign.Middle);
         shape.GroupId = record.GroupId ?? 0;
         shape.Rotation = record.Rotation ?? 0;
+        shape.Uid = record.Uid ?? string.Empty;
 
         // Four numbers, or nothing at all for a label that simply fills its shape.
         if (record.TextFrame is { Length: 4 } frame)

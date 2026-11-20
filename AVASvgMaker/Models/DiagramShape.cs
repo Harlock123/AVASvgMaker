@@ -34,6 +34,12 @@ public abstract class DiagramShape
     public string Text { get; set; } = string.Empty;
 
     /// <summary>
+    /// An id that lasts from save to save and through undo ("s12"), by which AI agents refer to the shape. Empty until
+    /// an agent first looks; <c>Agents.ShapeIds</c> hands them out and keeps them unique.
+    /// </summary>
+    public string Uid { get; set; } = string.Empty;
+
+    /// <summary>
     /// The data the shape carries. Empty for most shapes; a shape that stands for something
     /// with facts attached to it keeps them here.
     /// </summary>

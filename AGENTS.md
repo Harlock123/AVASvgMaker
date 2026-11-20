@@ -15,6 +15,8 @@ subclasses draw themselves. It saves its own `.avadiag` format, exports SVG, PDF
 dotnet build AVASvgMaker.sln                      # needs the .NET 10 SDK (no global.json)
 dotnet test AVASvgMaker.Tests                     # headless (Avalonia.Headless): no window opens
 dotnet run --project AVASvgMaker/AVASvgMaker.csproj
+dotnet run --project AVASvgMaker/AVASvgMaker.csproj -- --mcp   # the MCP server on stdio, no window (--attach: the open window;
+                                                               # --http [ADDRESS:]PORT: over the network, with a token)
 AVASVG_SHOOT=1 dotnet test AVASvgMaker.Tests --filter FullyQualifiedName~Screenshots   # refresh Images/ window shots
 ./build.sh [--version 1.2.0] [--targets "win-x64 osx-arm64"] [--mode aot]               # publish into dist/
 ./make-guide.sh                                   # rebuild USERGUIDE.pdf from USERGUIDE.md (Tools/GuideBuilder)
@@ -36,6 +38,20 @@ highlighter), which is not on nuget.org yet. Keep it until it is.
   - `Svg*`, `Pdf*`, `Raster*`, `Mermaid*` and `Visio*` files do import and export.
   - `Preferences.cs` and `StencilLibrary.cs` keep settings and saved shapes.
 - `AVASvgMaker/Views/`: self-drawing controls and dialogs. `DrawingCanvas.cs` is the page and its tools.
+- `AVASvgMaker/Agents/`: AI agents and the AI Chat. Nothing below `Mcp/` and `Chat/` touches a window.
+  - `Mcp/`: the MCP server (ModelContextProtocol.Core, and .AspNetCore for the network door). `DiagramTools*.cs` are
+    the tools as `[McpServerTool]` methods; `DiagramServer.cs` the instructions every agent is told, the argument
+    checks and the recording of each session's changes; `Recipes.cs` the saved recipes. `Hosting.cs`: handlers touch
+    the drawing only through `IDiagramHost.RunAsync` and an `IDiagramSession` (the document, its `UndoStack`, its
+    file); `DiagramHost` runs each call on the UI thread, waiting while a dialog is open; `ShapeIds` hands out the
+    lasting ids agents use. `LiveListener`/`LiveBridge` (`--mcp --attach`), `NetworkListener` and `McpCommandLine` are
+    the same files as AVAPageStream's, CirqAvalonia's and AVA Modeler's, the names apart: fix them together.
+  - `Chat/`: the AI Chat's conversation and clients (Claude through the Anthropic SDK, or any OpenAI-compatible
+    server), keys, usage, saved chats and the in-process bridge to the server: a copy of AVA Modeler's
+    `AVAModeler.Chat` (by way of AVAPageStream), so a fix there may be wanted here.
+  - `ChatPanel.cs` (the panel, in `AppTheme`'s colours), `LiveAgents.cs` (the doors and hosts on the window),
+    `AgentMain.cs` (`--mcp`: Avalonia headless with Skia), `AgentSettings.cs` (`agents.json` beside `settings.json`).
+    `MainWindow.Agents.cs` is the AI menu, the chat's place on the right and Connect an Agent.
 - `AVASvgMaker.Tests/`: xUnit 2 tests driving the real window headlessly; `Harness.cs` has the helpers.
 - `Tools/GuideBuilder/`: turns `USERGUIDE.md` into `USERGUIDE.pdf` with Skia.
 - `manifests/`: the winget manifest submitted for each version (the package itself lives in microsoft/winget-pkgs).
@@ -52,7 +68,19 @@ highlighter), which is not on nuget.org yet. Keep it until it is.
 - **Tests drive real input.** Drag tests press, move and release through the headless platform rather than
   calling the method a drag would call. Keep new interaction tests that way.
 - **The test project is never published.** `build.sh` and the workflow publish `AVASvgMaker/AVASvgMaker.csproj`
-  by name. AOT builds (`--mode aot`) are not single files and cannot cross operating systems.
+  by name. AOT builds (`--mode aot`) are not single files and cannot cross operating systems. The MCP server and
+  the AI Chat bind their tools by reflection (the MCP SDK's attribute model), so they aren't expected to work in an
+  AOT build, which is never released; the released single-file builds are not trimmed.
+
+- **Agent tools.** Every change an agent makes goes through `DiagramTools.Edit`: one `BeginBatch`, so one undo step,
+  and the drawing put back whole if it throws. A batch is several calls squashed into one step afterwards
+  (`UndoStack.Squash`). Agents name shapes by `DiagramShape.Uid`, saved in the file; `ShapeIds.Ensure` gives every
+  shape one and keeps them unique (a paste brings a copy's). A new tool needs a `[Description]` on it and every
+  parameter (snake_case names) and a place in `AgentTests.ToolNames`; every recipe is run call by call by
+  `AgentTests`. `read_file` and every other path stay inside the working folder (`Workspace`).
+- **No real model, keys or pipe in tests.** `SettingsIsolation` moves `Preferences.Path` (and so `agents.json`, keys,
+  token and chats) to a temporary folder before any test; chat tests answer from `FakeModelServer`; test windows get
+  key stores of their own (`MainWindow.ChatKeys`) and pipes of their own (`AgentPipe`).
 
 ## Making a change
 
